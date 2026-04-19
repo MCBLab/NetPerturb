@@ -66,7 +66,7 @@ seuratObj <- ConstructNetwork(
   setDatExpr = FALSE, 
   overwrite_tom = TRUE, 
   tom_name = "network", 
-  minModuleSize = 100 
+  minModuleSize = 20
 )
 n_metacells <- ncol(GetMetacellObject(seuratObj))
 nome_arquivo <- paste0(cell_type, "_weight_hdWGCNA_", n_metacells, ".rds")

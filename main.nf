@@ -40,9 +40,8 @@ workflow {
         .collect()
         .set { rank_cells  }
     }
-    else if( network == 'hdwgcna' ) {
-        DOWNSAMPLE.out.seurat_downsample.set{ sc_down }
-        HDWGCNA( sc_down, column, n_cores  )
+    else if( network == 'hdwgcna' ) {     
+        HDWGCNA( sc_obj, column, n_cores )
         HDWGCNA.out.rank_obj
         .collect()
         .set { rank_cells  }

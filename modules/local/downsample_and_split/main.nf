@@ -19,6 +19,7 @@ process DOWNSAMPLE {
   output:
     path "*.RDS", emit: scrank_obj
     path "seurat_downsample.rds", emit: seurat_downsample
+    path "unique_cell_types.txt", emit: cell_types_list
 
   when:
   task.ext.when == null || task.ext.when  
@@ -26,7 +27,7 @@ process DOWNSAMPLE {
   script:
     """
     #!/bin/bash
-    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells}
+    downsample_and_split.R "${obj}" "${target}" "${column}" "${species}" "${n_cells}"
     """
 }
 

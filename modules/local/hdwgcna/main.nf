@@ -19,6 +19,6 @@ process HDWGCNA {
 
     script:
     """
-    hdwgcna.R ${sc_obj} ${column} ${n_cores} ${params.target}
+    hdwgcna.R "${sc_obj}" "${column}" "${n_cores}" "${params.target}"
     """
 }
