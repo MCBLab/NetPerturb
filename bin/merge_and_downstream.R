@@ -44,10 +44,8 @@ all_ranks <- data.frame()
 for (target_sc in targets) {
   message("Processing target: ", target_sc)
   
-  target_sc <- strsplit(target_sc, split = ";")[[1]]
-
   # Set the target
-  obj@para$target <- target_sc
+  obj@para$target <- strsplit(target_sc, split = ";")[[1]]
   
   # Try running rank_celltype
   tryCatch({
