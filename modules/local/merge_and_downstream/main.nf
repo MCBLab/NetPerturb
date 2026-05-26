@@ -13,7 +13,7 @@ process MERGE {
     path target
     val species
     val column
-    path rank_obj
+    path 'rank_obj/*'
 
   output:
     path "merged_obj.RDS", emit: merged_obj
@@ -24,8 +24,7 @@ process MERGE {
 
   script:
     """
-    #!/bin/bash
-    merge_and_downstream.R ${obj} ${target} ${species} ${column} ${rank_obj}
+    Rscript ${baseDir}/bin/merge_and_downstream.R ${obj} ${target} ${species} ${column} rank_obj/*
     """
 }
 

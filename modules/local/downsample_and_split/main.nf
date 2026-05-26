@@ -11,7 +11,7 @@ process DOWNSAMPLE {
 
   input:
     path obj
-    path target
+    val target
     val column
     val species
     val n_cells
@@ -24,8 +24,7 @@ process DOWNSAMPLE {
 
   script:
     """
-    #!/bin/bash
-    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells}
+    Rscript ${baseDir}/bin/downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells}
     """
 }
 

@@ -8,13 +8,12 @@ library(GENIE3)
 args <- commandArgs(trailingOnly = TRUE)
 
 seuratObj <- args[1]
-targets <- args[2]
+target <- args[2]
 species <- args[3]
 column <- args[4]
 rds_files <- args[5:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
-targets <- readLines(targets)
 target <- strsplit(targets[1], split = ";")[[1]]
 
 sc_objs <- lapply(rds_files, readRDS)
@@ -41,7 +40,7 @@ saveRDS(obj, "merged_obj.RDS")
 
 all_ranks <- data.frame()
 
-for (target_sc in targets) {
+for (target_sc in target) {
   message("Processing target: ", target_sc)
   
   # Set the target
