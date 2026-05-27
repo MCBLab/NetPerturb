@@ -14,7 +14,8 @@ column <- args[4]
 rds_files <- args[5:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
-target <- strsplit(targets[1], split = ";")[[1]]
+
+target_rank <- strsplit(targets[1], split = ";")[[1]]
 
 sc_objs <- lapply(rds_files, readRDS)
 
@@ -28,7 +29,7 @@ if (seuratObj == 'AML_object.rda') {
 obj <- CreateScRank(input = seuratObj,
                     species = species, 
                     cell_type = column,
-                    target = target)
+                    target = target_rank)
 
 obj@net <- sc_objs
 names(obj@net) <- cell_types
@@ -36,7 +37,6 @@ names(obj@net) <- cell_types
 obj@para$ct.keep = names(obj@net)
 
 saveRDS(obj, "merged_obj.RDS")
-
 
 all_ranks <- data.frame()
 
@@ -71,7 +71,7 @@ for (target_sc in target) {
 # Save results (even if partial)
 write.table(
   all_ranks, 
-  "perbscore_all_targets.txt", 
+  paste0("perbscore_all_targets.", gsub(";", "_", target), ".txt"), 
   quote = FALSE, 
   row.names = FALSE, 
   col.names = TRUE, 
