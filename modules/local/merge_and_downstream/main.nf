@@ -10,7 +10,7 @@ process MERGE {
 
   input:
     path obj
-    path target
+    val target
     val species
     val column
     path 'rank_obj/*'
