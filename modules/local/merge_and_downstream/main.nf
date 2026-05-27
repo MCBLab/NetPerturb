@@ -24,7 +24,8 @@ process MERGE {
 
   script:
     """
-    Rscript ${baseDir}/bin/merge_and_downstream.R ${obj} ${target} ${species} ${column} rank_obj/*
+   #!/bin/bash
+    merge_and_downstream.R ${obj} ${target} ${species} ${column} ${rank_obj}
     """
 }
 

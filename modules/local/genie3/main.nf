@@ -2,7 +2,6 @@ process GENIE3 {
  """
   Generates WGN based on scRank obj
  """
-tag "Cell: ${scobj.baseName} | Target: ${target_gene}"
 
   label "r_genie3"
 
@@ -12,7 +11,6 @@ tag "Cell: ${scobj.baseName} | Target: ${target_gene}"
   input:
     path scobj
     val n_cores
-    val target_gene
 
   output:
     path "*.rds", emit: rank_obj
@@ -22,6 +20,7 @@ tag "Cell: ${scobj.baseName} | Target: ${target_gene}"
 
   script:
     """
-  Rscript ${baseDir}/bin/genie3.R ${scobj} ${n_cores} ${target_gene}
+   #!/bin/bash
+    genie3.R ${scobj} ${n_cores} 
     """
 }

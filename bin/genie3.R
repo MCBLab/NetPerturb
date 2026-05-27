@@ -7,7 +7,6 @@ args <- commandArgs(trailingOnly = TRUE)
 
 seuratObj <- args[1]
 n_cores <- args[2]
-target_gene <- args[3]
 n_cores <- as.integer(n_cores)
 
 cell_type <- sub(".RDS", "", seuratObj)

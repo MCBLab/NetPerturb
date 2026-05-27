@@ -30,18 +30,15 @@ workflow {
     if( !(network in ['genie3', 'sctnet', 'scrank']) ) {
         error "Invalid --network '${params.network}'. Supported values: genie3 or sctnet"
     } 
-    list_targets = Channel
-	.fromPath(target)
-	.splitText(){ it.trim() }
 	
     DOWNSAMPLE( obj, target, column, species, n_cells )
-	
-ch_genie3_inputs = DOWNSAMPLE.out.scrank_obj
-        .flatten()
-        .combine(list_targets)
 
+    DOWNSAMPLE.out.scrank_obj
+    .flatten()
+    .set { sc_obj }
+    
     if( network == 'genie3' ) {
-       GENIE3( ch_genie3_inputs.map{ it[0] },n_cores, ch_genie3_inputs.map{ it[1] } )
+       GENIE3( sc_obj, n_cores )
 
         GENIE3.out.rank_obj
         .collect()
