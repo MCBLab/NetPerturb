@@ -25,6 +25,8 @@ workflow {
     n_cells = params.n_cells
     n_cores = params.n_cores
     target = file(params.target)
+    //create a list of targets from the input file, assuming one target per line
+    target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
     network = params.network
 
     if( !(network in ['genie3', 'sctnet', 'scrank']) ) {
@@ -59,6 +61,6 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target, species, column, rank_cells ) 
+    MERGE( obj, target_list, species, column, rank_cells ) 
 
 }
