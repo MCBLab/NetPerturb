@@ -17,6 +17,9 @@ cell_types <- sub("_weight.*", "", basename(rds_files))
 
 target_rank <- strsplit(target[1], split = ";")[[1]]
 
+#add a print statement to check the target variable before processing the targets
+print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
+
 sc_objs <- lapply(rds_files, readRDS)
 
 if (seuratObj == 'AML_object.rda') {
