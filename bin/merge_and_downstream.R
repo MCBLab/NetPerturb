@@ -15,7 +15,7 @@ rds_files <- args[5:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
-target_rank <- strsplit(targets[1], split = ";")[[1]]
+target_rank <- strsplit(target[1], split = ";")[[1]]
 
 sc_objs <- lapply(rds_files, readRDS)
 
