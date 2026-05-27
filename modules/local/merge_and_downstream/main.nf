@@ -13,7 +13,7 @@ process MERGE {
     val target
     val species
     val column
-    path 'rank_obj/*'
+    path rank_obj
 
   output:
     path "merged_obj.RDS", emit: merged_obj
