@@ -17,7 +17,7 @@ process MERGE {
 
   output:
     path "merged_obj.RDS", emit: merged_obj
-    path "perbscore_all_targets.txt", emit: rank_scores
+    path "perbscore_all_targets*.txt", emit: rank_scores
 
   when:
   task.ext.when == null || task.ext.when  
