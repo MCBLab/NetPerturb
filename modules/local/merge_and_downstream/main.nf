@@ -13,6 +13,7 @@ process MERGE {
     val target
     val species
     val column
+    val binding
     path rank_obj
 
   output:
@@ -25,7 +26,7 @@ process MERGE {
   script:
     """
    #!/bin/bash
-    merge_and_downstream.R ${obj} ${target} ${species} ${column} ${rank_obj}
+    merge_and_downstream.R ${obj} "${target}" ${species} ${column} ${binding} ${rank_obj}
     """
 }
 

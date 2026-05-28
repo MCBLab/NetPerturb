@@ -11,7 +11,8 @@ seuratObj <- args[1]
 target <- args[2]
 species <- args[3]
 column <- args[4]
-rds_files <- args[5:length(args)]
+binding <- args[5]
+rds_files <- args[6:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
@@ -62,6 +63,7 @@ if (!(target_sc %in% rownames(seuratObj))) {
     df_long <- data.frame(
       cell_type = cell_types,
       target = target_sc,
+      binding = binding,
       perb_score = as.numeric(perb_scores)
     )
     

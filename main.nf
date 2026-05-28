@@ -17,6 +17,8 @@ include { MERGE } from "./modules/local/merge_and_downstream/main.nf"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
+params.binding = "agonist"
+
 workflow {
 
     obj = file(params.obj)
@@ -61,6 +63,5 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target_list.join(";"), species, column, rank_cells ) 
-
+    MERGE( obj, target_list.join(";"), species, column, params.binding, rank_cells ) 
 }
