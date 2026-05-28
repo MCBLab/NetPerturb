@@ -61,6 +61,6 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target_list, species, column, rank_cells ) 
+    MERGE( obj, target_list.join(";"), species, column, rank_cells ) 
 
 }
