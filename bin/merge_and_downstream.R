@@ -24,7 +24,7 @@ sc_objs <- lapply(rds_files, readRDS)
 
 if (seuratObj == 'AML_object.rda') {
   load(seuratObj)
-  seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target),]
+  seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target_rank[1]),]
 } else {
   seuratObj <- readRDS(seuratObj)
 }
@@ -32,7 +32,7 @@ if (seuratObj == 'AML_object.rda') {
 obj <- CreateScRank(input = seuratObj,
                     species = species, 
                     cell_type = column,
-                    target = target_rank)
+                    target = target_rank[1])
 
 obj@net <- sc_objs
 names(obj@net) <- cell_types
@@ -43,11 +43,15 @@ saveRDS(obj, "merged_obj.RDS")
 
 all_ranks <- data.frame()
 
-for (target_sc in target) {
+for (target_sc in target_rank) {
   message("Processing target: ", target_sc)
-  
+if (!(target_sc %in% rownames(seuratObj))) {
+    message("Target ", target_sc, " not found in Seurat object. Skipping.")
+    next
+  }
+  message("Target ", target_sc, " found. Proceeding with rank_celltype.") 
   # Set the target
-  obj@para$target <- strsplit(target_sc, split = ";")[[1]]
+  obj@para$target <- target_sc
   
   # Try running rank_celltype
   tryCatch({
