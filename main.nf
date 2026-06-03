@@ -10,6 +10,7 @@ include { SCTENIFOLDNET } from "./modules/local/sctenifoldnet/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
 include { RANK_SCORE } from "./modules/local/rank_score/main.nf"
+include { MERGE } from "./modules/local/merge/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -63,4 +64,6 @@ workflow {
     }
 
     RANK_SCORE( obj, target_ch, species, column, params.binding, rank_cells ) 
+
+    MERGE( RANK_SCORE.out.rank_scores.collect() )
 }
