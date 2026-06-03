@@ -4,6 +4,7 @@ process MERGE {
   """
 
   label "r_scrank"
+  tag "$target"
 
   container "${ workflow.containerEngine == 'singularity' ? 'docker://juliaapolonio/scrank:latest':
             'docker.io/juliaapolonio/scrank:latest' }"
@@ -14,10 +15,9 @@ process MERGE {
     val species
     val column
     val binding
-    path rank_obj
+    path(rank_obj)
 
   output:
-    path "merged_obj.RDS", emit: merged_obj
     path "perbscore_all_targets*.txt", emit: rank_scores
 
   when:
@@ -29,4 +29,3 @@ process MERGE {
     merge_and_downstream.R ${obj} "${target}" ${species} ${column} ${binding} ${rank_obj}
     """
 }
-

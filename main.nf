@@ -27,6 +27,7 @@ workflow {
     target = file(params.target)
     //create a list of targets from the input file, assuming one target per line
     target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
+    target_ch = Channel.fromList(target_list)
     network = params.network
 
     if( !(network in ['genie3', 'sctnet', 'scrank']) ) {
@@ -61,5 +62,5 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target_list.join(";"), species, column, params.binding, rank_cells ) 
+    MERGE( obj, target_ch, species, column, params.binding, rank_cells ) 
 }

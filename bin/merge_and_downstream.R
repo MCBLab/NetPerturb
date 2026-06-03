@@ -17,6 +17,7 @@ rds_files <- args[6:length(args)]
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
 target_rank <- strsplit(target[1], split = ";")[[1]]
+target_id <- gsub("[^A-Za-z0-9_.-]+", "_", paste(target_rank, collapse = "_"))
 
 #add a print statement to check the target variable before processing the targets
 print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
@@ -40,19 +41,15 @@ names(obj@net) <- cell_types
 
 obj@para$ct.keep = names(obj@net)
 
-saveRDS(obj, "merged_obj.RDS")
+# saveRDS(obj, paste0("merged_obj.", target_id, ".RDS"))
 
 all_ranks <- data.frame()
 
-for (target_sc in target_rank) {
+for (target_sc in target) {
   message("Processing target: ", target_sc)
-if (!(target_sc %in% rownames(seuratObj))) {
-    message("Target ", target_sc, " not found in Seurat object. Skipping.")
-    next
-  }
   message("Target ", target_sc, " found. Proceeding with rank_celltype.") 
   # Set the target
-  obj@para$target <- target_sc
+  obj@para$target <- strsplit(target_sc, split = ";")[[1]]
   
   # Try running rank_celltype
   tryCatch({
@@ -80,7 +77,7 @@ if (!(target_sc %in% rownames(seuratObj))) {
 # Save results (even if partial)
 write.table(
   all_ranks, 
-  paste0("perbscore_all_targets.", gsub(";", "_", target), ".txt"), 
+  paste0("perbscore_all_targets.", target_id, ".txt"), 
   quote = FALSE, 
   row.names = FALSE, 
   col.names = TRUE, 
