@@ -1,4 +1,4 @@
-process MERGE {
+process RANK_SCORE {
   """
   Merge the networks and rank for each target
   """
@@ -26,6 +26,6 @@ process MERGE {
   script:
     """
    #!/bin/bash
-    merge_and_downstream.R ${obj} "${target}" ${species} ${column} ${binding} ${rank_obj}
+    rank_score.R ${obj} "${target}" ${species} ${column} ${binding} ${rank_obj}
     """
 }
