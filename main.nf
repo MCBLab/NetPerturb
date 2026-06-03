@@ -17,8 +17,6 @@ include { MERGE } from "./modules/local/merge_and_downstream/main.nf"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-params.binding = "agonist"
-
 workflow {
 
     obj = file(params.obj)
