@@ -11,7 +11,7 @@ The workflow executes the following core modules:
 ### 1. Object Parsing and Downsampling (`DOWNSAMPLE`)
 This is the initial step of the process. It ingests a fully processed Seurat object (`.rds`) and identifies the user-defined metadata column containing the cell identities (e.g., cell types or clones). To ensure statistical robustness and equitable GRN inference, it randomly downsamples the cells from each identity to a specified maximum number (`--n_cells`), balancing the computational load.
 
-### 2. Network Inference (`GENIE3`, `SCTENINFOLD`, `SCRANK`)
+### 2. Network Inference (`GENIE3`, `SCTENIFOLDNET`, `SCRANK`)
 This is the heavy-lifting computational core. For each downsampled cellular identity, the pipeline infers a gene regulatory network using the method selected with `--network`: `genie3` runs [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html), `sctnet` runs SCTENIFOLDNET, and `scrank` uses the scRank network strategy. Each method returns regulatory interaction weights between genes for each cell state.
 
 ### 3. Perturbation Scoring (`RANK_SCORE`)
