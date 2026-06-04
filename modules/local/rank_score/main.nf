@@ -1,31 +1,31 @@
-process MERGE {
+process RANK_SCORE {
   """
   Merge the networks and rank for each target
   """
 
   label "r_scrank"
+  tag "$target"
 
   container "${ workflow.containerEngine == 'singularity' ? 'docker://juliaapolonio/scrank:latest':
             'docker.io/juliaapolonio/scrank:latest' }"
 
   input:
     path obj
-    path target
+    val target
     val species
     val column
-    path rank_obj
+    val binding
+    path(rank_obj)
 
   output:
-    path "merged_obj.RDS", emit: merged_obj
-    path "perbscore_all_targets.txt", emit: rank_scores
+    path "perbscore_all_targets*.txt", emit: rank_scores
 
   when:
   task.ext.when == null || task.ext.when  
 
   script:
     """
-    #!/bin/bash
-    merge_and_downstream.R ${obj} ${target} ${species} ${column} ${rank_obj}
+   #!/bin/bash
+    rank_score.R ${obj} "${target}" ${species} ${column} ${binding} ${rank_obj}
     """
 }
-

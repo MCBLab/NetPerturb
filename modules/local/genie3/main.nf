@@ -1,7 +1,7 @@
 process GENIE3 {
-  """
+ """
   Generates WGN based on scRank obj
-  """
+ """
 
   label "r_genie3"
 
@@ -20,7 +20,7 @@ process GENIE3 {
 
   script:
     """
-    #!/bin/bash
+   #!/bin/bash
     genie3.R ${scobj} ${n_cores} 
     """
 }

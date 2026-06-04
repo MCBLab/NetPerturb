@@ -8,20 +8,25 @@ library(GENIE3)
 args <- commandArgs(trailingOnly = TRUE)
 
 seuratObj <- args[1]
-targets <- args[2]
+target <- args[2]
 species <- args[3]
 column <- args[4]
-rds_files <- args[5:length(args)]
+binding <- args[5]
+rds_files <- args[6:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
-targets <- readLines(targets)
-target <- strsplit(targets[1], split = ";")[[1]]
+
+target_rank <- strsplit(target[1], split = ";")[[1]]
+target_id <- gsub("[^A-Za-z0-9_.-]+", "_", paste(target_rank, collapse = "_"))
+
+#add a print statement to check the target variable before processing the targets
+print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
 
 sc_objs <- lapply(rds_files, readRDS)
 
 if (seuratObj == 'AML_object.rda') {
   load(seuratObj)
-  seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target),]
+  seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target_rank[1]),]
 } else {
   seuratObj <- readRDS(seuratObj)
 }
@@ -29,21 +34,20 @@ if (seuratObj == 'AML_object.rda') {
 obj <- CreateScRank(input = seuratObj,
                     species = species, 
                     cell_type = column,
-                    target = target)
+                    target = target_rank[1])
 
 obj@net <- sc_objs
 names(obj@net) <- cell_types
 
 obj@para$ct.keep = names(obj@net)
 
-saveRDS(obj, "merged_obj.RDS")
-
+# saveRDS(obj, paste0("merged_obj.", target_id, ".RDS"))
 
 all_ranks <- data.frame()
 
-for (target_sc in targets) {
+for (target_sc in target) {
   message("Processing target: ", target_sc)
-  
+  message("Target ", target_sc, " found. Proceeding with rank_celltype.") 
   # Set the target
   obj@para$target <- strsplit(target_sc, split = ";")[[1]]
   
@@ -56,6 +60,7 @@ for (target_sc in targets) {
     df_long <- data.frame(
       cell_type = cell_types,
       target = target_sc,
+      binding = binding,
       perb_score = as.numeric(perb_scores)
     )
     
@@ -72,7 +77,7 @@ for (target_sc in targets) {
 # Save results (even if partial)
 write.table(
   all_ranks, 
-  "perbscore_all_targets.txt", 
+  paste0("perbscore_all_targets.", target_id, ".txt"), 
   quote = FALSE, 
   row.names = FALSE, 
   col.names = TRUE, 
