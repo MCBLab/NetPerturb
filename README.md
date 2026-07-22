@@ -1,8 +1,8 @@
-# NF_scRank 🧬
+# NetPerturb 🧬
 
-**MCBLab/NF_scRank** is a scalable Nextflow pipeline designed to infer Gene Regulatory Networks (GRNs) and calculate single-cell expression ranking perturbation scores using the scRank algorithm. 
+**MCBLab/NetPerturb** is a scalable Nextflow pipeline designed to infer Gene Regulatory Networks (GRNs) and calculate single-cell expression ranking perturbation scores using the scRank algorithm. 
 
-Previous GRN tools are often difficult to scale for large Single-Cell RNA-seq (scRNA-seq) datasets. In this context, `NF_scRank` was built to enable high-throughput perturbation scoring in a user-friendly, parallelized, and computationally effective way. The pipeline uses Singularity containers, making installation trivial and results highly reproducible across high-performance computing (HPC) environments.
+Previous GRN tools are often difficult to scale for large Single-Cell RNA-seq (scRNA-seq) datasets. In this context, `NetPerturb` was built to enable high-throughput perturbation scoring in a user-friendly, parallelized, and computationally effective way. The pipeline uses Singularity containers, making installation trivial and results highly reproducible across high-performance computing (HPC) environments.
 
 ## Pipeline Summary
 
@@ -27,11 +27,11 @@ This final step collects the perturbation scores from all parallel GENIE3 tasks 
 
 ```bash
 # Quick example
-nextflow run nf_scrank/main.nf \
+nextflow run netperturb/main.nf \
   profile test,singularity
 
 # Example with all parameters
-nextflow run nf_scrank/main.nf \
+nextflow run netperturb/main.nf \
   --obj /path/to/your/seurat_object.rds \
   --column clone_annotation \
   --species human \
@@ -46,7 +46,7 @@ nextflow run nf_scrank/main.nf \
 ``` 
 
 ### Inputs and References
-NF_scRank requires the following main parameters:
+NetPerturb requires the following main parameters:
 
 `--obj`: Path to a fully processed Seurat object (`.rds` or compatible serialized object) containing normalized RNA assays and metadata annotations.
 
@@ -92,7 +92,7 @@ resistant	Cstdc5	antagonist	2.91128461301128e-06
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
 
 ### Credits
-NF_scRank is developed and maintained by the Marques-Coelho Bioinformatics Lab(MCBLab).
+NetPerturb is developed and maintained by the Marques-Coelho Bioinformatics Lab(MCBLab).
 
 ### Citations
 If you use this pipeline in your research, please cite:
