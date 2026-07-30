@@ -178,8 +178,8 @@ DT::datatable(
 f <- paste(rep("`", 3), collapse = "")
 
 net_template <- paste0(
-  "### {{ct}}\n\n",
-  f, "{r net-{{idx}}, fig.width=9, fig.height=7}\n",
+  "### {{tgt}} — {{ct}}\n\n",
+  f, "{r net-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
   'plot_net(objs[["{{tgt}}"]], mode = "network", celltype = "{{ct}}")\n',
   f, "\n\n"
 )
@@ -202,8 +202,8 @@ for (tgt in names(objs)) {   # itera apenas sobre targets que tiveram init_mod c
 f <- paste(rep("`", 3), collapse = "")
 
 hm_template <- paste0(
-  "### {{ct}}\n\n",
-  f, "{r hm-{{idx}}, fig.width=9, fig.height=7}\n",
+  "### {{tgt}} — {{ct}}\n\n",
+  f, "{r hm-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
   'plot_net(objs[["{{tgt}}"]], mode = "heatmap", celltype = "{{ct}}")\n',
   f, "\n\n"
 )
@@ -230,7 +230,7 @@ f <- paste(rep("`", 3), collapse = "")
 
 delta_template <- paste0(
   "### {{tgt}}\n\n",
-  f, "{r delta-{{idx}}, fig.width=10, fig.height=7}\n",
+  f, "{r delta-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
   ".delta_plot_nf_scrank(objs[[\"{{tgt}}\"]], top_ct = top_ct_por_target[[\"{{tgt}}\"]],",
   " bot_ct = bot_ct_por_target[[\"{{tgt}}\"]])\n",
   f, "\n\n"
