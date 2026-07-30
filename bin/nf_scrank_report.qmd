@@ -22,8 +22,15 @@ library(Seurat)
 library(scRank)
 library(dplyr)
 library(DT)
-library(pheatmap)
 library(ggpubr)
+
+# `library(Seurat)` carrega `future` como dependência, e o `.onLoad()` do
+# future detecta heuristicamente um ambiente de "R CMD check" (por ausência
+# de NOT_CRAN) e força _R_CHECK_LIMIT_CORES_=TRUE. Isso faz
+# parallel::mclapply() (usado por scRank::rank_celltype) abortar com "N
+# simultaneous processes spawned" para n.core > 2. Só dá pra limpar DEPOIS
+# de carregar as libs — limpar antes não sobrevive ao library(Seurat).
+Sys.setenv("_R_CHECK_LIMIT_CORES_" = "")
 
 obj_base   <- readRDS(params$merged_obj)
 target_vec <- strsplit(params$target, ";")[[1]]
