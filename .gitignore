@@ -13,4 +13,4 @@ nf-test
 test.nf
 site
 CLAUDE.md
-logs/nf_scrank_*
+logs/
