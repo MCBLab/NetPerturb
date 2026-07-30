@@ -1,5 +1,5 @@
 ---
-title: "NF_scRank"
+title: "NetPerturb"
 format:
   dashboard:
     theme: flatly
@@ -103,7 +103,7 @@ for (tgt in target_vec) {
     df <- data.frame(
       Target    = tgt,
       Regulated = names(obj@para$gene_clusters),
-      Modulo    = paste0("M", obj@para$gene_clusters),
+      Module    = paste0("M", obj@para$gene_clusters),
       CellType  = ct,
       stringsAsFactors = FALSE
     ) |>
@@ -111,7 +111,7 @@ for (tgt in target_vec) {
       dplyr::rowwise() |>
       dplyr::mutate(`abs(cor)` = get_cor_val(rede, tgt, Regulated)) |>
       dplyr::ungroup() |>
-      dplyr::mutate(.mod_num = as.integer(sub("M", "", Modulo))) |>
+      dplyr::mutate(.mod_num = as.integer(sub("M", "", Module))) |>
       dplyr::arrange(.mod_num, dplyr::desc(`abs(cor)`)) |>
       dplyr::select(-.mod_num)
 
@@ -120,21 +120,44 @@ for (tgt in target_vec) {
 }
 
 tabela_completa <- dplyr::bind_rows(unlist(tabelas, recursive = FALSE))
-```
 
-# Visão Geral e Dados {icon="table"}
+# Como o número de targets/celltypes pode crescer bastante, as páginas abaixo
+# usam seletores (dropdown/datalist) em vez de caixas/abas fixas que não
+# escalam. Usamos JS "clássico" (<script>, sem type="module") em vez do
+# runtime OJS do Quarto porque OJS depende de ES modules, que os navegadores
+# bloqueiam em URLs file:// — e o relatório é pensado pra ser baixado e
+# aberto localmente, não servido por um servidor web.
+ref_df <- data.frame(
+  target = names(top_ct_por_target),
+  top_ct = unlist(top_ct_por_target, use.names = FALSE),
+  bot_ct = unlist(bot_ct_por_target, use.names = FALSE),
+  stringsAsFactors = FALSE
+)
 
-## Row
+html_escape <- function(x) gsub('"', "&quot;", x, fixed = TRUE)
 
-```{r}
-#| content: valuebox
-#| title: "Target"
-list(
-  icon  = "bullseye",
-  color = "primary",
-  value = params$target
+options_html <- function(values) {
+  paste0('<option value="', html_escape(values), '">', html_escape(values), '</option>', collapse = "\n")
+}
+
+# Sem essa estilagem explícita, o reset CSS do Bootstrap (tema "flatly" do
+# Quarto) deixa um <select> puro praticamente invisível (encolhe pra uma
+# caixinha sem espaço pro texto) — precisa da classe form-select + largura
+# manual pra ficar legível.
+select_style <- 'style="display:inline-block; width:auto; min-width:150px; padding:6px; font-size:1.05em;"'
+
+ref_json <- paste0(
+  "{", paste0(
+    '"', html_escape(ref_df$target), '":{"top_ct":"', html_escape(ref_df$top_ct),
+    '","bot_ct":"', html_escape(ref_df$bot_ct), '"}',
+    collapse = ","
+  ), "}"
 )
 ```
+
+# Overview & Data {icon="table"}
+
+## Row {height="20%"}
 
 ```{r}
 #| content: valuebox
@@ -147,19 +170,41 @@ list(
 ```
 
 ```{r}
-#| content: valuebox
-#| title: "Referência (top_celltype)"
-list(
-  icon  = "star",
-  color = "success",
-  value = paste(unlist(top_ct_por_target), collapse = ", ")
-)
+#| title: "Target"
+#| results: asis
+cat(paste0(
+  '<input list="targets-list-1" id="target-input-1" value="', html_escape(names(objs)[1]),
+  '" style="width:95%; padding:6px; font-size:1.1em;">\n',
+  '<datalist id="targets-list-1">\n', options_html(names(objs)), '\n</datalist>'
+))
+```
+
+```{r}
+#| title: "Reference (top_celltype)"
+#| results: asis
+cat(paste0(
+  '<div id="ref-output-1" style="font-size:1.15em; padding-top:0.3em;"></div>\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var refData = ', ref_json, ';\n',
+  '  var input   = document.getElementById("target-input-1");\n',
+  '  var output  = document.getElementById("ref-output-1");\n',
+  '  function update() {\n',
+  '    var d = refData[input.value];\n',
+  '    if (d) output.innerHTML = "<b>Top:</b> " + d.top_ct + " &nbsp;|&nbsp; <b>Bottom:</b> " + d.bot_ct;\n',
+  '  }\n',
+  '  input.addEventListener("input", update);\n',
+  '  input.addEventListener("focus", function() { input.value = ""; });\n',
+  '  update();\n',
+  '})();\n',
+  '</script>'
+))
 ```
 
 ## Row
 
 ```{r}
-#| title: "Módulos Regulatórios Independentes ranqueados por Força de Ligação"
+#| title: "Independent regulatory modules ranked by binding strength"
 DT::datatable(
   tabela_completa,
   options  = list(pageLength = 10, autoWidth = TRUE),
@@ -167,74 +212,89 @@ DT::datatable(
 ) |> DT::formatRound("abs(cor)", digits = 4)
 ```
 
-# Mapas de Rede {icon="diagram-2"}
+# Network Maps {icon="diagram-2"}
 
-## Row {.tabset}
-
-```{r network-tabs, results='asis'}
-# Triple backticks não podem aparecer literalmente dentro de um code chunk no
-# Quarto — o preprocessor os interpreta como fechamento de fence. Por isso o
-# template é construído via paste0 com backticks gerados em runtime.
+```{r network-gen, results='asis'}
+# Gera os PNGs de cada combinação target x celltype sem exibi-los inline
+# (fig.show='hide' ainda salva o arquivo em *_files/figure-html/, só não
+# insere a imagem na posição do chunk). A página abaixo usa dois seletores
+# (target, celltype) para trocar qual imagem fica visível — evita uma
+# barra de abas larga que não escala com muitos targets/celltypes.
 f <- paste(rep("`", 3), collapse = "")
 
 net_template <- paste0(
-  "### {{tgt}} — {{ct}}\n\n",
-  f, "{r net-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
+  f, "{r net-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
   'plot_net(objs[["{{tgt}}"]], mode = "network", celltype = "{{ct}}")\n',
   f, "\n\n"
 )
 
-idx <- 0L
-for (tgt in names(objs)) {   # itera apenas sobre targets que tiveram init_mod com sucesso
+for (tgt in names(objs)) {
   for (ct in celltypes) {
-    idx     <- idx + 1L
-    expanded <- knitr::knit_expand(text = net_template, tgt = tgt, ct = ct, idx = idx)
+    expanded <- knitr::knit_expand(text = net_template, tgt = tgt, ct = ct)
     cat(knitr::knit_child(text = expanded, quiet = TRUE))
   }
 }
+```
+
+## Row {height="15%"}
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<label>Target: <select id="target-select-net" class="form-select" ', select_style, '>\n',
+  options_html(names(objs)), '\n</select></label>\n',
+  '&nbsp;&nbsp;\n',
+  '<label>Cell Type: <select id="celltype-select-net" class="form-select" ', select_style, '>\n',
+  options_html(celltypes), '\n</select></label>'
+))
+```
+
+## Row
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<img id="net-img" src="nf_scrank_report_files/figure-html/net-', html_escape(names(objs)[1]), '-',
+  html_escape(celltypes[1]), '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var t = document.getElementById("target-select-net");\n',
+  '  var c = document.getElementById("celltype-select-net");\n',
+  '  var img = document.getElementById("net-img");\n',
+  '  function update() {\n',
+  '    img.src = "nf_scrank_report_files/figure-html/net-" + t.value + "-" + c.value + "-1.png";\n',
+  '  }\n',
+  '  t.addEventListener("change", update);\n',
+  '  c.addEventListener("change", update);\n',
+  '})();\n',
+  '</script>'
+))
 ```
 
 # Heatmaps {icon="grid"}
 
-## Row {.tabset}
-
-```{r heatmap-tabs, results='asis'}
+```{r heatmap-gen, results='asis'}
 f <- paste(rep("`", 3), collapse = "")
 
 hm_template <- paste0(
-  "### {{tgt}} — {{ct}}\n\n",
-  f, "{r hm-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
+  f, "{r hm-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
   'plot_net(objs[["{{tgt}}"]], mode = "heatmap", celltype = "{{ct}}")\n',
   f, "\n\n"
 )
 
-idx <- 100L
 for (tgt in names(objs)) {
   for (ct in celltypes) {
-    idx      <- idx + 1L
-    expanded <- knitr::knit_expand(text = hm_template, tgt = tgt, ct = ct, idx = idx)
+    expanded <- knitr::knit_expand(text = hm_template, tgt = tgt, ct = ct)
     cat(knitr::knit_child(text = expanded, quiet = TRUE))
   }
 }
 ```
 
-## Row {.tabset}
-
-```{r delta-cor-tabs, results='asis'}
+```{r delta-gen, results='asis'}
 # Painel Δcor: |cor_top_ct| - |cor_bot_ct| para os genes da subnet (order_gene).
 # Evidencia quais genes e módulos têm correlação diferencial entre o celltype mais
 # afetado (top_ct, maior rank de perturbação) e o menos afetado (bot_ct).
 # Escala divergente: positivo = correlação mais forte em top_ct, negativo = em bot_ct.
-
-f <- paste(rep("`", 3), collapse = "")
-
-delta_template <- paste0(
-  "### {{tgt}}\n\n",
-  f, "{r delta-{{idx}}, fig.width=10, fig.height=7, out.width=\"100%\"}\n",
-  ".delta_plot_nf_scrank(objs[[\"{{tgt}}\"]], top_ct = top_ct_por_target[[\"{{tgt}}\"]],",
-  " bot_ct = bot_ct_por_target[[\"{{tgt}}\"]])\n",
-  f, "\n\n"
-)
 
 .delta_plot_nf_scrank <- function(obj, top_ct, bot_ct) {
   genes   <- obj@para$order_gene
@@ -286,10 +346,82 @@ delta_template <- paste0(
   ))
 }
 
-idx_d <- 200L
+f <- paste(rep("`", 3), collapse = "")
+
+delta_template <- paste0(
+  f, "{r delta-{{tgt}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
+  ".delta_plot_nf_scrank(objs[[\"{{tgt}}\"]], top_ct = top_ct_por_target[[\"{{tgt}}\"]],",
+  " bot_ct = bot_ct_por_target[[\"{{tgt}}\"]])\n",
+  f, "\n\n"
+)
+
 for (tgt in names(objs)) {
-  idx_d   <- idx_d + 1L
-  expanded <- knitr::knit_expand(text = delta_template, tgt = tgt, idx = idx_d)
+  expanded <- knitr::knit_expand(text = delta_template, tgt = tgt)
   cat(knitr::knit_child(text = expanded, quiet = TRUE))
 }
+```
+
+## Row {height="15%"}
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(names(objs)), '\n</select></label>\n',
+  '&nbsp;&nbsp;\n',
+  '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(celltypes), '\n</select></label>'
+))
+```
+
+## Row
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<img id="hm-img" src="nf_scrank_report_files/figure-html/hm-', html_escape(names(objs)[1]), '-',
+  html_escape(celltypes[1]), '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var t = document.getElementById("target-select-hm");\n',
+  '  var c = document.getElementById("celltype-select-hm");\n',
+  '  var img = document.getElementById("hm-img");\n',
+  '  function update() {\n',
+  '    img.src = "nf_scrank_report_files/figure-html/hm-" + t.value + "-" + c.value + "-1.png";\n',
+  '  }\n',
+  '  t.addEventListener("change", update);\n',
+  '  c.addEventListener("change", update);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+## Row {height="15%"}
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<label>Target (Δcor top_ct − bot_ct): <select id="target-select-delta" class="form-select" ',
+  select_style, '>\n', options_html(names(objs)), '\n</select></label>'
+))
+```
+
+## Row
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<img id="delta-img" src="nf_scrank_report_files/figure-html/delta-', html_escape(names(objs)[1]),
+  '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var t = document.getElementById("target-select-delta");\n',
+  '  var img = document.getElementById("delta-img");\n',
+  '  function update() {\n',
+  '    img.src = "nf_scrank_report_files/figure-html/delta-" + t.value + "-1.png";\n',
+  '  }\n',
+  '  t.addEventListener("change", update);\n',
+  '})();\n',
+  '</script>'
+))
 ```
