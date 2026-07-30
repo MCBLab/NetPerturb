@@ -9,7 +9,8 @@ include { GENIE3 } from "./modules/local/genie3/main.nf"
 include { SCTENIFOLDNET } from "./modules/local/sctenifoldnet/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
-include { MERGE } from "./modules/local/merge_and_downstream/main.nf"
+include { RANK_SCORE } from "./modules/local/rank_score/main.nf"
+include { MERGE } from "./modules/local/merge/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
 
 /*
@@ -29,6 +30,7 @@ workflow {
     target = file(params.target)
     //create a list of targets from the input file, assuming one target per line
     target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
+    target_ch = Channel.fromList(target_list)
     network = params.network
 
     if( !(network in ['genie3', 'sctnet', 'scrank']) ) {
@@ -63,12 +65,18 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target_list.join(";"), species, column, params.binding, rank_cells )
+    RANK_SCORE( obj, target_ch, species, column, params.binding, rank_cells )
+
+    MERGE( RANK_SCORE.out.rank_scores.collect() )
 
     if( params.render_report ) {
         qmd_template = file(params.report_qmd)
         logo         = file(params.report_logo)
 
-        REPORT( MERGE.out.merged_obj, qmd_template, logo, target_list.join(";"), params.report_n_cores )
+        // RANK_SCORE roda em paralelo (um por target) e cada instância reconstrói o
+        // mesmo obj@net (target-independente, vem do mesmo rank_cells de entrada) —
+        // só obj@para$target muda entre elas. Basta pegar UM merged_obj.RDS pro
+        // REPORT, que já itera sobre todos os targets internamente.
+        REPORT( RANK_SCORE.out.merged_obj.first(), qmd_template, logo, target_list.join(";"), params.report_n_cores )
     }
 }
