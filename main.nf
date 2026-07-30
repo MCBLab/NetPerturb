@@ -10,6 +10,7 @@ include { SCTENIFOLDNET } from "./modules/local/sctenifoldnet/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
 include { MERGE } from "./modules/local/merge_and_downstream/main.nf"
+include { REPORT } from "./modules/local/report/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -62,5 +63,12 @@ workflow {
         .set { rank_cells  }
     }
 
-    MERGE( obj, target_list.join(";"), species, column, params.binding, rank_cells ) 
+    MERGE( obj, target_list.join(";"), species, column, params.binding, rank_cells )
+
+    if( params.render_report ) {
+        qmd_template = file(params.report_qmd)
+        logo         = file(params.report_logo)
+
+        REPORT( MERGE.out.merged_obj, qmd_template, logo, target_list.join(";"), params.report_n_cores )
+    }
 }
