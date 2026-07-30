@@ -11,16 +11,17 @@ process GENIE3 {
   input:
     path scobj
     val n_cores
+    val n_trees
 
   output:
     path "*.rds", emit: rank_obj
 
   when:
-  task.ext.when == null || task.ext.when  
+  task.ext.when == null || task.ext.when
 
   script:
     """
    #!/bin/bash
-    genie3.R ${scobj} ${n_cores} 
+    genie3.R ${scobj} ${n_cores} ${n_trees}
     """
 }

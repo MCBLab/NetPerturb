@@ -24,6 +24,7 @@ workflow {
     species = params.species
     n_cells = params.n_cells
     n_cores = params.n_cores
+    n_trees = params.n_trees
     target = file(params.target)
     //create a list of targets from the input file, assuming one target per line
     target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
@@ -40,7 +41,7 @@ workflow {
     .set { sc_obj }
     
     if( network == 'genie3' ) {
-       GENIE3( sc_obj, n_cores )
+       GENIE3( sc_obj, n_cores, n_trees )
 
         GENIE3.out.rank_obj
         .collect()

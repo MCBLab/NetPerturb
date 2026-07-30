@@ -12,3 +12,5 @@ nf-test
 .nf-test.log
 test.nf
 site
+CLAUDE.md
+logs/nf_scrank_*
