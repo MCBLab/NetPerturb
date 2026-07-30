@@ -30,7 +30,7 @@ nextflow run main.nf \
   --obj ../data/vehicle_processed2.rds \
   --column annotation \
   --species mouse \
-  --n_cells 4000 \
+  --n_cells 100 \
   --n_cores 32 \
   --n_trees 50 \
   --target ../alvos.txt \
