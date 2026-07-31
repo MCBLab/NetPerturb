@@ -15,7 +15,7 @@ params:
   n_cores: 1
 ---
 
-```{r setup}
+```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 
 library(Seurat)
@@ -109,10 +109,10 @@ for (tgt in target_vec) {
     ) |>
       dplyr::filter(Regulated %in% obj@para$subnet_node, Regulated != tgt) |>
       dplyr::rowwise() |>
-      dplyr::mutate(`abs(cor)` = get_cor_val(rede, tgt, Regulated)) |>
+      dplyr::mutate(`Absolute correlation` = get_cor_val(rede, tgt, Regulated)) |>
       dplyr::ungroup() |>
       dplyr::mutate(.mod_num = as.integer(sub("M", "", Module))) |>
-      dplyr::arrange(.mod_num, dplyr::desc(`abs(cor)`)) |>
+      dplyr::arrange(.mod_num, dplyr::desc(`Absolute correlation`)) |>
       dplyr::select(-.mod_num)
 
     tabelas[[tgt]][[ct]] <- df
@@ -160,16 +160,6 @@ ref_json <- paste0(
 ## Row {height="20%"}
 
 ```{r}
-#| content: valuebox
-#| title: "Cell Types"
-list(
-  icon  = "diagram-3",
-  color = "info",
-  value = length(celltypes)
-)
-```
-
-```{r}
 #| title: "Target"
 #| results: asis
 cat(paste0(
@@ -180,10 +170,31 @@ cat(paste0(
 ```
 
 ```{r}
-#| title: "Reference (top_celltype)"
+#| content: valuebox
+#| title: "Cell Types"
+list(
+  icon  = "diagram-3",
+  color = "info",
+  value = length(celltypes)
+)
+```
+
+```{r}
 #| results: asis
+# Reproduz manualmente o HTML/CSS que o Quarto gera pra um valuebox nativo
+# (`#| content: valuebox`), porque essas só suportam um valor estático — a
+# nossa precisa reagir à seleção de target via JS, então não dá pra usar o
+# mecanismo nativo diretamente.
 cat(paste0(
-  '<div id="ref-output-1" style="font-size:1.15em; padding-top:0.3em;"></div>\n',
+  '<div class="card valuebox cell html-fill-item html-fill-container bslib-card bslib-value-box bg-success showcase-left-center" ',
+  'style="background-color:#18bc9c !important; color:#fff;">\n',
+  '<div class="card-body html-fill-item html-fill-container">\n',
+  '<div data-icon="star" class="html-fill-item html-fill-container value-box-grid">\n',
+  '<div class="value-box-showcase html-fill-item html-fill-container"><i class="bi bi-star"></i></div>\n',
+  '<div class="value-box-area">\n',
+  '<p class="value-box-title">Reference</p>\n',
+  '<p class="value-box-value"><div id="ref-output-1" style="font-size:0.55em; line-height:1.5;"></div></p>\n',
+  '</div>\n</div>\n</div>\n</div>\n',
   '<script>\n',
   '(function() {\n',
   '  var refData = ', ref_json, ';\n',
@@ -191,7 +202,7 @@ cat(paste0(
   '  var output  = document.getElementById("ref-output-1");\n',
   '  function update() {\n',
   '    var d = refData[input.value];\n',
-  '    if (d) output.innerHTML = "<b>Top:</b> " + d.top_ct + " &nbsp;|&nbsp; <b>Bottom:</b> " + d.bot_ct;\n',
+  '    if (d) output.innerHTML = "Sensitive: " + d.bot_ct + "<br>Resistant: " + d.top_ct;\n',
   '  }\n',
   '  input.addEventListener("input", update);\n',
   '  input.addEventListener("focus", function() { input.value = ""; });\n',
@@ -204,12 +215,12 @@ cat(paste0(
 ## Row
 
 ```{r}
-#| title: "Independent regulatory modules ranked by binding strength"
+#| title: "Independent regulatory modules ranked by absolute correlation"
 DT::datatable(
   tabela_completa,
   options  = list(pageLength = 10, autoWidth = TRUE),
   rownames = FALSE
-) |> DT::formatRound("abs(cor)", digits = 4)
+) |> DT::formatRound("Absolute correlation", digits = 4)
 ```
 
 # Network Maps {icon="diagram-2"}
