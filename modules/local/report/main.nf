@@ -7,8 +7,6 @@ process REPORT {
 
   container params.report_container
 
-  containerOptions "--bind ${params.report_r_libs_user}:${params.report_r_libs_user}"
-
   input:
     path merged_obj
     path qmd_template, stageAs: 'template.qmd'
@@ -26,7 +24,6 @@ process REPORT {
   script:
     """
     #!/bin/bash
-    export R_LIBS_USER="${params.report_r_libs_user}"
     export XDG_CACHE_HOME="\$PWD/.cache"
     mkdir -p "\$XDG_CACHE_HOME"
     cp ${qmd_template} nf_scrank_report.qmd
