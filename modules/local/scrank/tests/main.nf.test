@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "SCRANK"
+    script "modules/local/scrank/main.nf"
+    process "SCRANK"
+
+    test("names its output so rank_score.R can recover the cell type") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/sensitive.RDS")
+                input[1] = "mouse"
+                input[2] = file("\${projectDir}/testdata/test_input.txt")
+                input[3] = "labels"
+                input[4] = 1
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.rank_obj.size() == 1
+
+            def name = file(process.out.rank_obj[0]).name
+            assert name == "sensitive_weight_SCRANK_100.rds"
+            assert name.replaceFirst(/_weight.*/, "") == "sensitive"
+        }
+    }
+}

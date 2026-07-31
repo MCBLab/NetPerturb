@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "GENIE3"
+    script "modules/local/genie3/main.nf"
+    process "GENIE3"
+
+    test("names its output so rank_score.R can recover the cell type") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/sensitive.RDS")
+                input[1] = 1
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.rank_obj.size() == 1
+
+            def name = file(process.out.rank_obj[0]).name
+            assert name == "sensitive_weight_GENIE3_100.rds"
+
+            // rank_score.R recovers the cell type with sub("_weight.*", ""),
+            // so the _weight_ separator is a contract between the two files
+            assert name.replaceFirst(/_weight.*/, "") == "sensitive"
+        }
+    }
+}

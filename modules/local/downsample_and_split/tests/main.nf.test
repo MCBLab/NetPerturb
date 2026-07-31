@@ -1,0 +1,34 @@
+nextflow_process {
+
+    name "DOWNSAMPLE"
+    script "modules/local/downsample_and_split/main.nf"
+    process "DOWNSAMPLE"
+
+    test("emits one object per cell identity") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/dummy_obj.rds")
+                input[1] = file("\${projectDir}/testdata/test_input.txt")
+                input[2] = "labels"
+                input[3] = "mouse"
+                input[4] = 100
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // the glob emits every identity as one list, which is why main.nf
+            // has to flatten this channel before fanning out to the network step
+            assert process.out.scrank_obj.size() == 1
+
+            def names = process.out.scrank_obj[0].collect { file(it).name }.sort()
+            assert names == ["resistant.RDS", "sensitive.RDS"]
+        }
+    }
+}

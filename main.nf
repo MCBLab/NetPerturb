@@ -8,6 +8,7 @@
 include { GENIE3 } from "./modules/local/genie3/main.nf"
 include { SCTENIFOLDNET } from "./modules/local/sctenifoldnet/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
+include { HDWGCNA } from "./modules/local/hdwgcna/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
 include { RANK_SCORE } from "./modules/local/rank_score/main.nf"
 include { MERGE } from "./modules/local/merge/main.nf"
@@ -31,9 +32,9 @@ workflow {
     target_ch = Channel.fromList(target_list)
     network = params.network
 
-    if( !(network in ['genie3', 'sctnet', 'scrank']) ) {
-        error "Invalid --network '${params.network}'. Supported values: genie3 or sctnet"
-    } 
+    if( !(network in ['genie3', 'sctnet', 'scrank', 'hdwgcna']) ) {
+        error "Invalid --network '${params.network}'. Supported values: genie3, sctnet, scrank or hdwgcna"
+    }
 	
     DOWNSAMPLE( obj, target, column, species, n_cells )
 
@@ -59,6 +60,13 @@ workflow {
         SCRANK( sc_obj, species, target, column, n_cores )
 
         SCRANK.out.rank_obj
+        .collect()
+        .set { rank_cells  }
+    }
+    else if( network == 'hdwgcna' ) {
+        HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells )
+
+        HDWGCNA.out.rank_obj
         .collect()
         .set { rank_cells  }
     }

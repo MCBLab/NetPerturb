@@ -1,0 +1,62 @@
+nextflow_process {
+
+    name "RANK_SCORE"
+    script "modules/local/rank_score/main.nf"
+    process "RANK_SCORE"
+
+    test("sanitises a multi-gene target into the output file name") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/dummy_obj.rds")
+                input[1] = "Stfa1;Mpo"
+                input[2] = "mouse"
+                input[3] = "labels"
+                input[4] = "antagonist"
+                input[5] = [
+                    file("\${projectDir}/tests/fixtures/sensitive.RDS"),
+                    file("\${projectDir}/tests/fixtures/resistant.RDS")
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.rank_scores.size() == 1
+
+            // ';' is not filename safe, rank_score.R replaces it before writing
+            assert file(process.out.rank_scores[0]).name == "perbscore_all_targets.Stfa1_Mpo.txt"
+        }
+    }
+
+    test("keeps the target and binding it was given in the table") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/dummy_obj.rds")
+                input[1] = "Brd4"
+                input[2] = "mouse"
+                input[3] = "labels"
+                input[4] = "agonist"
+                input[5] = [ file("\${projectDir}/tests/fixtures/sensitive.RDS") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.rank_scores[0]).readLines()
+            assert lines[0].split("\t") == ["cell_type", "target", "binding", "perb_score"]
+            assert lines.every { it.startsWith("cell_type") || it.contains("Brd4") }
+            assert lines.every { it.startsWith("cell_type") || it.contains("agonist") }
+        }
+    }
+}

@@ -26,4 +26,9 @@ process SCRANK {
     #!/bin/bash
     scrank.R ${scobj} ${species} ${target} ${column} ${n_cores}
     """
+
+  stub:
+    """
+    touch ${scobj.baseName}_weight_SCRANK_100.rds
+    """
 }
