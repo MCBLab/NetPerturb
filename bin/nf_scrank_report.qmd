@@ -275,16 +275,16 @@ for (tgt in names(objs)) {
 }
 ```
 
-## Row {height="15%"}
+## Row {height="7%"}
 
 ```{r}
 #| results: asis
 cat(paste0(
+  '<div style="display:flex; align-items:center; gap:16px; height:100%; padding:0 4px;">\n',
   '<label>Target: <select id="target-select-net" class="form-select" ', select_style, '>\n',
   options_html(names(objs)), '\n</select></label>\n',
-  '&nbsp;&nbsp;\n',
   '<label>Cell Type: <select id="celltype-select-net" class="form-select" ', select_style, '>\n',
-  options_html(celltypes), '\n</select></label>\n',
+  options_html(celltypes), '\n</select></label>\n</div>\n',
   '<script>window.NP.register(document.getElementById("target-select-net"));</script>'
 ))
 ```
@@ -401,16 +401,16 @@ for (tgt in names(objs)) {
 }
 ```
 
-## Row {height="15%"}
+## Row {height="7%"}
 
 ```{r}
 #| results: asis
 cat(paste0(
+  '<div style="display:flex; align-items:center; gap:16px; height:100%; padding:0 4px;">\n',
   '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
   options_html(names(objs)), '\n</select></label>\n',
-  '&nbsp;&nbsp;\n',
   '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
-  options_html(celltypes), '\n</select></label>\n',
+  options_html(celltypes), '\n</select></label>\n</div>\n',
   '<script>window.NP.register(document.getElementById("target-select-hm"));</script>'
 ))
 ```
@@ -437,13 +437,14 @@ cat(paste0(
 ))
 ```
 
-## Row {height="15%"}
+## Row {height="7%"}
 
 ```{r}
 #| results: asis
 cat(paste0(
+  '<div style="display:flex; align-items:center; height:100%; padding:0 4px;">\n',
   '<label>Target (Δcor top_ct − bot_ct): <select id="target-select-delta" class="form-select" ',
-  select_style, '>\n', options_html(names(objs)), '\n</select></label>\n',
+  select_style, '>\n', options_html(names(objs)), '\n</select></label>\n</div>\n',
   '<script>window.NP.register(document.getElementById("target-select-delta"));</script>'
 ))
 ```
