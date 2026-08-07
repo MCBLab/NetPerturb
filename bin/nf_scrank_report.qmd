@@ -281,8 +281,12 @@ for (tgt in names(objs)) {
 #| results: asis
 #| expandable: false
 cat(paste0(
-  '<style>#toolbar-net p { margin: 0; }</style>',
-  '<div id="toolbar-net" style="display:flex; align-items:center; justify-content:flex-start; width:100%; gap:16px; padding:0 4px;">',
+  '<style>\n',
+  '  .card:has(#toolbar-net) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-net) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-net p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-net" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
   '<label>Target: <select id="target-select-net" class="form-select" ', select_style, '>\n',
   options_html(names(objs)), '\n</select></label>\n',
   '<label>Cell Type: <select id="celltype-select-net" class="form-select" ', select_style, '>\n',
@@ -409,8 +413,12 @@ for (tgt in names(objs)) {
 #| results: asis
 #| expandable: false
 cat(paste0(
-  '<style>#toolbar-hm p { margin: 0; }</style>',
-  '<div id="toolbar-hm" style="display:flex; align-items:center; justify-content:flex-start; width:100%; gap:16px; padding:0 4px;">',
+  '<style>\n',
+  '  .card:has(#toolbar-hm) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-hm) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-hm p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-hm" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
   '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
   options_html(names(objs)), '\n</select></label>\n',
   '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
@@ -447,8 +455,12 @@ cat(paste0(
 #| results: asis
 #| expandable: false
 cat(paste0(
-  '<style>#toolbar-delta p { margin: 0; }</style>',
-  '<div id="toolbar-delta" style="display:flex; align-items:center; justify-content:flex-start; width:100%; padding:0 4px;">',
+  '<style>\n',
+  '  .card:has(#toolbar-delta) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-delta) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-delta p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-delta" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
   '<label>Target (Δcor top_ct − bot_ct): <select id="target-select-delta" class="form-select" ',
   select_style, '>\n', options_html(names(objs)), '\n</select></label>\n</div>\n',
   '<script>window.NP.register(document.getElementById("target-select-delta"));</script>'
