@@ -7,6 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=480G
+#SBATCH --exclude=r1i3n13
 #SBATCH --time=2-00:00:00
 #SBATCH --chdir=/mnt/beegfs/scratch/lgdqamorim/projeto_nextflow/nf_scrank
 #SBATCH --output=/mnt/beegfs/scratch/lgdqamorim/projeto_nextflow/nf_scrank/logs/nf_scrank_%j.out
@@ -30,7 +31,7 @@ nextflow run main.nf \
   --obj ../data/vehicle_processed2.rds \
   --column annotation \
   --species mouse \
-  --n_cells 100 \
+  --n_cells 4000 \
   --n_cores 32 \
   --n_trees 50 \
   --target ../alvos.txt \
