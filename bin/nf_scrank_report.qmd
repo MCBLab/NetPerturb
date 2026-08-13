@@ -11,6 +11,7 @@ execute:
   message: false
 params:
   merged_obj: "merged_obj.RDS"
+  perbscore: "perbscore_all_targets.txt"
   target: "Brd4"
   n_cores: 1
 ---
@@ -35,6 +36,14 @@ Sys.setenv("_R_CHECK_LIMIT_CORES_" = "")
 obj_base   <- readRDS(params$merged_obj)
 target_vec <- strsplit(params$target, ";")[[1]]
 celltypes  <- names(obj_base@net)
+
+perbscore_df <- read.delim(params$perbscore, stringsAsFactors = FALSE) |>
+  dplyr::rename(
+    `Cell Type`          = cell_type,
+    `Target`             = target,
+    `Perturbation Type`  = binding,
+    `Perturbation Score` = perb_score
+  )
 
 objs              <- list()
 tabelas           <- list()
@@ -240,10 +249,21 @@ cat(paste0(
 ))
 ```
 
-## Row
+## Row {.tabset}
+
+### Perturbation Scores
 
 ```{r}
-#| title: "Independent regulatory modules ranked by absolute correlation"
+DT::datatable(
+  perbscore_df,
+  options  = list(pageLength = 10, autoWidth = TRUE),
+  rownames = FALSE
+) |> DT::formatSignif("Perturbation Score", digits = 4)
+```
+
+### Regulatory Modules (Absolute Correlation)
+
+```{r}
 DT::datatable(
   tabela_completa,
   options  = list(pageLength = 10, autoWidth = TRUE),

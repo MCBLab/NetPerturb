@@ -77,6 +77,6 @@ workflow {
         // mesmo obj@net (target-independente, vem do mesmo rank_cells de entrada) —
         // só obj@para$target muda entre elas. Basta pegar UM merged_obj.RDS pro
         // REPORT, que já itera sobre todos os targets internamente.
-        REPORT( RANK_SCORE.out.merged_obj.first(), qmd_template, logo, target_list.join(";"), params.report_n_cores )
+        REPORT( RANK_SCORE.out.merged_obj.first(), MERGE.out.merged_rank_scores, qmd_template, logo, target_list.join(";"), params.report_n_cores )
     }
 }

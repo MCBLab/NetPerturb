@@ -9,6 +9,7 @@ process REPORT {
 
   input:
     path merged_obj
+    path perbscore
     path qmd_template, stageAs: 'template.qmd'
     path logo, stageAs: 'lab-logo.png'
     val target
@@ -29,6 +30,7 @@ process REPORT {
     cp ${qmd_template} nf_scrank_report.qmd
     quarto render nf_scrank_report.qmd \\
       -P merged_obj:${merged_obj} \\
+      -P perbscore:${perbscore} \\
       -P target:"${target}" \\
       -P n_cores:${n_cores}
     """
