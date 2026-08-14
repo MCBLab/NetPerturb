@@ -24,6 +24,8 @@ library(scRank)
 library(dplyr)
 library(DT)
 library(ggpubr)
+library(fgsea)
+library(msigdbr)
 
 # `library(Seurat)` carrega `future` como dependência, e o `.onLoad()` do
 # future detecta heuristicamente um ambiente de "R CMD check" (por ausência
@@ -129,6 +131,76 @@ for (tgt in target_vec) {
 }
 
 tabela_completa <- dplyr::bind_rows(unlist(tabelas, recursive = FALSE))
+
+# --- Atividade do módulo ---
+# Resume, por Target x CellType x Module, a força média de conexão do módulo
+# ao alvo (média da "Absolute correlation" dos genes do módulo) — comparável
+# entre celltypes, já que o conjunto de genes do módulo é o mesmo em todas.
+modulo_atividade <- tabela_completa |>
+  dplyr::group_by(Target, CellType, Module) |>
+  dplyr::summarise(
+    `Module activity` = mean(`Absolute correlation`, na.rm = TRUE),
+    `N genes`          = dplyr::n(),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(Target, CellType, Module)
+
+# --- Enriquecimento funcional por módulo (GO BP / KEGG / Reactome) ---
+# fora() (fgsea) roda um teste de sobre-representação (hipergeométrico) da
+# lista discreta de genes de cada módulo — fgsea/msigdbr já são dependências
+# transitivas do scRank (evita adicionar clusterProfiler/org.db à imagem).
+# Universo = genes da clusterização final usada pelos módulos (já reflete o
+# zoom de init_mod quando ele ocorre), não o genoma inteiro.
+species_full <- if (identical(obj_base@para$species, "mouse")) "Mus musculus" else "Homo sapiens"
+
+# NOTA: msigdbr >=10.0.0 renomeou os parâmetros — `collection` agora é o
+# nível C2/C5/H (era `category`), e o nível GO:BP/CP:KEGG_LEGACY/CP:REACTOME
+# vai em `subcollection` (era `subcategory`). Confirmado contra a versão
+# instalada no container (25.1.1) antes de fixar os nomes abaixo.
+pathway_db <- dplyr::bind_rows(
+  msigdbr::msigdbr(species = species_full, collection = "C5", subcollection = "GO:BP")         |> dplyr::mutate(source = "GO_BP"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:KEGG_LEGACY") |> dplyr::mutate(source = "KEGG"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:REACTOME")    |> dplyr::mutate(source = "Reactome")
+)
+pathway_list <- split(pathway_db$gene_symbol, paste(pathway_db$source, pathway_db$gs_name, sep = "::"))
+
+enrich_module <- function(genes, universe) {
+  res <- fgsea::fora(pathways = pathway_list, genes = genes, universe = universe)
+  res <- res[order(res$pval), ]
+  res <- res[res$padj < 0.05, ]
+  if (nrow(res) == 0) return(NULL)
+  data.frame(
+    Source          = sub("::.*", "", res$pathway),
+    Pathway         = sub("^[^:]+::", "", res$pathway),
+    Overlap         = res$overlap,
+    `Gene Set Size` = res$size,
+    `P-value`       = res$pval,
+    `Adj. P-value`  = res$padj,
+    Genes           = vapply(res$overlapGenes, paste, character(1), collapse = ", "),
+    check.names     = FALSE
+  )
+}
+
+enrichment_list <- list()
+for (tgt in names(objs)) {
+  clusters <- objs[[tgt]]@para$gene_clusters
+  universe <- names(clusters)
+  for (m in sort(unique(clusters))) {
+    res <- enrich_module(names(clusters[clusters == m]), universe)
+    if (!is.null(res)) {
+      enrichment_list[[paste(tgt, m)]] <- cbind(Target = tgt, Module = paste0("M", m), res)
+    }
+  }
+}
+enrichment_completa <- dplyr::bind_rows(enrichment_list)
+if (nrow(enrichment_completa) == 0) {
+  enrichment_completa <- data.frame(
+    Target = character(), Module = character(), Source = character(),
+    Pathway = character(), Overlap = integer(), `Gene Set Size` = integer(),
+    `P-value` = numeric(), `Adj. P-value` = numeric(), Genes = character(),
+    check.names = FALSE
+  )
+}
 
 # Como o número de targets/celltypes pode crescer bastante, as páginas abaixo
 # usam seletores (dropdown/datalist) em vez de caixas/abas fixas que não
@@ -269,6 +341,16 @@ DT::datatable(
   options  = list(pageLength = 10, autoWidth = TRUE),
   rownames = FALSE
 ) |> DT::formatRound("Absolute correlation", digits = 4)
+```
+
+### Module Activity
+
+```{r}
+DT::datatable(
+  modulo_atividade,
+  options  = list(pageLength = 10, autoWidth = TRUE),
+  rownames = FALSE
+) |> DT::formatRound("Module activity", digits = 4)
 ```
 
 # Network Maps {icon="diagram-2"}
@@ -505,4 +587,18 @@ cat(paste0(
   '})();\n',
   '</script>'
 ))
+```
+
+# Functional Enrichment {icon="search"}
+
+## Row
+
+```{r}
+#| title: "GO Biological Process / KEGG / Reactome enrichment per module"
+DT::datatable(
+  enrichment_completa,
+  filter   = "top",
+  options  = list(pageLength = 15, autoWidth = TRUE, order = list(list(7, "asc"))),
+  rownames = FALSE
+) |> DT::formatSignif(c("P-value", "Adj. P-value"), digits = 3)
 ```
