@@ -145,6 +145,12 @@ modulo_atividade <- tabela_completa |>
   ) |>
   dplyr::arrange(Target, CellType, Module)
 
+# Junta a atividade do módulo de volta na tabela por gene, em vez de manter
+# como aba separada — mesma granularidade de módulo, só que visível junto
+# com o detalhe por gene sem precisar trocar de aba.
+tabela_completa <- tabela_completa |>
+  dplyr::left_join(modulo_atividade, by = c("Target", "CellType", "Module"))
+
 # --- Enriquecimento funcional por módulo (GO BP / KEGG / Reactome) ---
 # fora() (fgsea) roda um teste de sobre-representação (hipergeométrico) da
 # lista discreta de genes de cada módulo — fgsea/msigdbr já são dependências
@@ -340,17 +346,7 @@ DT::datatable(
   tabela_completa,
   options  = list(pageLength = 10, autoWidth = TRUE),
   rownames = FALSE
-) |> DT::formatRound("Absolute correlation", digits = 4)
-```
-
-### Module Activity
-
-```{r}
-DT::datatable(
-  modulo_atividade,
-  options  = list(pageLength = 10, autoWidth = TRUE),
-  rownames = FALSE
-) |> DT::formatRound("Module activity", digits = 4)
+) |> DT::formatRound(c("Absolute correlation", "Module activity"), digits = 4)
 ```
 
 # Network Maps {icon="diagram-2"}
