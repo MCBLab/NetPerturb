@@ -45,7 +45,8 @@ perbscore_df <- read.delim(params$perbscore, stringsAsFactors = FALSE) |>
     `Target`             = target,
     `Perturbation Type`  = binding,
     `Perturbation Score` = perb_score
-  )
+  ) |>
+  dplyr::select(Target, `Cell Type`, `Perturbation Type`, `Perturbation Score`)
 
 objs              <- list()
 tabelas           <- list()
@@ -233,6 +234,27 @@ options_html <- function(values) {
 # manual pra ficar legível.
 select_style <- 'style="display:inline-block; width:auto; min-width:150px; padding:6px; font-size:1.05em;"'
 
+# Constrói as duas boxes "Cell Types"/"Reference" a partir do mesmo template
+# HTML, pra garantir tipografia idêntica entre as duas (título e valor com
+# mesmo tamanho/peso de fonte). Cell Types precisa desse tratamento manual
+# em vez do valuebox nativo do Quarto (`#| content: valuebox`) porque o
+# nativo escala o valor via clamp() responsivo (cqw), que não bate em
+# tamanho com o texto multi-linha do Reference — só dá pra igualar os dois
+# com font-size explícito nos dois, o que exige construir os dois à mão.
+value_box_html <- function(bg_color, icon, title, value_html) {
+  paste0(
+    '<div class="card valuebox cell html-fill-item html-fill-container bslib-card bslib-value-box bg-success showcase-left-center" ',
+    'style="background-color:', bg_color, ' !important; color:#fff;">\n',
+    '<div class="card-body html-fill-item html-fill-container">\n',
+    '<div data-icon="', icon, '" class="html-fill-item html-fill-container value-box-grid">\n',
+    '<div class="value-box-showcase html-fill-item html-fill-container"><i class="bi bi-', icon, '"></i></div>\n',
+    '<div class="value-box-area">\n',
+    '<p class="value-box-title" style="font-size:1rem; font-weight:500;">', title, '</p>\n',
+    '<p class="value-box-value" style="font-size:1.5rem; font-weight:500; margin-bottom:0;">', value_html, '</p>\n',
+    '</div>\n</div>\n</div>\n</div>'
+  )
+}
+
 ref_json <- paste0(
   "{", paste0(
     '"', html_escape(ref_df$target), '":{"top_ct":"', html_escape(ref_df$top_ct),
@@ -249,6 +271,7 @@ ref_json <- paste0(
 ```{r}
 #| title: "Target"
 #| results: asis
+#| expandable: false
 # window.NP é o estado compartilhado de target selecionado entre as 3
 # páginas do dashboard (todas coexistem no mesmo DOM — são abas via
 # CSS, não navegações separadas — então um único objeto global mantido
@@ -288,31 +311,16 @@ cat(paste0(
 ```
 
 ```{r}
-#| content: valuebox
-#| title: "Cell Types"
-list(
-  icon  = "diagram-3",
-  color = "info",
-  value = length(celltypes)
-)
+#| results: asis
+#| expandable: false
+cat(value_box_html("#3498db", "diagram-3", "Cell Types", as.character(length(celltypes))))
 ```
 
 ```{r}
 #| results: asis
-# Reproduz manualmente o HTML/CSS que o Quarto gera pra um valuebox nativo
-# (`#| content: valuebox`), porque essas só suportam um valor estático — a
-# nossa precisa reagir à seleção de target via JS, então não dá pra usar o
-# mecanismo nativo diretamente.
+#| expandable: false
 cat(paste0(
-  '<div class="card valuebox cell html-fill-item html-fill-container bslib-card bslib-value-box bg-success showcase-left-center" ',
-  'style="background-color:#18bc9c !important; color:#fff;">\n',
-  '<div class="card-body html-fill-item html-fill-container">\n',
-  '<div data-icon="star" class="html-fill-item html-fill-container value-box-grid">\n',
-  '<div class="value-box-showcase html-fill-item html-fill-container"><i class="bi bi-star"></i></div>\n',
-  '<div class="value-box-area">\n',
-  '<p class="value-box-title">Reference</p>\n',
-  '<p class="value-box-value"><div id="ref-output-1" style="font-size:0.55em; line-height:1.5;"></div></p>\n',
-  '</div>\n</div>\n</div>\n</div>\n',
+  value_box_html("#18bc9c", "star", "Reference", '<div id="ref-output-1" style="line-height:1.3;"></div>'),
   '<script>\n',
   '(function() {\n',
   '  var output = document.getElementById("ref-output-1");\n',
@@ -327,26 +335,15 @@ cat(paste0(
 ))
 ```
 
-## Row {.tabset}
-
-### Perturbation Scores
+## Row
 
 ```{r}
+#| title: "Perturbation Scores"
 DT::datatable(
   perbscore_df,
   options  = list(pageLength = 10, autoWidth = TRUE),
   rownames = FALSE
 ) |> DT::formatSignif("Perturbation Score", digits = 4)
-```
-
-### Regulatory Modules (Absolute Correlation)
-
-```{r}
-DT::datatable(
-  tabela_completa,
-  options  = list(pageLength = 10, autoWidth = TRUE),
-  rownames = FALSE
-) |> DT::formatRound(c("Absolute correlation", "Module activity"), digits = 4)
 ```
 
 # Network Maps {icon="diagram-2"}
@@ -396,6 +393,8 @@ cat(paste0(
 ## Row
 
 ```{r}
+#| title: "Network"
+#| width: 60%
 #| results: asis
 cat(paste0(
   '<img id="net-img" src="nf_scrank_report_files/figure-html/net-', html_escape(names(objs)[1]), '-',
@@ -413,6 +412,38 @@ cat(paste0(
   '})();\n',
   '</script>'
 ))
+```
+
+```{r}
+#| title: "Regulatory Modules"
+#| width: 40%
+# Mesma tabela de antes (Overview), agora filtrada ao vivo pelos seletores
+# Target/Cell Type já existentes no topo da página — reusa os controles em
+# vez de duplicar, via API do DataTables (column().search().draw()).
+tbl <- DT::datatable(
+  tabela_completa,
+  elementId = "regmod-table",
+  options   = list(pageLength = 8, autoWidth = TRUE),
+  rownames  = FALSE
+) |> DT::formatRound(c("Absolute correlation", "Module activity"), digits = 4)
+
+filter_script <- htmltools::tags$script(htmltools::HTML(paste0(
+  '(function() {\n',
+  '  function filterTable() {\n',
+  '    var dt = $("#regmod-table").DataTable();\n',
+  '    var target = window.NP.target;\n',
+  '    var ct = document.getElementById("celltype-select-net").value;\n',
+  '    dt.column(0).search("^" + $.fn.dataTable.util.escapeRegex(target) + "$", true, false);\n',
+  '    dt.column(3).search("^" + $.fn.dataTable.util.escapeRegex(ct) + "$", true, false);\n',
+  '    dt.draw();\n',
+  '  }\n',
+  '  window.NP.onChange.push(filterTable);\n',
+  '  document.getElementById("celltype-select-net").addEventListener("change", filterTable);\n',
+  '  $("#regmod-table").on("init.dt", filterTable);\n',
+  '})();'
+)))
+
+htmltools::tagList(tbl, filter_script)
 ```
 
 # Heatmaps {icon="grid"}
@@ -505,9 +536,12 @@ for (tgt in names(objs)) {
 }
 ```
 
-## Row {height="60px"}
+## Row
+
+### Column
 
 ```{r}
+#| height: 60px
 #| results: asis
 #| expandable: false
 cat(paste0(
@@ -525,19 +559,29 @@ cat(paste0(
 ))
 ```
 
-## Row
-
 ```{r}
 #| results: asis
+# Imagem inteira precisa caber sem cortar (inclusive a legenda de módulos,
+# que faz parte do PNG gerado pelo ComplexHeatmap) — max-height:100% +
+# object-fit:contain encolhe a imagem pra caber no card em vez de vazar
+# pra scroll interno. Link em volta abre o PNG em tamanho real numa aba
+# nova, como alternativa leve a um zoom/pan dedicado.
 cat(paste0(
+  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
+  '<a id="hm-link" href="nf_scrank_report_files/figure-html/hm-', html_escape(names(objs)[1]), '-',
+  html_escape(celltypes[1]), '-1.png" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
   '<img id="hm-img" src="nf_scrank_report_files/figure-html/hm-', html_escape(names(objs)[1]), '-',
-  html_escape(celltypes[1]), '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  html_escape(celltypes[1]), '-1.png" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>\n',
   '<script>\n',
   '(function() {\n',
   '  var c = document.getElementById("celltype-select-hm");\n',
   '  var img = document.getElementById("hm-img");\n',
+  '  var link = document.getElementById("hm-link");\n',
   '  function update(target) {\n',
-  '    img.src = "nf_scrank_report_files/figure-html/hm-" + target + "-" + c.value + "-1.png";\n',
+  '    var src = "nf_scrank_report_files/figure-html/hm-" + target + "-" + c.value + "-1.png";\n',
+  '    img.src = src;\n',
+  '    link.href = src;\n',
   '  }\n',
   '  window.NP.onChange.push(update);\n',
   '  c.addEventListener("change", function() { update(window.NP.target); });\n',
@@ -547,9 +591,10 @@ cat(paste0(
 ))
 ```
 
-## Row {height="60px"}
+### Column
 
 ```{r}
+#| height: 60px
 #| results: asis
 #| expandable: false
 cat(paste0(
@@ -565,18 +610,23 @@ cat(paste0(
 ))
 ```
 
-## Row
-
 ```{r}
 #| results: asis
 cat(paste0(
+  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
+  '<a id="delta-link" href="nf_scrank_report_files/figure-html/delta-', html_escape(names(objs)[1]),
+  '-1.png" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
   '<img id="delta-img" src="nf_scrank_report_files/figure-html/delta-', html_escape(names(objs)[1]),
-  '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  '-1.png" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>\n',
   '<script>\n',
   '(function() {\n',
   '  var img = document.getElementById("delta-img");\n',
+  '  var link = document.getElementById("delta-link");\n',
   '  function update(target) {\n',
-  '    img.src = "nf_scrank_report_files/figure-html/delta-" + target + "-1.png";\n',
+  '    var src = "nf_scrank_report_files/figure-html/delta-" + target + "-1.png";\n',
+  '    img.src = src;\n',
+  '    link.href = src;\n',
   '  }\n',
   '  window.NP.onChange.push(update);\n',
   '  update(window.NP.target);\n',
