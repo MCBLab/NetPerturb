@@ -17,6 +17,10 @@ min_cells <- as.integer(args[5])
 k          <- 25
 max_shared <- 10
 
+# One soft power for every cell identity, see the note at TestSoftPowers below.
+# 6 is WGCNA's standing recommendation for an unsigned network on few samples.
+soft_power <- 6
+
 allowWGCNAThreads(nThreads = n_cores)
 
 cell_type <- sub("\\.RDS$", "", basename(seuratObj))
@@ -80,13 +84,22 @@ built <- tryCatch({
   # below has nothing to recover. Unsigned keeps |cor|^power, letting magnitude
   # carry the strength of the association and the recovered sign carry its
   # direction, which is the same semantics as scRank's signed regression betas.
+  # The power is deliberately NOT taken from the estimate. powerEstimate is the
+  # first power whose scale-free fit clears RsquaredCut, so it lands somewhere
+  # different for every cell identity and is NA whenever the fit never clears it
+  # at all. A per-cell-type exponent means a per-cell-type |cor|^power
+  # transform, and the resulting edge weights are then not on a common scale.
+  # scRank compares perturbation scores across cell identities, so the exponent
+  # has to be the same everywhere. The estimate is still computed and logged so
+  # the per-cell-type fit stays auditable.
   sc_obj <- TestSoftPowers(sc_obj, networkType = "unsigned")
   power_est <- GetActiveWGCNA(sc_obj)$sft$powerEstimate
-  final_power <- if (is.null(power_est) || is.na(power_est) || is.infinite(power_est)) 6 else power_est
+  message("Soft power: using fixed ", soft_power, ", per-cell-type estimate was ",
+          if (is.null(power_est) || is.na(power_est) || is.infinite(power_est)) "NA" else power_est)
 
   sc_obj <- ConstructNetwork(
     sc_obj,
-    soft_power    = final_power,
+    soft_power    = soft_power,
     setDatExpr    = FALSE,
     overwrite_tom = TRUE,
     tom_name      = "network",
@@ -142,22 +155,48 @@ if (n_padded > 0) {
 # --- 3. Sparsify ------------------------------------------------------------
 # A TOM is fully dense. scRank derives degree and entropy from the count of
 # non-zero edges and sums its marker distance over the target's neighbourhood,
-# so a dense matrix makes every gene a neighbour of every other one. The
-# quantile spans the whole matrix, matching scRank's own Constr_net.
+# so a dense matrix makes every gene a neighbour of every other one.
+#
+# The quantile is taken over the genes hdWGCNA actually kept rather than over
+# the padded matrix. How much padding step 2 added varies a lot between cell
+# identities, so a quantile spanning those zeros makes cut_ratio buy a
+# different amount of sparsification per cell type. Worse, once the zero
+# fraction exceeds cut_ratio the threshold is 0, the comparison below is never
+# true, and the network is not sparsified at all.
 diag(full) <- 0
-abs_full <- abs(full)
-threshold <- quantile(abs_full, cut_ratio, na.rm = TRUE)
-full[abs_full < threshold] <- 0
+sub <- full[keep, keep, drop = FALSE]
 
-# --- 4. Scale to max |w| = 1 ------------------------------------------------
+nz <- sub[sub != 0]
+if (length(nz) == 0) {
+  drop_celltype("no non-zero edges in the hdWGCNA network")
+}
+
+threshold <- quantile(abs(nz), cut_ratio, na.rm = TRUE)
+sub[abs(sub) < threshold] <- 0
+full[keep, keep] <- sub
+
+# --- 4. Rank-normalise the surviving edges ----------------------------------
 # scRank's manifold alignment offsets the network by 1 before building the
-# Laplacian, so all the signal sits in the deviation from 1. Raw TOM values are
-# orders of magnitude smaller and would collapse into numerical noise.
-max_weight <- max(abs(full))
-if (max_weight == 0) {
+# Laplacian and propagates the perturbation multiplicatively along paths, so
+# the score is driven by the typical edge weight, not the largest one. Scaling
+# by max |w| pins the maximum to 1 but leaves the rest of the distribution
+# free, and that distribution tracks metacell count: a cell identity with few
+# metacells has correlations inflated by small-sample noise, which survive
+# |cor|^power far better than the true, more modest correlations of a
+# well-sampled identity. In practice that left the median surviving weight two
+# orders of magnitude apart across cell types and made the perturbation score
+# an almost perfectly monotone function of how many metacells the identity
+# could produce.
+#
+# Ranking gives every cell type the same edge-weight distribution while keeping
+# the ordering and the sign within each network, which is all scRank reads off
+# a network, so the cross-cell-type comparison is no longer confounded by
+# sample size.
+i <- which(full != 0)
+if (length(i) == 0) {
   drop_celltype("no non-zero edges left after sparsification")
 }
-full <- full / max_weight
+full[i] <- sign(full[i]) * rank(abs(full[i])) / length(i)
 
 n_metacells <- ncol(GetMetacellObject(sc_obj))
 
