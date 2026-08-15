@@ -429,8 +429,10 @@ tbl <- DT::datatable(
 
 filter_script <- htmltools::tags$script(htmltools::HTML(paste0(
   '(function() {\n',
+  '  var sel = "#regmod-table table";\n',
   '  function filterTable() {\n',
-  '    var dt = $("#regmod-table").DataTable();\n',
+  '    if (!$.fn.DataTable.isDataTable(sel)) return;\n',
+  '    var dt = $(sel).DataTable();\n',
   '    var target = window.NP.target;\n',
   '    var ct = document.getElementById("celltype-select-net").value;\n',
   '    dt.column(0).search("^" + $.fn.dataTable.util.escapeRegex(target) + "$", true, false);\n',
@@ -439,7 +441,8 @@ filter_script <- htmltools::tags$script(htmltools::HTML(paste0(
   '  }\n',
   '  window.NP.onChange.push(filterTable);\n',
   '  document.getElementById("celltype-select-net").addEventListener("change", filterTable);\n',
-  '  $("#regmod-table").on("init.dt", filterTable);\n',
+  '  $(sel).on("init.dt", filterTable);\n',
+  '  filterTable();\n',
   '})();'
 )))
 
