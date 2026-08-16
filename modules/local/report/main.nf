@@ -5,8 +5,8 @@ process REPORT {
 
   label "r_report"
 
-  container "${ workflow.containerEngine == 'singularity' ? 'docker://rocker/verse:4.4.1':
-            'docker.io/rocker/verse:4.4.1' }"
+  container "${ workflow.containerEngine == 'singularity' ? 'docker://diegomscoelho/rquarto:1.5.54':
+            'docker.io/diegomscoelho/rquarto:1.5.54' }"
 
   input:
     path perbscore_table

@@ -22,5 +22,5 @@ WORKDIR /app
 # 5. Install required R packages (e.g., rmarkdown, knitr)
 RUN R -e "install.packages(c('rmarkdown', 'knitr', 'DT'), repos='https://r-project.org')"
 
-# 7. Render the Quarto document upon container execution
-CMD ["quarto", "render", "document.qmd", "--to", "html"]
+# 6. Render the Quarto document upon container execution
+CMD ["quarto", "--help"]
