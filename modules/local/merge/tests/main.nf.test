@@ -1,0 +1,58 @@
+/*
+MERGE is pure bash with no container, so these run the real script rather than
+a stub.
+*/
+nextflow_process {
+
+    name "MERGE"
+    script "modules/local/merge/main.nf"
+    process "MERGE"
+
+    test("concatenates per-target tables under a single header") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt"),
+                    file("\${projectDir}/tests/fixtures/perbscore_all_targets.Stfa1_Mpo.txt")
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.merged_rank_scores[0]).readLines()
+
+            // one header plus two rows from each of the two inputs
+            assert lines.size() == 5
+            assert lines[0] == "cell_type\ttarget\tbinding\tperb_score"
+            assert lines.count { it.startsWith("cell_type\t") } == 1
+
+            // no row from either input is lost
+            assert lines.count { it.contains("Brd4") } == 2
+            assert lines.count { it.contains("Stfa1;Mpo") } == 2
+        }
+    }
+
+    test("a single input table survives unchanged") {
+
+        when {
+            process {
+                """
+                input[0] = [ file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def merged = path(process.out.merged_rank_scores[0]).readLines()
+            def source = path("${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt").readLines()
+            assert merged == source
+        }
+    }
+}

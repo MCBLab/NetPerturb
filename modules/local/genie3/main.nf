@@ -22,6 +22,10 @@ process GENIE3 {
   script:
     """
    #!/bin/bash
-    genie3.R ${scobj} ${n_cores} ${n_trees}
+   genie3.R ${scobj} ${n_cores} ${n_trees}
+    
+  stub:
+    """
+    touch ${scobj.baseName}_weight_GENIE3_100.rds
     """
 }

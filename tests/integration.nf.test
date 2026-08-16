@@ -1,0 +1,57 @@
+/*
+End to end run on the test profile, with the real containers and the real R.
+
+Opt in only, since it downloads the AML object and pulls a Seurat image:
+
+    nf-test test --tag integration --profile singularity
+
+Everything here is deliberately loose about the numbers. The perturbation score
+depends on the downsampling seed and on the inference method, so these assert
+the shape and the invariants of the output rather than exact values.
+*/
+nextflow_pipeline {
+
+    name "NetPerturb end to end"
+    script "main.nf"
+
+    test("test profile produces a score for every target and identity") {
+
+        tag "integration"
+
+        when {
+            params {
+                outdir = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def merged = path("${outputDir}/rank_scores/perbscore_all_targets.txt")
+            assert merged.exists()
+
+            def lines = merged.readLines()
+            assert lines[0] == "cell_type\ttarget\tbinding\tperb_score"
+            assert lines.count { it.startsWith("cell_type\t") } == 1
+
+            def rows = lines.tail().collect { it.split("\t") }
+            assert rows.size() > 0
+
+            // conf/test.config asks for all three targets in testdata/test_input.txt
+            def targets = rows.collect { it[1] }.unique().sort()
+            assert targets == ["Brd4", "Cstdc5", "Stfa1;Mpo"]
+
+            // antagonist is the default binding
+            assert rows.every { it[2] == "antagonist" }
+
+            // a perturbation score is a finite, non-negative number
+            assert rows.every { it[3].isNumber() }
+            assert rows.every { Double.parseDouble(it[3]) >= 0 }
+            assert rows.every { Double.isFinite(Double.parseDouble(it[3])) }
+
+            // every identity is scored for every target
+            def identities = rows.collect { it[0] }.unique()
+            assert rows.size() == identities.size() * targets.size()
+        }
+    }
+}

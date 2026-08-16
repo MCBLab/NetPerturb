@@ -1,0 +1,29 @@
+nextflow_process {
+
+    name "SCTENIFOLDNET"
+    script "modules/local/sctenifoldnet/main.nf"
+    process "SCTENIFOLDNET"
+
+    test("names its output so rank_score.R can recover the cell type") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/resistant.RDS")
+                input[1] = 1
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.rank_obj.size() == 1
+
+            def name = file(process.out.rank_obj[0]).name
+            assert name == "resistant_weight_sctenifoldnet_100.rds"
+            assert name.replaceFirst(/_weight.*/, "") == "resistant"
+        }
+    }
+}

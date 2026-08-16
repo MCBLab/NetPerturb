@@ -1,0 +1,32 @@
+nextflow_process {
+
+    name "HDWGCNA"
+    script "modules/local/hdwgcna/main.nf"
+    process "HDWGCNA"
+
+    test("names its output so rank_score.R can recover the cell type") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/sensitive.RDS")
+                input[1] = "labels"
+                input[2] = 1
+                input[3] = 0.95
+                input[4] = 150
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.rank_obj.size() == 1
+
+            def name = file(process.out.rank_obj[0]).name
+            assert name == "sensitive_weight_hdWGCNA_100.rds"
+            assert name.replaceFirst(/_weight.*/, "") == "sensitive"
+        }
+    }
+}
