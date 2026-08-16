@@ -23,7 +23,8 @@ process GENIE3 {
     """
    #!/bin/bash
    genie3.R ${scobj} ${n_cores} ${n_trees}
-    
+    """
+ 
   stub:
     """
     touch ${scobj.baseName}_weight_GENIE3_100.rds
