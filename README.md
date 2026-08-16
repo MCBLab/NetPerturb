@@ -11,8 +11,17 @@ The workflow executes the following core modules:
 ### 1. Object Parsing and Downsampling (`DOWNSAMPLE`)
 This is the initial step of the process. It ingests a fully processed Seurat object (`.rds`) and identifies the user-defined metadata column containing the cell identities (e.g., cell types or clones). To ensure statistical robustness and equitable GRN inference, it randomly downsamples the cells from each identity to a specified maximum number (`--n_cells`), balancing the computational load.
 
-### 2. Network Inference (`GENIE3`, `SCTENIFOLDNET`, `SCRANK`)
-This is the heavy-lifting computational core. For each downsampled cellular identity, the pipeline infers a gene regulatory network using the method selected with `--network`: `genie3` runs [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html), `sctnet` runs SCTENIFOLDNET, and `scrank` uses the scRank network strategy. Each method returns regulatory interaction weights between genes for each cell state.
+### 2. Network Inference (`GENIE3`, `SCTENIFOLDNET`, `SCRANK`, `HDWGCNA`)
+This is the heavy-lifting computational core. For each downsampled cellular identity, the pipeline infers a gene regulatory network using the method selected with `--network`: `genie3` runs [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html), `sctnet` runs SCTENIFOLDNET, `scrank` uses the scRank network strategy, and `hdwgcna` runs [hdWGCNA](https://smorabit.github.io/hdWGCNA/) on metacells. Each method returns regulatory interaction weights between genes for each cell state.
+
+The hdWGCNA module aggregates cells into metacells, builds an unsigned co-expression network and then adapts its topological overlap matrix (TOM) to what scRank expects from a network. Four things happen to the raw TOM:
+
+1. **Sign recovery.** A TOM is always positive, so activation and repression are indistinguishable in it. Each edge is multiplied by the sign of the correlation between the same two genes across metacells, keeping the TOM magnitude but restoring its direction of effect. The network is built as `unsigned` for this reason: a `signed` adjacency already pushes anti-correlated pairs towards zero, so repressive edges would be cut before the sign could be recovered.
+2. **Padding to a shared gene universe.** Genes dropped by hdWGCNA quality control return as zero rows and columns, so every cell identity is described over the same gene set. scRank refuses to align networks whose features differ.
+3. **Sparsification.** A TOM is fully dense, which would make every gene a neighbour of every other one and flatten the degree and entropy terms scRank scores on. Edges whose absolute weight falls below the `--cut_ratio` quantile are cut.
+4. **Rescaling.** Weights are divided by the largest absolute weight so that they span `[-1, 1]`, the range scRank's manifold alignment and its agonist mode both assume.
+
+Cell identities that are too small to aggregate into metacells, or for which hdWGCNA otherwise fails, are skipped with a message in the log rather than failing the run. They are absent from the final ranking.
 
 ### 3. Perturbation Scoring (`RANK_SCORE`)
 Using the list of target genes (`--target`) provided by the user, this module extracts the specific regulatory weight of the targets from the GENIE3 output. It calculates the perturbation score, which reflects how much the network relies on the specific target gene within that specific cell state.
@@ -28,7 +37,7 @@ This final step collects the perturbation scores from all parallel GENIE3 tasks 
 ```bash
 # Quick example
 nextflow run netperturb/main.nf \
-  profile test,singularity
+  -profile test,singularity
 
 # Example with all parameters
 nextflow run netperturb/main.nf \
@@ -63,7 +72,11 @@ Cstdc5
 Stfa1;Mpo
 ```
 
-`--network`: Network inference method to use. Supported values are `genie3`, `sctnet`, and `scrank`.
+`--network`: Network inference method to use. Supported values are `genie3`, `sctnet`, `scrank`, and `hdwgcna`.
+
+`--cut_ratio`: Quantile of absolute edge weight below which edges are cut, used by `--network hdwgcna`. Defaults to `0.95`, the same threshold scRank applies to its own networks, which keeps the strongest 5% of edges. Lower it to retain a denser network. Because a TOM has a different weight distribution than the regression coefficients scRank normally works with, this value is worth tuning on your data.
+
+`--hdwgcna_min_cells`: Minimum number of cells an identity must have for `--network hdwgcna` to attempt metacell aggregation. Defaults to `150`. Identities below it are skipped.
 
 `--n_cells`: Maximum number of cells to keep per cellular identity during downsampling. If an identity has fewer cells than this value, the pipeline uses all available cells for that identity.
 
@@ -90,6 +103,26 @@ resistant	Cstdc5	antagonist	2.91128461301128e-06
 ```
 
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
+
+### Development
+[`docs/IMPLEMENTATION.md`](docs/IMPLEMENTATION.md) records how the pipeline was built, grouped into waves of work rather than individual commits.
+
+#### Tests
+The pipeline is covered by [nf-test](https://www.nf-test.com/). The default suite runs every process through its `stub` block, so it pulls no containers and executes no R, and finishes in about a minute:
+
+```bash
+nf-test test
+```
+
+It checks the wiring rather than the science: that `--network` selects exactly one inference process, that each line of the target file becomes its own `RANK_SCORE` task, that `MERGE` gathers them under a single header, that an unsupported `--network` aborts before any task is launched, and that every network module names its output so `rank_score.R` can still recover the cell identity from the file name.
+
+The end to end run is opt-in, since it downloads the test object and pulls containers. It is excluded from the default suite and has its own config:
+
+```bash
+nf-test test -c nf-test.integration.config --tag integration --profile test,singularity
+```
+
+Note for machines running the uutils reimplementation of coreutils, the default on recent Ubuntu: Nextflow's task wrapper times tasks with `date +%s%3N`, and uutils ignores the `%3N` width modifier. The wrapper then aborts every task with `Unexpected: unbound variable` before the script runs. This affects any Nextflow pipeline on such a machine, not just this one. Installing GNU coreutils resolves it.
 
 ### Credits
 NetPerturb is developed and maintained by the Marques-Coelho Bioinformatics Lab(MCBLab).
