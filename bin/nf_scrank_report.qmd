@@ -1,10 +1,11 @@
 ---
 title: "NetPerturb"
 format:
-  dashboard:
+  html:
     theme: flatly
     orientation: rows
     logo: lab-logo.png
+    embed-resources: true
 execute:
   echo: false
   warning: false
