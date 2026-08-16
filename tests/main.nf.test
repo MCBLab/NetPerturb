@@ -148,6 +148,33 @@ nextflow_pipeline {
         }
     }
 
+    test("REPORT renders the merged table once MERGE finishes") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+            assert names.count { it.startsWith("REPORT") } == 1
+
+            assert path("${outputDir}/report/netperturb_report.html").exists()
+        }
+    }
+
     test("an unsupported --network fails before doing any work") {
 
         options "-stub"

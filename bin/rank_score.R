@@ -46,7 +46,6 @@ obj@para$ct.keep = names(obj@net)
 all_ranks <- data.frame()
 
 for (target_sc in target) {
-  message("Processing target: ", target_sc)
   message("Target ", target_sc, " found. Proceeding with rank_celltype.") 
   # Set the target
   obj@para$target <- strsplit(target_sc, split = ";")[[1]]

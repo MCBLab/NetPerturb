@@ -1,0 +1,26 @@
+nextflow_process {
+
+    name "REPORT"
+    script "modules/local/report/main.nf"
+    process "REPORT"
+
+    test("renders the merged table into a single HTML report") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt")
+                input[1] = file("\${projectDir}/bin/report.qmd")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.report.size() == 1
+            assert file(process.out.report[0]).name == "netperturb_report.html"
+        }
+    }
+}

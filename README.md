@@ -27,7 +27,10 @@ Cell identities that are too small to aggregate into metacells, or for which hdW
 Using the list of target genes (`--target`) provided by the user, this module extracts the specific regulatory weight of the targets from the GENIE3 output. It calculates the perturbation score, which reflects how much the network relies on the specific target gene within that specific cell state.
 
 ### 4. Consolidate Results (`MERGE`)
-This final step collects the perturbation scores from all parallel GENIE3 tasks and merges them into a single, clean text file, ready for downstream visualization.
+This step collects the perturbation scores from all parallel `RANK_SCORE` tasks and merges them into a single, clean text file, ready for downstream visualization.
+
+### 5. Report (`REPORT`)
+Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, and a heatmap of scores across all cell types and targets that were run.
 
 ## Quick Start
 1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html) (`>=22.10.1`).
@@ -101,6 +104,8 @@ resistant	Brd4	antagonist	1.61320913209275e-06
 sensitive	Cstdc5	antagonist	1.30868421341405e-06
 resistant	Cstdc5	antagonist	2.91128461301128e-06
 ```
+
+report/netperturb_report.html: A self-contained Quarto report built from `perbscore_all_targets.txt`, with a queryable table and a cell type x target heatmap of perturbation scores.
 
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
 

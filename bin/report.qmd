@@ -1,0 +1,75 @@
+---
+title: "NetPerturb Report"
+subtitle: "Perturbation scores across targets and cell types"
+date: today
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    number-sections: true
+    page-layout: full
+    theme: flatly
+params:
+  perbscore_file: "perbscore_all_targets.txt"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(DT)
+library(scales)
+
+perb_score <- read.delim(params$perbscore_file, header = TRUE, sep = "\t")
+
+n_cell_types <- n_distinct(perb_score$cell_type)
+n_targets    <- n_distinct(perb_score$target)
+n_bindings   <- n_distinct(perb_score$binding)
+```
+
+## Overview
+
+This report summarizes `r nrow(perb_score)` perturbation scores from
+`r params$perbscore_file`, covering `r n_targets` target(s) across
+`r n_cell_types` cell type(s), scored under `r n_bindings` binding
+mode(s) (`r paste(sort(unique(perb_score$binding)), collapse = ", ")`).
+
+## Perturbation score table
+
+Use the column filters below to query by cell type, target, or binding.
+
+```{r table}
+perb_score %>%
+  arrange(target, cell_type) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    options = list(pageLength = 15, order = list(list(1, "asc"))),
+    caption = "All target x cell type perturbation scores."
+  ) %>%
+  formatSignif(columns = "perb_score", digits = 4)
+```
+
+## Perturbation score heatmap
+
+Scores are log10-transformed for display; non-positive values are shown as
+missing (gray).
+
+```{r heatmap, fig.width=10, fig.height=max(4, 0.4 * n_cell_types)}
+heatmap_data <- perb_score %>%
+  mutate(log_score = ifelse(perb_score > 0, log10(perb_score), NA_real_))
+
+ggplot(heatmap_data, aes(x = target, y = cell_type, fill = log_score)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  scale_fill_viridis_c(name = "log10(perb_score)", na.value = "gray80") +
+  labs(x = "Target", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  { if (n_bindings > 1) facet_wrap(~binding) }
+```
