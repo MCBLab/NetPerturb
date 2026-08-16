@@ -4,8 +4,8 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Landed | PR |
 |---|---|---|---|
-| 12 | nf-test suite | in progress | — |
-| 11 | hdWGCNA, second attempt | in progress | — |
+| 12 | nf-test suite | Aug 2026 | — |
+| 11 | hdWGCNA, second attempt | Aug 2026 | — |
 | 10 | Rename to NetPerturb | Jul 2026 | — |
 | 9 | Targets scored in parallel | Jun 2026 | #12 |
 | 8 | Multi-target support | May 2026 | — |
@@ -21,7 +21,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 ## Wave 12 — nf-test suite
 
-**In progress**
+**Aug 2026** · `hdwgcna_network`
 
 Every process gained a `stub` block, which lets the whole pipeline run without pulling a container or executing any R. On top of that sits a suite of fourteen tests: one per module asserting its output contract, and five at the workflow level asserting the shape of the run.
 
@@ -33,7 +33,7 @@ The end to end run is kept out of the default suite. nf-test's `ignore` also blo
 
 ## Wave 11 — hdWGCNA, second attempt
 
-**In progress**
+**Aug 2026** · `hdwgcna_network`
 
 Reintroduces `--network hdwgcna`, this time adapting the TOM to scRank's assumptions instead of handing it over raw. `bin/hdwgcna.R` applies four transformations after `ConstructNetwork`:
 
