@@ -385,6 +385,45 @@ DT::datatable(
 # saída visível vira uma seção fantasma vazia, empurrando o conteúdo real da
 # página pra baixo (mesmo problema já corrigido no chunk "Target").
 
+# Versão própria do modo "network" do plot_net() (scRank) — não é nosso
+# pacote pra alterar. O original usa o peso bruto da aresta como
+# edge.width direto, sem piso nem reescala; quando os pesos da GRN ficam
+# numa faixa pequena (o caso comum aqui — confirmado em todo dataset já
+# testado, não só nos pequenos), a aresta renderiza com espessura
+# sub-pixel e fica invisível mesmo existindo no grafo. Reescala pelo peso
+# máximo DESTE grafo específico, com piso mínimo, pra aresta mais forte
+# sempre aparecer.
+.network_plot_nf_scrank <- function(obj, celltype, highlight_gene = NULL,
+                                     vertex_label_cex = 0.5, charge = 0.01) {
+  gene_clusters <- obj@para$gene_clusters
+  order_gene    <- obj@para$order_gene
+  if (is.null(highlight_gene)) highlight_gene <- obj@para$target
+
+  plot_data     <- obj@net[[celltype]][order_gene, order_gene]
+  module_number <- as.numeric(gene_clusters[highlight_gene])
+  module_show   <- gene_clusters[gene_clusters %in% module_number] |> names()
+
+  Y  <- igraph::graph_from_adjacency_matrix(as.matrix(plot_data[module_show, module_show]), weighted = TRUE, diag = FALSE)
+  gY <- rownames(Y[])
+  set.seed(12)
+  lNet <- igraph::layout.graphopt(Y, charge = charge)
+
+  color_use <- ggpubr::get_palette(palette = "lancet", k = length(unique(gene_clusters)))[module_number]
+  fcolor    <- ifelse(gY %in% highlight_gene, "forestgreen", color_use)
+
+  w <- abs(igraph::E(Y)$weight)
+  edge_width <- if (length(w) > 0 && max(w) > 0) 0.5 + 4.5 * (w / max(w)) else rep(1, length(w))
+
+  plot(Y,
+    layout = lNet, edge.arrow.size = 0,
+    edge.color = ifelse(igraph::E(Y)$weight > 0, "gray60", "#6565FF"),
+    vertex.label = gY, vertex.size = 10, vertex.label.dist = 1,
+    vertex.label.family = "Arial", vertex.label.color = "black", vertex.label.cex = vertex_label_cex,
+    edge.width = edge_width,
+    vertex.frame.width = 1, vertex.color = fcolor, vertex.frame.color = fcolor
+  )
+}
+
 # Gera os PNGs de cada combinação target x celltype sem exibi-los inline
 # (fig.show='hide' ainda salva o arquivo em *_files/figure-html/, só não
 # insere a imagem na posição do chunk). A página abaixo usa dois seletores
@@ -394,7 +433,7 @@ f <- paste(rep("`", 3), collapse = "")
 
 net_template <- paste0(
   f, "{r net-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
-  'plot_net(objs[["{{tgt}}"]], mode = "network", celltype = "{{ct}}")\n',
+  '.network_plot_nf_scrank(objs[["{{tgt}}"]], celltype = "{{ct}}")\n',
   f, "\n\n"
 )
 
