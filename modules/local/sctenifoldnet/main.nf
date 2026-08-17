@@ -23,4 +23,9 @@ process SCTENIFOLDNET {
     #!/bin/bash
     sctenifoldnet.R ${scobj} ${n_cores}
     """
+
+  stub:
+    """
+    touch ${scobj.baseName}_weight_sctenifoldnet_100.rds
+    """
 }

@@ -24,9 +24,15 @@ process DOWNSAMPLE {
 
   script:
     """
-    #!/bin/bash 
-    
+    #!/bin/bash
+
     downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells}
+    """
+
+  stub:
+    """
+    touch sensitive.RDS
+    touch resistant.RDS
     """
 }
 

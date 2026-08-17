@@ -1,0 +1,178 @@
+/*
+Workflow wiring tests. Every one runs with -stub, so no container is pulled and
+no R executes. What they check is the shape of the pipeline: that --network
+picks exactly one inference process, that every target becomes its own task,
+and that the tables reach MERGE intact.
+
+Trace tasks expose `name` as a public field rather than a getter, so it is read
+with `it.@name`. The name carries the tag too, as in "RANK_SCORE (Brd4)".
+*/
+nextflow_pipeline {
+
+    name "NetPerturb workflow"
+    script "main.nf"
+
+    test("genie3 runs GENIE3 and nothing else") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def processes = workflow.trace.tasks()
+                .collect { it.@name.replaceFirst(/ \(.*/, "") }
+                .unique()
+
+            assert processes.contains("GENIE3")
+            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCRANK")
+            assert !processes.contains("HDWGCNA")
+        }
+    }
+
+    test("hdwgcna runs HDWGCNA and nothing else") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj       = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target    = "${projectDir}/testdata/test_input.txt"
+                column    = "labels"
+                species   = "mouse"
+                n_cells   = 100
+                n_cores   = 1
+                network   = "hdwgcna"
+                cut_ratio = 0.95
+                outdir    = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def processes = workflow.trace.tasks()
+                .collect { it.@name.replaceFirst(/ \(.*/, "") }
+                .unique()
+
+            assert processes.contains("HDWGCNA")
+            assert !processes.contains("GENIE3")
+            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCRANK")
+        }
+    }
+
+    test("every target line becomes its own RANK_SCORE task") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // testdata/test_input.txt holds Brd4, Cstdc5 and Stfa1;Mpo, and the
+            // process tag puts the target it was handed into the task name
+            def rankTasks = names.findAll { it.startsWith("RANK_SCORE") }
+            assert rankTasks.size() == 3
+            assert rankTasks.contains("RANK_SCORE (Brd4)")
+            assert rankTasks.contains("RANK_SCORE (Cstdc5)")
+            assert rankTasks.contains("RANK_SCORE (Stfa1;Mpo)")
+
+            // one network per identity, two identities from the DOWNSAMPLE stub
+            assert names.count { it.startsWith("GENIE3") } == 2
+
+            // and a single MERGE gathering all of it
+            assert names.count { it.startsWith("MERGE") } == 1
+        }
+    }
+
+    test("MERGE collects every target into one table") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def merged = path("${outputDir}/rank_scores/perbscore_all_targets.txt")
+            assert merged.exists()
+
+            def lines = merged.readLines()
+
+            // one header, then 3 targets x 2 identities from the stubs
+            assert lines.size() == 7
+            assert lines[0] == "cell_type\ttarget\tbinding\tperb_score"
+            assert lines.count { it.startsWith("cell_type\t") } == 1
+
+            // the ';' target survives the round trip through the file name
+            assert lines.count { it.contains("Stfa1;Mpo") } == 2
+        }
+    }
+
+    test("an unsupported --network fails before doing any work") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "wgcna"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+
+            // the guard reports on stdout, not in the error report
+            assert workflow.stdout.any { it.contains("Invalid --network 'wgcna'") }
+
+            // and it stops the run before a single task is launched
+            assert workflow.trace.tasks().isEmpty()
+        }
+    }
+}
