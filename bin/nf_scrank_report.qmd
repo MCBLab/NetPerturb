@@ -284,15 +284,25 @@ ref_json <- paste0(
 # primeiro no documento, então é aqui que NP nasce; as páginas
 # seguintes só chamam NP.register()/NP.onChange.push().
 #
-# O <style> de altura das linhas de conteúdo (Network Maps/Heatmaps) vai
-# aqui dentro, em vez de um chunk próprio antes do cabeçalho da página —
-# um chunk solto ali virava uma seção fantasma vazia, empurrando o
-# conteúdo de TODAS as páginas pra baixo (mesmo problema do net-embed).
+# O <style> abaixo vai aqui dentro, em vez de um chunk próprio antes do
+# cabeçalho da página — um chunk solto ali virava uma seção fantasma
+# vazia, empurrando o conteúdo de TODAS as páginas pra baixo (mesmo
+# problema do net-embed).
+#
+# A causa real do espaço sobrando entre o toolbar e o grafo, em Network
+# Maps: a página inteira é UM grid (`#network-maps > .bslib-grid`) com
+# `grid-template-rows: minmax(3em,1fr) minmax(3em,1fr)` — as duas ## Row
+# (toolbar e conteúdo) recebem 50% da altura CADA UMA nesse nível, mesmo
+# o card do toolbar só usando 60px (o `#| height: 60px` do chunk
+# dimensiona o CARD certinho, mas não propaga pro cálculo de altura da
+# linha nesse grid de página — só funciona quando aninhado num
+# `### Column`, por isso Heatmaps já saiu correto sozinho). Sobrescreve
+# esse grid-template-rows específico pra dar só o necessário à primeira
+# linha (toolbar) e o resto à segunda (grafo/tabela).
 cat(paste0(
   '<style>\n',
-  '.bslib-grid:has(#net-img), .bslib-grid:has(#regmod-table),\n',
-  '.bslib-grid:has(#toolbar-hm), .bslib-grid:has(#toolbar-delta) {\n',
-  '  height: calc(100vh - 180px) !important;\n',
+  '#network-maps > .bslib-grid {\n',
+  '  grid-template-rows: 60px minmax(3em, 1fr) !important;\n',
   '}\n',
   '</style>\n',
   '<input list="targets-list-1" id="target-input-1" value="', html_escape(names(objs)[1]),
