@@ -1,0 +1,735 @@
+---
+title: "NetPerturb"
+format:
+  dashboard:
+    theme: flatly
+    orientation: rows
+    logo: lab-logo.png
+    embed-resources: true
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  merged_obj: "merged_obj.RDS"
+  perbscore: "perbscore_all_targets.txt"
+  target: "Brd4"
+  n_cores: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+
+library(Seurat)
+library(scRank)
+library(dplyr)
+library(DT)
+library(ggpubr)
+library(fgsea)
+library(msigdbr)
+
+# `library(Seurat)` carrega `future` como dependência, e o `.onLoad()` do
+# future detecta heuristicamente um ambiente de "R CMD check" (por ausência
+# de NOT_CRAN) e força _R_CHECK_LIMIT_CORES_=TRUE. Isso faz
+# parallel::mclapply() (usado por scRank::rank_celltype) abortar com "N
+# simultaneous processes spawned" para n.core > 2. Só dá pra limpar DEPOIS
+# de carregar as libs — limpar antes não sobrevive ao library(Seurat).
+Sys.setenv("_R_CHECK_LIMIT_CORES_" = "")
+
+obj_base   <- readRDS(params$merged_obj)
+target_vec <- strsplit(params$target, ";")[[1]]
+celltypes  <- names(obj_base@net)
+
+perbscore_df <- read.delim(params$perbscore, stringsAsFactors = FALSE) |>
+  dplyr::rename(
+    `Cell Type`          = cell_type,
+    `Target`             = target,
+    `Perturbation Type`  = binding,
+    `Perturbation Score` = perb_score
+  ) |>
+  dplyr::select(Target, `Cell Type`, `Perturbation Type`, `Perturbation Score`)
+
+objs              <- list()
+tabelas           <- list()
+top_ct_por_target <- list()
+bot_ct_por_target <- list()
+
+get_cor_val <- function(rede, tgt, regulado) {
+  genes <- strsplit(tgt, ";")[[1]]
+  vals  <- sapply(genes, function(g) {
+    if (g %in% rownames(rede) && regulado %in% colnames(rede)) abs(rede[g, regulado]) else NA_real_
+  })
+  mean(vals, na.rm = TRUE)
+}
+
+# --- Enriquecimento funcional por módulo (GO BP / KEGG / Reactome) ---
+# fora() (fgsea) roda um teste de sobre-representação (hipergeométrico) da
+# lista discreta de genes de cada módulo — fgsea/msigdbr já são dependências
+# transitivas do scRank (evita adicionar clusterProfiler/org.db à imagem).
+# Definido antes do loop principal pra rodar dentro dele reusando os
+# `clusters` já obtidos ali, em vez de buscar a subrede de novo numa
+# segunda passada separada.
+species_full <- if (identical(obj_base@para$species, "mouse")) "Mus musculus" else "Homo sapiens"
+
+# NOTA: msigdbr >=10.0.0 renomeou os parâmetros — `collection` agora é o
+# nível C2/C5/H (era `category`), e o nível GO:BP/CP:KEGG_LEGACY/CP:REACTOME
+# vai em `subcollection` (era `subcategory`). Confirmado contra a versão
+# instalada no container (25.1.1) antes de fixar os nomes abaixo.
+pathway_db <- dplyr::bind_rows(
+  msigdbr::msigdbr(species = species_full, collection = "C5", subcollection = "GO:BP")         |> dplyr::mutate(source = "GO_BP"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:KEGG_LEGACY") |> dplyr::mutate(source = "KEGG"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:REACTOME")    |> dplyr::mutate(source = "Reactome")
+)
+pathway_list <- split(pathway_db$gene_symbol, paste(pathway_db$source, pathway_db$gs_name, sep = "::"))
+
+enrich_module <- function(genes, universe) {
+  res <- fgsea::fora(pathways = pathway_list, genes = genes, universe = universe)
+  res <- res[order(res$pval), ]
+  res <- res[res$padj < 0.05, ]
+  if (nrow(res) == 0) return(NULL)
+  data.frame(
+    Source          = sub("::.*", "", res$pathway),
+    Pathway         = sub("^[^:]+::", "", res$pathway),
+    Overlap         = res$overlap,
+    `Gene Set Size` = res$size,
+    `P-value`       = res$pval,
+    `Adj. P-value`  = res$padj,
+    Genes           = vapply(res$overlapGenes, paste, character(1), collapse = ", "),
+    check.names     = FALSE
+  )
+}
+enrichment_list <- list()
+
+for (tgt in target_vec) {
+  obj             <- obj_base
+  obj@para$target <- tgt
+  obj             <- rank_celltype(obj, n.core = params$n_cores)
+
+  top_ct <- obj@cell_type_rank |>
+    dplyr::arrange(dplyr::desc(rank)) |>
+    rownames() |>
+    _[1]
+
+  bot_ct <- obj@cell_type_rank |>
+    dplyr::arrange(rank) |>
+    rownames() |>
+    _[1]
+
+  top_ct_por_target[[tgt]] <- top_ct
+
+  # init_mod: zoom=TRUE pode falhar quando o target fica num sub-módulo menor que
+  # min_ModuleSize após a re-clusterização (cutree(k=0) → erro). Fallback progressivo:
+  # 1. padrão (zoom=TRUE, min=10); 2. zoom=FALSE com min=5; 3. zoom=FALSE com min=3.
+  obj <- tryCatch(
+    init_mod(obj, top_celltype = top_ct),
+    error = function(e) {
+      message("[nf_scrank] init_mod padrão falhou para '", tgt, "': ", conditionMessage(e),
+              "\n  → tentando zoom=FALSE, min_ModuleSize=5")
+      tryCatch(
+        init_mod(obj, top_celltype = top_ct, zoom = FALSE, min_ModuleSize = 5),
+        error = function(e2) {
+          message("[nf_scrank] init_mod zoom=FALSE min=5 falhou: ", conditionMessage(e2),
+                  "\n  → tentando zoom=FALSE, min_ModuleSize=3")
+          tryCatch(
+            init_mod(obj, top_celltype = top_ct, zoom = FALSE, min_ModuleSize = 3),
+            error = function(e3) {
+              message("[nf_scrank] init_mod falhou em todos os fallbacks para '", tgt,
+                      "': ", conditionMessage(e3), "\n  → target pulado.")
+              NULL
+            }
+          )
+        }
+      )
+    }
+  )
+
+  if (is.null(obj)) next  # pula target se init_mod falhou completamente
+
+  bot_ct_por_target[[tgt]] <- bot_ct
+  objs[[tgt]]  <- obj
+
+  # Subrede/módulos do alvo, buscados uma única vez aqui e reusados tanto
+  # pra tabela por gene abaixo quanto pro enriquecimento funcional logo
+  # depois — antes eram buscados de novo numa segunda passada separada.
+  clusters <- obj@para$gene_clusters
+
+  tabelas[[tgt]] <- list()
+  for (ct in celltypes) {
+    rede <- obj@net[[ct]]
+    df <- data.frame(
+      Target    = tgt,
+      Regulated = names(clusters),
+      Module    = paste0("M", clusters),
+      CellType  = ct,
+      stringsAsFactors = FALSE
+    ) |>
+      dplyr::filter(Regulated %in% obj@para$subnet_node, Regulated != tgt) |>
+      dplyr::rowwise() |>
+      dplyr::mutate(`Absolute correlation` = get_cor_val(rede, tgt, Regulated)) |>
+      dplyr::ungroup() |>
+      dplyr::mutate(.mod_num = as.integer(sub("M", "", Module))) |>
+      dplyr::arrange(.mod_num, dplyr::desc(`Absolute correlation`)) |>
+      dplyr::select(-.mod_num)
+
+    tabelas[[tgt]][[ct]] <- df
+  }
+
+  universe <- names(clusters)
+  for (m in sort(unique(clusters))) {
+    res <- enrich_module(names(clusters[clusters == m]), universe)
+    if (!is.null(res)) {
+      enrichment_list[[paste(tgt, m)]] <- cbind(Target = tgt, Module = paste0("M", m), res)
+    }
+  }
+}
+
+tabela_completa <- dplyr::bind_rows(unlist(tabelas, recursive = FALSE))
+
+# --- Atividade do módulo ---
+# Resume, por Target x CellType x Module, a força média de conexão do módulo
+# ao alvo (média da "Absolute correlation" dos genes do módulo) — comparável
+# entre celltypes, já que o conjunto de genes do módulo é o mesmo em todas.
+modulo_atividade <- tabela_completa |>
+  dplyr::group_by(Target, CellType, Module) |>
+  dplyr::summarise(
+    `Module activity` = mean(`Absolute correlation`, na.rm = TRUE),
+    `N genes`          = dplyr::n(),
+    .groups = "drop"
+  ) |>
+  dplyr::arrange(Target, CellType, Module)
+
+# Junta a atividade do módulo de volta na tabela por gene, em vez de manter
+# como aba separada — mesma granularidade de módulo, só que visível junto
+# com o detalhe por gene sem precisar trocar de aba.
+tabela_completa <- tabela_completa |>
+  dplyr::left_join(modulo_atividade, by = c("Target", "CellType", "Module"))
+
+enrichment_completa <- dplyr::bind_rows(enrichment_list)
+if (nrow(enrichment_completa) == 0) {
+  enrichment_completa <- data.frame(
+    Target = character(), Module = character(), Source = character(),
+    Pathway = character(), Overlap = integer(), `Gene Set Size` = integer(),
+    `P-value` = numeric(), `Adj. P-value` = numeric(), Genes = character(),
+    check.names = FALSE
+  )
+}
+
+# Como o número de targets/celltypes pode crescer bastante, as páginas abaixo
+# usam seletores (dropdown/datalist) em vez de caixas/abas fixas que não
+# escalam. Usamos JS "clássico" (<script>, sem type="module") em vez do
+# runtime OJS do Quarto porque OJS depende de ES modules, que os navegadores
+# bloqueiam em URLs file:// — e o relatório é pensado pra ser baixado e
+# aberto localmente, não servido por um servidor web.
+ref_df <- data.frame(
+  target = names(top_ct_por_target),
+  top_ct = unlist(top_ct_por_target, use.names = FALSE),
+  bot_ct = unlist(bot_ct_por_target, use.names = FALSE),
+  stringsAsFactors = FALSE
+)
+
+html_escape <- function(x) gsub('"', "&quot;", x, fixed = TRUE)
+
+options_html <- function(values) {
+  paste0('<option value="', html_escape(values), '">', html_escape(values), '</option>', collapse = "\n")
+}
+
+# Sem essa estilagem explícita, o reset CSS do Bootstrap (tema "flatly" do
+# Quarto) deixa um <select> puro praticamente invisível (encolhe pra uma
+# caixinha sem espaço pro texto) — precisa da classe form-select + largura
+# manual pra ficar legível.
+select_style <- 'style="display:inline-block; width:auto; min-width:150px; padding:6px; font-size:1.05em;"'
+
+# Constrói as duas boxes "Cell Types"/"Reference" a partir do mesmo template
+# HTML, pra garantir tipografia idêntica entre as duas (título e valor com
+# mesmo tamanho/peso de fonte). Cell Types precisa desse tratamento manual
+# em vez do valuebox nativo do Quarto (`#| content: valuebox`) porque o
+# nativo escala o valor via clamp() responsivo (cqw), que não bate em
+# tamanho com o texto multi-linha do Reference — só dá pra igualar os dois
+# com font-size explícito nos dois, o que exige construir os dois à mão.
+value_box_html <- function(bg_color, icon, title, value_html) {
+  paste0(
+    '<div class="card valuebox cell html-fill-item html-fill-container bslib-card bslib-value-box bg-success showcase-left-center" ',
+    'style="background-color:', bg_color, ' !important; color:#fff;">\n',
+    '<div class="card-body html-fill-item html-fill-container">\n',
+    '<div data-icon="', icon, '" class="html-fill-item html-fill-container value-box-grid">\n',
+    '<div class="value-box-showcase html-fill-item html-fill-container"><i class="bi bi-', icon, '"></i></div>\n',
+    '<div class="value-box-area">\n',
+    '<p class="value-box-title" style="font-size:1rem; font-weight:500;">', title, '</p>\n',
+    '<p class="value-box-value" style="font-size:1.5rem; font-weight:500; margin-bottom:0;">', value_html, '</p>\n',
+    '</div>\n</div>\n</div>\n</div>'
+  )
+}
+
+ref_json <- paste0(
+  "{", paste0(
+    '"', html_escape(ref_df$target), '":{"top_ct":"', html_escape(ref_df$top_ct),
+    '","bot_ct":"', html_escape(ref_df$bot_ct), '"}',
+    collapse = ","
+  ), "}"
+)
+```
+
+# Overview & Data {icon="table"}
+
+## Row {height="20%"}
+
+```{r}
+#| title: "Target"
+#| results: asis
+#| expandable: false
+# window.NP é o estado compartilhado de target selecionado entre as 3
+# páginas do dashboard (todas coexistem no mesmo DOM — são abas via
+# CSS, não navegações separadas — então um único objeto global mantido
+# vivo do primeiro carregamento até o fim funciona). Esse chunk roda
+# primeiro no documento, então é aqui que NP nasce; as páginas
+# seguintes só chamam NP.register()/NP.onChange.push().
+#
+# O <style> abaixo vai aqui dentro, em vez de um chunk próprio antes do
+# cabeçalho da página — um chunk solto ali virava uma seção fantasma
+# vazia, empurrando o conteúdo de TODAS as páginas pra baixo (mesmo
+# problema do net-embed).
+#
+# A causa real do espaço sobrando entre o toolbar e o grafo, em Network
+# Maps: a página inteira é UM grid (`#network-maps > .bslib-grid`) com
+# `grid-template-rows: minmax(3em,1fr) minmax(3em,1fr)` — as duas ## Row
+# (toolbar e conteúdo) recebem 50% da altura CADA UMA nesse nível, mesmo
+# o card do toolbar só usando 60px (o `#| height: 60px` do chunk
+# dimensiona o CARD certinho, mas não propaga pro cálculo de altura da
+# linha nesse grid de página — só funciona quando aninhado num
+# `### Column`, por isso Heatmaps já saiu correto sozinho). Sobrescreve
+# esse grid-template-rows específico pra dar só o necessário à primeira
+# linha (toolbar) e o resto à segunda (grafo/tabela).
+cat(paste0(
+  '<style>\n',
+  '#network-maps > .bslib-grid {\n',
+  '  grid-template-rows: 60px minmax(3em, 1fr) !important;\n',
+  '}\n',
+  '</style>\n',
+  '<input list="targets-list-1" id="target-input-1" value="', html_escape(names(objs)[1]),
+  '" style="width:95%; padding:6px; font-size:1.1em;">\n',
+  '<datalist id="targets-list-1">\n', options_html(names(objs)), '\n</datalist>\n',
+  '<script>\n',
+  '(function() {\n',
+  '  window.NP = window.NP || {\n',
+  '    refData: ', ref_json, ',\n',
+  '    target: "', html_escape(names(objs)[1]), '",\n',
+  '    controls: [],\n',
+  '    onChange: [],\n',
+  '    register: function(el) {\n',
+  '      this.controls.push(el);\n',
+  '      var self = this;\n',
+  '      var evt = (el.tagName === "INPUT") ? "input" : "change";\n',
+  '      el.addEventListener(evt, function() { self.setTarget(el.value, el); });\n',
+  '    },\n',
+  '    setTarget: function(value, source) {\n',
+  '      if (!(value in this.refData)) return;\n',
+  '      this.target = value;\n',
+  '      this.controls.forEach(function(el) { if (el !== source) el.value = value; });\n',
+  '      this.onChange.forEach(function(fn) { fn(value); });\n',
+  '    }\n',
+  '  };\n',
+  '  var input = document.getElementById("target-input-1");\n',
+  '  window.NP.register(input);\n',
+  '  input.addEventListener("focus", function() { input.value = ""; });\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+```{r}
+#| results: asis
+#| expandable: false
+cat(value_box_html("#3498db", "diagram-3", "Cell Types", as.character(length(celltypes))))
+```
+
+```{r}
+#| results: asis
+#| expandable: false
+cat(paste0(
+  value_box_html("#18bc9c", "star", "Reference", '<div id="ref-output-1" style="line-height:1.3;"></div>'),
+  '<script>\n',
+  '(function() {\n',
+  '  var output = document.getElementById("ref-output-1");\n',
+  '  function update(target) {\n',
+  '    var d = window.NP.refData[target];\n',
+  '    if (d) output.innerHTML = "Sensitive: " + d.bot_ct + "<br>Resistant: " + d.top_ct;\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+## Row
+
+```{r}
+#| title: "Perturbation Scores"
+DT::datatable(
+  perbscore_df,
+  options  = list(pageLength = 10, autoWidth = TRUE),
+  rownames = FALSE
+) |> DT::formatSignif("Perturbation Score", digits = 4)
+```
+
+# Network Maps {icon="diagram-2"}
+
+## Row
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs (network-gen) e o embed em base64 (net-embed) rodam aqui
+# dentro, em vez de um chunk próprio antes deste Row — um chunk solto sem
+# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real da
+# página pra baixo (mesmo problema já corrigido no chunk "Target").
+
+# Gera os PNGs de cada combinação target x celltype sem exibi-los inline
+# (fig.show='hide' ainda salva o arquivo em *_files/figure-html/, só não
+# insere a imagem na posição do chunk). A página abaixo usa dois seletores
+# (target, celltype) para trocar qual imagem fica visível — evita uma
+# barra de abas larga que não escala com muitos targets/celltypes.
+f <- paste(rep("`", 3), collapse = "")
+
+net_template <- paste0(
+  f, "{r net-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
+  'plot_net(objs[["{{tgt}}"]], mode = "network", celltype = "{{ct}}")\n',
+  f, "\n\n"
+)
+
+for (tgt in names(objs)) {
+  for (ct in celltypes) {
+    expanded <- knitr::knit_expand(text = net_template, tgt = tgt, ct = ct)
+    cat(knitr::knit_child(text = expanded, quiet = TRUE))
+  }
+}
+
+# embed-resources:true não embute essas imagens sozinho — elas são trocadas
+# via JS montando o caminho do arquivo (nf_scrank_report_files/figure-html/...),
+# e o pós-processador do Quarto só embute tags <img>/<link> literais que ele
+# mesmo escreve, não caminhos montados dentro de <script>. Embute cada PNG
+# como base64 logo depois de gerado e expõe via window.NP_IMG, pro JS usar o
+# data URI direto em vez de um caminho que não existiria no HTML final.
+img_data_uri <- function(path) paste0("data:image/png;base64,", base64enc::base64encode(path))
+
+net_images <- lapply(names(objs), function(tgt) {
+  vals <- lapply(celltypes, function(ct) {
+    img_data_uri(paste0("nf_scrank_report_files/figure-html/net-", tgt, "-", ct, "-1.png"))
+  })
+  names(vals) <- celltypes
+  vals
+})
+names(net_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.net = ', jsonlite::toJSON(net_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
+
+cat(paste0(
+  '<style>\n',
+  '  .card:has(#toolbar-net) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-net) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-net p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-net" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
+  '<label>Target: <select id="target-select-net" class="form-select" ', select_style, '>\n',
+  options_html(names(objs)), '\n</select></label>\n',
+  '<label>Cell Type: <select id="celltype-select-net" class="form-select" ', select_style, '>\n',
+  options_html(celltypes), '\n</select></label>\n</div>\n',
+  '<script>window.NP.register(document.getElementById("target-select-net"));</script>'
+))
+```
+
+## Row
+
+```{r}
+#| title: "Network"
+#| width: 50%
+#| results: asis
+cat(paste0(
+  '<img id="net-img" src="" style="max-width:100%; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var c = document.getElementById("celltype-select-net");\n',
+  '  var img = document.getElementById("net-img");\n',
+  '  function update(target) {\n',
+  '    img.src = window.NP_IMG.net[target][c.value];\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  c.addEventListener("change", function() { update(window.NP.target); });\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+```{r}
+#| title: "Regulatory Modules"
+#| width: 50%
+# Mesma tabela de antes (Overview), agora filtrada ao vivo pelos seletores
+# Target/Cell Type já existentes no topo da página — reusa os controles em
+# vez de duplicar, via API do DataTables (column().search().draw()).
+tbl <- DT::datatable(
+  tabela_completa,
+  elementId = "regmod-table",
+  options   = list(pageLength = 8, autoWidth = TRUE),
+  rownames  = FALSE
+) |> DT::formatRound(c("Absolute correlation", "Module activity"), digits = 4)
+
+filter_script <- htmltools::tags$script(htmltools::HTML(paste0(
+  '(function() {\n',
+  '  var sel = "#regmod-table table";\n',
+  '  function filterTable() {\n',
+  '    if (!$.fn.DataTable.isDataTable(sel)) return;\n',
+  '    var dt = $(sel).DataTable();\n',
+  '    var target = window.NP.target;\n',
+  '    var ct = document.getElementById("celltype-select-net").value;\n',
+  '    dt.column(0).search("^" + $.fn.dataTable.util.escapeRegex(target) + "$", true, false);\n',
+  '    dt.column(3).search("^" + $.fn.dataTable.util.escapeRegex(ct) + "$", true, false);\n',
+  '    dt.draw();\n',
+  '  }\n',
+  '  window.NP.onChange.push(filterTable);\n',
+  '  document.getElementById("celltype-select-net").addEventListener("change", filterTable);\n',
+  '  $(sel).on("init.dt", filterTable);\n',
+  '  filterTable();\n',
+  '})();'
+)))
+
+htmltools::tagList(tbl, filter_script)
+```
+
+# Heatmaps {icon="grid"}
+
+## Row
+
+### Column
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs (heatmap-gen) e o embed em base64 (hm-embed) rodam aqui
+# dentro, em vez de chunks próprios antes deste Row — um chunk solto sem
+# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real
+# da página pra baixo (mesmo problema já corrigido em Network Maps).
+f <- paste(rep("`", 3), collapse = "")
+
+hm_template <- paste0(
+  f, "{r hm-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
+  'plot_net(objs[["{{tgt}}"]], mode = "heatmap", celltype = "{{ct}}")\n',
+  f, "\n\n"
+)
+
+for (tgt in names(objs)) {
+  for (ct in celltypes) {
+    expanded <- knitr::knit_expand(text = hm_template, tgt = tgt, ct = ct)
+    cat(knitr::knit_child(text = expanded, quiet = TRUE))
+  }
+}
+
+# Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
+hm_images <- lapply(names(objs), function(tgt) {
+  vals <- lapply(celltypes, function(ct) {
+    img_data_uri(paste0("nf_scrank_report_files/figure-html/hm-", tgt, "-", ct, "-1.png"))
+  })
+  names(vals) <- celltypes
+  vals
+})
+names(hm_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.hm = ', jsonlite::toJSON(hm_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
+
+cat(paste0(
+  '<style>\n',
+  '  .card:has(#toolbar-hm) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-hm) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-hm p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-hm" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
+  '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(names(objs)), '\n</select></label>\n',
+  '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(celltypes), '\n</select></label>\n</div>\n',
+  '<script>window.NP.register(document.getElementById("target-select-hm"));</script>'
+))
+```
+
+```{r}
+#| results: asis
+# Imagem inteira precisa caber sem cortar (inclusive a legenda de módulos,
+# que faz parte do PNG gerado pelo ComplexHeatmap) — max-height:100% +
+# object-fit:contain encolhe a imagem pra caber no card em vez de vazar
+# pra scroll interno. Link em volta abre o PNG em tamanho real numa aba
+# nova, como alternativa leve a um zoom/pan dedicado.
+cat(paste0(
+  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
+  '<a id="hm-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img id="hm-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var c = document.getElementById("celltype-select-hm");\n',
+  '  var img = document.getElementById("hm-img");\n',
+  '  var link = document.getElementById("hm-link");\n',
+  '  function update(target) {\n',
+  '    var src = window.NP_IMG.hm[target][c.value];\n',
+  '    img.src = src;\n',
+  '    link.href = src;\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  c.addEventListener("change", function() { update(window.NP.target); });\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+### Column
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs de delta (delta-gen) e o embed em base64 (delta-embed)
+# rodam aqui dentro, pelo mesmo motivo do bloco de heatmap-gen acima.
+
+# Painel Δcor: |cor_top_ct| - |cor_bot_ct| para os genes da subnet (order_gene).
+# Evidencia quais genes e módulos têm correlação diferencial entre o celltype mais
+# afetado (top_ct, maior rank de perturbação) e o menos afetado (bot_ct).
+# Escala divergente: positivo = correlação mais forte em top_ct, negativo = em bot_ct.
+
+.delta_plot_nf_scrank <- function(obj, top_ct, bot_ct) {
+  genes   <- obj@para$order_gene
+  gc      <- obj@para$gene_clusters[genes]
+  tgt     <- obj@para$target
+
+  net_top <- abs(obj@net[[top_ct]][genes, genes])
+  net_bot <- abs(obj@net[[bot_ct]][genes, genes])
+  delta   <- net_top - net_bot  # rownames/colnames = genes
+
+  # Rownames: mostra apenas o target (padrão visual de plot_net)
+  id_other <- which(!genes %in% tgt)
+  id_tgt   <- which(genes %in% tgt)
+  rownames(delta)[id_other] <- ""
+  rownames(delta)[id_tgt]   <- paste0("<", tgt)
+
+  # Anotação de módulos (colnames mantidos como gene names para o match)
+  if (length(unique(gc)) < 2) {
+    nM <- rep("Module1", length(gc))
+  } else {
+    nM <- do.call(c, lapply(seq_len(length(unique(gc))), function(i) {
+      rep(paste0("Module", i), as.integer(table(sort(gc)))[i])
+    }))
+  }
+  ann_col <- data.frame(Module = factor(nM))
+  rownames(ann_col) <- genes
+  mat_colors <- list(Module = ggpubr::get_palette("lancet", length(unique(nM))))
+  names(mat_colors$Module) <- unique(nM)
+
+  gaps  <- which(diff(sort(gc)) != 0)
+  lim   <- max(abs(range(delta, na.rm = TRUE)), 1e-9)
+  bk    <- seq(-lim, lim, length.out = 101)
+  cols  <- grDevices::colorRampPalette(c("#6565FF", "white", "forestgreen"))(100)
+
+  # Usa ComplexHeatmap::pheatmap para consistência visual com plot_net(mode="heatmap")
+  suppressWarnings(ComplexHeatmap::pheatmap(
+    delta,
+    cluster_rows         = FALSE, cluster_cols         = FALSE,
+    show_rownames        = TRUE,  show_colnames        = FALSE,
+    breaks               = bk,    color                = cols,
+    border_color         = NA,
+    name                 = "Δcor",
+    annotation_col       = ann_col,
+    annotation_colors    = mat_colors,
+    annotation_names_col = FALSE,
+    annotation_legend    = TRUE,
+    gaps_row             = gaps,  gaps_col             = gaps,
+    main                 = paste0("Δ|cor|  =  |", top_ct, "|  −  |", bot_ct, "|")
+  ))
+}
+
+f <- paste(rep("`", 3), collapse = "")
+
+delta_template <- paste0(
+  f, "{r delta-{{tgt}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
+  ".delta_plot_nf_scrank(objs[[\"{{tgt}}\"]], top_ct = top_ct_por_target[[\"{{tgt}}\"]],",
+  " bot_ct = bot_ct_por_target[[\"{{tgt}}\"]])\n",
+  f, "\n\n"
+)
+
+for (tgt in names(objs)) {
+  expanded <- knitr::knit_expand(text = delta_template, tgt = tgt)
+  cat(knitr::knit_child(text = expanded, quiet = TRUE))
+}
+
+# Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
+delta_images <- lapply(names(objs), function(tgt) {
+  img_data_uri(paste0("nf_scrank_report_files/figure-html/delta-", tgt, "-1.png"))
+})
+names(delta_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.delta = ', jsonlite::toJSON(delta_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
+
+cat(paste0(
+  '<style>\n',
+  '  .card:has(#toolbar-delta) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-delta) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-delta p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-delta" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
+  '<label>Target (Δcor top_ct − bot_ct): <select id="target-select-delta" class="form-select" ',
+  select_style, '>\n', options_html(names(objs)), '\n</select></label>\n</div>\n',
+  '<script>window.NP.register(document.getElementById("target-select-delta"));</script>'
+))
+```
+
+```{r}
+#| results: asis
+cat(paste0(
+  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
+  '<a id="delta-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img id="delta-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var img = document.getElementById("delta-img");\n',
+  '  var link = document.getElementById("delta-link");\n',
+  '  function update(target) {\n',
+  '    var src = window.NP_IMG.delta[target];\n',
+  '    img.src = src;\n',
+  '    link.href = src;\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+# Functional Enrichment {icon="search"}
+
+## Row
+
+```{r}
+#| title: "GO Biological Process / KEGG / Reactome enrichment per module"
+DT::datatable(
+  enrichment_completa,
+  filter   = "top",
+  options  = list(pageLength = 15, autoWidth = TRUE, order = list(list(7, "asc"))),
+  rownames = FALSE
+) |> DT::formatSignif(c("P-value", "Adj. P-value"), digits = 3)
+```

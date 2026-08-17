@@ -41,7 +41,7 @@ names(obj@net) <- cell_types
 
 obj@para$ct.keep = names(obj@net)
 
-# saveRDS(obj, paste0("merged_obj.", target_id, ".RDS"))
+saveRDS(obj, paste0("merged_obj.", target_id, ".RDS"))
 
 all_ranks <- data.frame()
 

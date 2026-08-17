@@ -19,6 +19,7 @@ process RANK_SCORE {
 
   output:
     path "perbscore_all_targets*.txt", emit: rank_scores
+    path "merged_obj*.RDS", emit: merged_obj
 
   when:
   task.ext.when == null || task.ext.when  
