@@ -364,7 +364,17 @@ DT::datatable(
 
 # Network Maps {icon="diagram-2"}
 
-```{r network-gen, results='asis'}
+## Row
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs (network-gen) e o embed em base64 (net-embed) rodam aqui
+# dentro, em vez de um chunk próprio antes deste Row — um chunk solto sem
+# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real da
+# página pra baixo (mesmo problema já corrigido no chunk "Target").
+
 # Gera os PNGs de cada combinação target x celltype sem exibi-los inline
 # (fig.show='hide' ainda salva o arquivo em *_files/figure-html/, só não
 # insere a imagem na posição do chunk). A página abaixo usa dois seletores
@@ -390,9 +400,7 @@ for (tgt in names(objs)) {
 # e o pós-processador do Quarto só embute tags <img>/<link> literais que ele
 # mesmo escreve, não caminhos montados dentro de <script>. Embute cada PNG
 # como base64 logo depois de gerado e expõe via window.NP_IMG, pro JS usar o
-# data URI direto em vez de um caminho que não existiria no HTML final. Fica
-# no mesmo chunk (em vez de um chunk `results: asis` à parte) pra não criar
-# um card vazio extra que rouba espaço vertical dos cards de verdade.
+# data URI direto em vez de um caminho que não existiria no HTML final.
 img_data_uri <- function(path) paste0("data:image/png;base64,", base64enc::base64encode(path))
 
 net_images <- lapply(names(objs), function(tgt) {
@@ -410,14 +418,7 @@ cat(
   'window.NP_IMG.net = ', jsonlite::toJSON(net_images, auto_unbox = TRUE), ';\n',
   '</script>'
 )
-```
 
-## Row
-
-```{r}
-#| height: 60px
-#| results: asis
-#| expandable: false
 cat(paste0(
   '<style>\n',
   '  .card:has(#toolbar-net) { border: none; box-shadow: none; background: transparent; }\n',
@@ -493,7 +494,18 @@ htmltools::tagList(tbl, filter_script)
 
 # Heatmaps {icon="grid"}
 
-```{r heatmap-gen, results='asis'}
+## Row
+
+### Column
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs (heatmap-gen) e o embed em base64 (hm-embed) rodam aqui
+# dentro, em vez de chunks próprios antes deste Row — um chunk solto sem
+# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real
+# da página pra baixo (mesmo problema já corrigido em Network Maps).
 f <- paste(rep("`", 3), collapse = "")
 
 hm_template <- paste0(
@@ -510,7 +522,6 @@ for (tgt in names(objs)) {
 }
 
 # Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
-# Fica no mesmo chunk pra não criar um card vazio extra.
 hm_images <- lapply(names(objs), function(tgt) {
   vals <- lapply(celltypes, function(ct) {
     img_data_uri(paste0("nf_scrank_report_files/figure-html/hm-", tgt, "-", ct, "-1.png"))
@@ -526,9 +537,61 @@ cat(
   'window.NP_IMG.hm = ', jsonlite::toJSON(hm_images, auto_unbox = TRUE), ';\n',
   '</script>'
 )
+
+cat(paste0(
+  '<style>\n',
+  '  .card:has(#toolbar-hm) { border: none; box-shadow: none; background: transparent; }\n',
+  '  .card:has(#toolbar-hm) .card-body { padding: 4px; align-items: flex-start; }\n',
+  '  #toolbar-hm p { margin: 0; }\n',
+  '</style>',
+  '<div id="toolbar-hm" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
+  '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(names(objs)), '\n</select></label>\n',
+  '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
+  options_html(celltypes), '\n</select></label>\n</div>\n',
+  '<script>window.NP.register(document.getElementById("target-select-hm"));</script>'
+))
 ```
 
-```{r delta-gen, results='asis'}
+```{r}
+#| results: asis
+# Imagem inteira precisa caber sem cortar (inclusive a legenda de módulos,
+# que faz parte do PNG gerado pelo ComplexHeatmap) — max-height:100% +
+# object-fit:contain encolhe a imagem pra caber no card em vez de vazar
+# pra scroll interno. Link em volta abre o PNG em tamanho real numa aba
+# nova, como alternativa leve a um zoom/pan dedicado.
+cat(paste0(
+  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
+  '<a id="hm-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img id="hm-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var c = document.getElementById("celltype-select-hm");\n',
+  '  var img = document.getElementById("hm-img");\n',
+  '  var link = document.getElementById("hm-link");\n',
+  '  function update(target) {\n',
+  '    var src = window.NP_IMG.hm[target][c.value];\n',
+  '    img.src = src;\n',
+  '    link.href = src;\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  c.addEventListener("change", function() { update(window.NP.target); });\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+### Column
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# Geração dos PNGs de delta (delta-gen) e o embed em base64 (delta-embed)
+# rodam aqui dentro, pelo mesmo motivo do bloco de heatmap-gen acima.
+
 # Painel Δcor: |cor_top_ct| - |cor_bot_ct| para os genes da subnet (order_gene).
 # Evidencia quais genes e módulos têm correlação diferencial entre o celltype mais
 # afetado (top_ct, maior rank de perturbação) e o menos afetado (bot_ct).
@@ -599,7 +662,6 @@ for (tgt in names(objs)) {
 }
 
 # Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
-# Fica no mesmo chunk pra não criar um card vazio extra.
 delta_images <- lapply(names(objs), function(tgt) {
   img_data_uri(paste0("nf_scrank_report_files/figure-html/delta-", tgt, "-1.png"))
 })
@@ -611,67 +673,7 @@ cat(
   'window.NP_IMG.delta = ', jsonlite::toJSON(delta_images, auto_unbox = TRUE), ';\n',
   '</script>'
 )
-```
 
-## Row
-
-### Column
-
-```{r}
-#| height: 60px
-#| results: asis
-#| expandable: false
-cat(paste0(
-  '<style>\n',
-  '  .card:has(#toolbar-hm) { border: none; box-shadow: none; background: transparent; }\n',
-  '  .card:has(#toolbar-hm) .card-body { padding: 4px; align-items: flex-start; }\n',
-  '  #toolbar-hm p { margin: 0; }\n',
-  '</style>',
-  '<div id="toolbar-hm" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
-  '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
-  options_html(names(objs)), '\n</select></label>\n',
-  '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
-  options_html(celltypes), '\n</select></label>\n</div>\n',
-  '<script>window.NP.register(document.getElementById("target-select-hm"));</script>'
-))
-```
-
-```{r}
-#| results: asis
-# Imagem inteira precisa caber sem cortar (inclusive a legenda de módulos,
-# que faz parte do PNG gerado pelo ComplexHeatmap) — max-height:100% +
-# object-fit:contain encolhe a imagem pra caber no card em vez de vazar
-# pra scroll interno. Link em volta abre o PNG em tamanho real numa aba
-# nova, como alternativa leve a um zoom/pan dedicado.
-cat(paste0(
-  '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
-  '<a id="hm-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
-  '<img id="hm-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
-  '</a>\n</div>\n',
-  '<script>\n',
-  '(function() {\n',
-  '  var c = document.getElementById("celltype-select-hm");\n',
-  '  var img = document.getElementById("hm-img");\n',
-  '  var link = document.getElementById("hm-link");\n',
-  '  function update(target) {\n',
-  '    var src = window.NP_IMG.hm[target][c.value];\n',
-  '    img.src = src;\n',
-  '    link.href = src;\n',
-  '  }\n',
-  '  window.NP.onChange.push(update);\n',
-  '  c.addEventListener("change", function() { update(window.NP.target); });\n',
-  '  update(window.NP.target);\n',
-  '})();\n',
-  '</script>'
-))
-```
-
-### Column
-
-```{r}
-#| height: 60px
-#| results: asis
-#| expandable: false
 cat(paste0(
   '<style>\n',
   '  .card:has(#toolbar-delta) { border: none; box-shadow: none; background: transparent; }\n',
