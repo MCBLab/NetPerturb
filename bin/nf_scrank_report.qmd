@@ -269,6 +269,26 @@ ref_json <- paste0(
 )
 ```
 
+```{r}
+#| results: asis
+#| expandable: false
+# O grid do bslib dimensiona a linha via var(--bslib-grid-height), calculada
+# em JS a partir da árvore de fill-containers — nos cards que a gente monta
+# à mão (cat/paste0 em vez do pipeline nativo do Quarto), essa variável não
+# fica definida, então a linha cai pro tamanho natural do conteúdo (baixa) em
+# vez de esticar até o fim da página. Força a altura direto via :has(),
+# mirando só as linhas de conteúdo de Network Maps/Heatmaps (não mexe no
+# Overview, que já renderiza correto).
+cat(
+  '<style>\n',
+  '.bslib-grid:has(#net-img), .bslib-grid:has(#regmod-table),\n',
+  '.bslib-grid:has(#toolbar-hm), .bslib-grid:has(#toolbar-delta) {\n',
+  '  height: calc(100vh - 180px) !important;\n',
+  '}\n',
+  '</style>'
+)
+```
+
 # Overview & Data {icon="table"}
 
 ## Row {height="20%"}
