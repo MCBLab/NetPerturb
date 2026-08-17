@@ -5,6 +5,7 @@ format:
     theme: flatly
     orientation: rows
     logo: lab-logo.png
+    embed-resources: true
 execute:
   echo: false
   warning: false
@@ -370,6 +371,32 @@ for (tgt in names(objs)) {
 }
 ```
 
+```{r net-embed, results='asis'}
+# embed-resources:true não embute essas imagens sozinho — elas são trocadas
+# via JS montando o caminho do arquivo (nf_scrank_report_files/figure-html/...),
+# e o pós-processador do Quarto só embute tags <img>/<link> literais que ele
+# mesmo escreve, não caminhos montados dentro de <script>. Embute cada PNG
+# como base64 logo depois de gerado e expõe via window.NP_IMG, pro JS usar o
+# data URI direto em vez de um caminho que não existiria no HTML final.
+img_data_uri <- function(path) paste0("data:image/png;base64,", base64enc::base64encode(path))
+
+net_images <- lapply(names(objs), function(tgt) {
+  vals <- lapply(celltypes, function(ct) {
+    img_data_uri(paste0("nf_scrank_report_files/figure-html/net-", tgt, "-", ct, "-1.png"))
+  })
+  names(vals) <- celltypes
+  vals
+})
+names(net_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.net = ', jsonlite::toJSON(net_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
+```
+
 ## Row {height="60px"}
 
 ```{r}
@@ -397,14 +424,13 @@ cat(paste0(
 #| width: 60%
 #| results: asis
 cat(paste0(
-  '<img id="net-img" src="nf_scrank_report_files/figure-html/net-', html_escape(names(objs)[1]), '-',
-  html_escape(celltypes[1]), '-1.png" style="max-width:100%; display:block; margin:auto;">\n',
+  '<img id="net-img" src="" style="max-width:100%; display:block; margin:auto;">\n',
   '<script>\n',
   '(function() {\n',
   '  var c = document.getElementById("celltype-select-net");\n',
   '  var img = document.getElementById("net-img");\n',
   '  function update(target) {\n',
-  '    img.src = "nf_scrank_report_files/figure-html/net-" + target + "-" + c.value + "-1.png";\n',
+  '    img.src = window.NP_IMG.net[target][c.value];\n',
   '  }\n',
   '  window.NP.onChange.push(update);\n',
   '  c.addEventListener("change", function() { update(window.NP.target); });\n',
@@ -466,6 +492,25 @@ for (tgt in names(objs)) {
     cat(knitr::knit_child(text = expanded, quiet = TRUE))
   }
 }
+```
+
+```{r hm-embed, results='asis'}
+# Mesmo motivo do net-embed (Network Maps) — ver comentário lá.
+hm_images <- lapply(names(objs), function(tgt) {
+  vals <- lapply(celltypes, function(ct) {
+    img_data_uri(paste0("nf_scrank_report_files/figure-html/hm-", tgt, "-", ct, "-1.png"))
+  })
+  names(vals) <- celltypes
+  vals
+})
+names(hm_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.hm = ', jsonlite::toJSON(hm_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
 ```
 
 ```{r delta-gen, results='asis'}
@@ -539,6 +584,21 @@ for (tgt in names(objs)) {
 }
 ```
 
+```{r delta-embed, results='asis'}
+# Mesmo motivo do net-embed (Network Maps) — ver comentário lá.
+delta_images <- lapply(names(objs), function(tgt) {
+  img_data_uri(paste0("nf_scrank_report_files/figure-html/delta-", tgt, "-1.png"))
+})
+names(delta_images) <- names(objs)
+
+cat(
+  '<script>\n',
+  'window.NP_IMG = window.NP_IMG || {};\n',
+  'window.NP_IMG.delta = ', jsonlite::toJSON(delta_images, auto_unbox = TRUE), ';\n',
+  '</script>'
+)
+```
+
 ## Row
 
 ### Column
@@ -571,10 +631,8 @@ cat(paste0(
 # nova, como alternativa leve a um zoom/pan dedicado.
 cat(paste0(
   '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
-  '<a id="hm-link" href="nf_scrank_report_files/figure-html/hm-', html_escape(names(objs)[1]), '-',
-  html_escape(celltypes[1]), '-1.png" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
-  '<img id="hm-img" src="nf_scrank_report_files/figure-html/hm-', html_escape(names(objs)[1]), '-',
-  html_escape(celltypes[1]), '-1.png" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '<a id="hm-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img id="hm-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
   '</a>\n</div>\n',
   '<script>\n',
   '(function() {\n',
@@ -582,7 +640,7 @@ cat(paste0(
   '  var img = document.getElementById("hm-img");\n',
   '  var link = document.getElementById("hm-link");\n',
   '  function update(target) {\n',
-  '    var src = "nf_scrank_report_files/figure-html/hm-" + target + "-" + c.value + "-1.png";\n',
+  '    var src = window.NP_IMG.hm[target][c.value];\n',
   '    img.src = src;\n',
   '    link.href = src;\n',
   '  }\n',
@@ -617,17 +675,15 @@ cat(paste0(
 #| results: asis
 cat(paste0(
   '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
-  '<a id="delta-link" href="nf_scrank_report_files/figure-html/delta-', html_escape(names(objs)[1]),
-  '-1.png" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
-  '<img id="delta-img" src="nf_scrank_report_files/figure-html/delta-', html_escape(names(objs)[1]),
-  '-1.png" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '<a id="delta-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img id="delta-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
   '</a>\n</div>\n',
   '<script>\n',
   '(function() {\n',
   '  var img = document.getElementById("delta-img");\n',
   '  var link = document.getElementById("delta-link");\n',
   '  function update(target) {\n',
-  '    var src = "nf_scrank_report_files/figure-html/delta-" + target + "-1.png";\n',
+  '    var src = window.NP_IMG.delta[target];\n',
   '    img.src = src;\n',
   '    link.href = src;\n',
   '  }\n',
