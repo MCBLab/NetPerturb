@@ -28,6 +28,30 @@ perb_score <- read.delim(params$perbscore_file, header = TRUE, sep = "\t")
 n_cell_types <- n_distinct(perb_score$cell_type)
 n_targets    <- n_distinct(perb_score$target)
 n_bindings   <- n_distinct(perb_score$binding)
+
+# Pool every score from every target on a log10 scale; non-positive scores
+# cannot be logged and are carried as NA.
+score_data <- perb_score %>%
+  mutate(log_score = ifelse(perb_score > 0, log10(perb_score), NA_real_))
+
+has_scores <- any(is.finite(score_data$log_score))
+
+# Quantile cut: values below q1 - 1.5 * IQR are low-expression outliers that
+# squash the colour scale, so they are imputed up to that bound.
+if (has_scores) {
+  q1  <- quantile(score_data$log_score, 0.25, na.rm = TRUE)
+  q3  <- quantile(score_data$log_score, 0.75, na.rm = TRUE)
+  iqr <- q3 - q1
+  lower_bound <- unname(q1 - 1.5 * iqr)
+} else {
+  lower_bound <- NA_real_
+}
+
+score_data <- score_data %>%
+  mutate(log_score_imputed = pmax(log_score, lower_bound))
+
+n_imputed <- sum(score_data$log_score < lower_bound, na.rm = TRUE)
+n_dropped <- sum(!is.finite(score_data$log_score))
 ```
 
 ## Overview
@@ -53,16 +77,53 @@ perb_score %>%
   formatSignif(columns = "perb_score", digits = 4)
 ```
 
+## Perturbation score distribution
+
+All `r sum(is.finite(score_data$log_score))` log10 scores from every target and
+cell type pooled into one distribution. To avoid low-expression biases, values
+below the quantile cut `q1 - 1.5 * IQR` (red line,
+`r if (has_scores) signif(lower_bound, 4) else NA`) are imputed up to that bound:
+`r n_imputed` value(s) were imputed and `r n_dropped` non-positive score(s) are
+not shown.
+
+```{r distribution, fig.width=10, fig.height=4, eval=has_scores}
+dist_data <- score_data %>%
+  select(log_score, log_score_imputed) %>%
+  pivot_longer(everything(), names_to = "stage", values_to = "value") %>%
+  mutate(stage = factor(
+    stage,
+    levels = c("log_score", "log_score_imputed"),
+    labels = c("Before imputation", "After imputation")
+  ))
+
+bound_line <- data.frame(
+  stage = factor("Before imputation", levels = levels(dist_data$stage)),
+  xintercept = lower_bound
+)
+
+ggplot(dist_data, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  geom_vline(data = bound_line, aes(xintercept = xintercept), color = "red") +
+  facet_wrap(~stage) +
+  labs(
+    title = "Distribution of perturbation scores across all targets",
+    x = "log10(perturbation score)",
+    y = "Counts per bin"
+  ) +
+  theme_classic(base_size = 12)
+```
+
+```{r distribution-empty, eval=!has_scores, results="asis"}
+cat("No positive perturbation score is available, so no distribution is shown.")
+```
+
 ## Perturbation score heatmap
 
-Scores are log10-transformed for display; non-positive values are shown as
-missing (gray).
+Scores are log10-transformed and quantile-cut as above; non-positive values are
+shown as missing (gray).
 
 ```{r heatmap, fig.width=10, fig.height=max(4, 0.4 * n_cell_types)}
-heatmap_data <- perb_score %>%
-  mutate(log_score = ifelse(perb_score > 0, log10(perb_score), NA_real_))
-
-ggplot(heatmap_data, aes(x = target, y = cell_type, fill = log_score)) +
+ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_imputed)) +
   geom_tile(color = "white", linewidth = 0.6) +
   scale_fill_viridis_c(name = "log10(perb_score)", na.value = "gray80") +
   labs(x = "Target", y = "Cell type") +
