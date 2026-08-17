@@ -62,6 +62,44 @@ get_cor_val <- function(rede, tgt, regulado) {
   mean(vals, na.rm = TRUE)
 }
 
+# --- Enriquecimento funcional por módulo (GO BP / KEGG / Reactome) ---
+# fora() (fgsea) roda um teste de sobre-representação (hipergeométrico) da
+# lista discreta de genes de cada módulo — fgsea/msigdbr já são dependências
+# transitivas do scRank (evita adicionar clusterProfiler/org.db à imagem).
+# Definido antes do loop principal pra rodar dentro dele reusando os
+# `clusters` já obtidos ali, em vez de buscar a subrede de novo numa
+# segunda passada separada.
+species_full <- if (identical(obj_base@para$species, "mouse")) "Mus musculus" else "Homo sapiens"
+
+# NOTA: msigdbr >=10.0.0 renomeou os parâmetros — `collection` agora é o
+# nível C2/C5/H (era `category`), e o nível GO:BP/CP:KEGG_LEGACY/CP:REACTOME
+# vai em `subcollection` (era `subcategory`). Confirmado contra a versão
+# instalada no container (25.1.1) antes de fixar os nomes abaixo.
+pathway_db <- dplyr::bind_rows(
+  msigdbr::msigdbr(species = species_full, collection = "C5", subcollection = "GO:BP")         |> dplyr::mutate(source = "GO_BP"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:KEGG_LEGACY") |> dplyr::mutate(source = "KEGG"),
+  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:REACTOME")    |> dplyr::mutate(source = "Reactome")
+)
+pathway_list <- split(pathway_db$gene_symbol, paste(pathway_db$source, pathway_db$gs_name, sep = "::"))
+
+enrich_module <- function(genes, universe) {
+  res <- fgsea::fora(pathways = pathway_list, genes = genes, universe = universe)
+  res <- res[order(res$pval), ]
+  res <- res[res$padj < 0.05, ]
+  if (nrow(res) == 0) return(NULL)
+  data.frame(
+    Source          = sub("::.*", "", res$pathway),
+    Pathway         = sub("^[^:]+::", "", res$pathway),
+    Overlap         = res$overlap,
+    `Gene Set Size` = res$size,
+    `P-value`       = res$pval,
+    `Adj. P-value`  = res$padj,
+    Genes           = vapply(res$overlapGenes, paste, character(1), collapse = ", "),
+    check.names     = FALSE
+  )
+}
+enrichment_list <- list()
+
 for (tgt in target_vec) {
   obj             <- obj_base
   obj@para$target <- tgt
@@ -110,13 +148,18 @@ for (tgt in target_vec) {
   bot_ct_por_target[[tgt]] <- bot_ct
   objs[[tgt]]  <- obj
 
+  # Subrede/módulos do alvo, buscados uma única vez aqui e reusados tanto
+  # pra tabela por gene abaixo quanto pro enriquecimento funcional logo
+  # depois — antes eram buscados de novo numa segunda passada separada.
+  clusters <- obj@para$gene_clusters
+
   tabelas[[tgt]] <- list()
   for (ct in celltypes) {
     rede <- obj@net[[ct]]
     df <- data.frame(
       Target    = tgt,
-      Regulated = names(obj@para$gene_clusters),
-      Module    = paste0("M", obj@para$gene_clusters),
+      Regulated = names(clusters),
+      Module    = paste0("M", clusters),
       CellType  = ct,
       stringsAsFactors = FALSE
     ) |>
@@ -129,6 +172,14 @@ for (tgt in target_vec) {
       dplyr::select(-.mod_num)
 
     tabelas[[tgt]][[ct]] <- df
+  }
+
+  universe <- names(clusters)
+  for (m in sort(unique(clusters))) {
+    res <- enrich_module(names(clusters[clusters == m]), universe)
+    if (!is.null(res)) {
+      enrichment_list[[paste(tgt, m)]] <- cbind(Target = tgt, Module = paste0("M", m), res)
+    }
   }
 }
 
@@ -153,53 +204,6 @@ modulo_atividade <- tabela_completa |>
 tabela_completa <- tabela_completa |>
   dplyr::left_join(modulo_atividade, by = c("Target", "CellType", "Module"))
 
-# --- Enriquecimento funcional por módulo (GO BP / KEGG / Reactome) ---
-# fora() (fgsea) roda um teste de sobre-representação (hipergeométrico) da
-# lista discreta de genes de cada módulo — fgsea/msigdbr já são dependências
-# transitivas do scRank (evita adicionar clusterProfiler/org.db à imagem).
-# Universo = genes da clusterização final usada pelos módulos (já reflete o
-# zoom de init_mod quando ele ocorre), não o genoma inteiro.
-species_full <- if (identical(obj_base@para$species, "mouse")) "Mus musculus" else "Homo sapiens"
-
-# NOTA: msigdbr >=10.0.0 renomeou os parâmetros — `collection` agora é o
-# nível C2/C5/H (era `category`), e o nível GO:BP/CP:KEGG_LEGACY/CP:REACTOME
-# vai em `subcollection` (era `subcategory`). Confirmado contra a versão
-# instalada no container (25.1.1) antes de fixar os nomes abaixo.
-pathway_db <- dplyr::bind_rows(
-  msigdbr::msigdbr(species = species_full, collection = "C5", subcollection = "GO:BP")         |> dplyr::mutate(source = "GO_BP"),
-  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:KEGG_LEGACY") |> dplyr::mutate(source = "KEGG"),
-  msigdbr::msigdbr(species = species_full, collection = "C2", subcollection = "CP:REACTOME")    |> dplyr::mutate(source = "Reactome")
-)
-pathway_list <- split(pathway_db$gene_symbol, paste(pathway_db$source, pathway_db$gs_name, sep = "::"))
-
-enrich_module <- function(genes, universe) {
-  res <- fgsea::fora(pathways = pathway_list, genes = genes, universe = universe)
-  res <- res[order(res$pval), ]
-  res <- res[res$padj < 0.05, ]
-  if (nrow(res) == 0) return(NULL)
-  data.frame(
-    Source          = sub("::.*", "", res$pathway),
-    Pathway         = sub("^[^:]+::", "", res$pathway),
-    Overlap         = res$overlap,
-    `Gene Set Size` = res$size,
-    `P-value`       = res$pval,
-    `Adj. P-value`  = res$padj,
-    Genes           = vapply(res$overlapGenes, paste, character(1), collapse = ", "),
-    check.names     = FALSE
-  )
-}
-
-enrichment_list <- list()
-for (tgt in names(objs)) {
-  clusters <- objs[[tgt]]@para$gene_clusters
-  universe <- names(clusters)
-  for (m in sort(unique(clusters))) {
-    res <- enrich_module(names(clusters[clusters == m]), universe)
-    if (!is.null(res)) {
-      enrichment_list[[paste(tgt, m)]] <- cbind(Target = tgt, Module = paste0("M", m), res)
-    }
-  }
-}
 enrichment_completa <- dplyr::bind_rows(enrichment_list)
 if (nrow(enrichment_completa) == 0) {
   enrichment_completa <- data.frame(
@@ -369,15 +373,15 @@ for (tgt in names(objs)) {
     cat(knitr::knit_child(text = expanded, quiet = TRUE))
   }
 }
-```
 
-```{r net-embed, results='asis'}
 # embed-resources:true não embute essas imagens sozinho — elas são trocadas
 # via JS montando o caminho do arquivo (nf_scrank_report_files/figure-html/...),
 # e o pós-processador do Quarto só embute tags <img>/<link> literais que ele
 # mesmo escreve, não caminhos montados dentro de <script>. Embute cada PNG
 # como base64 logo depois de gerado e expõe via window.NP_IMG, pro JS usar o
-# data URI direto em vez de um caminho que não existiria no HTML final.
+# data URI direto em vez de um caminho que não existiria no HTML final. Fica
+# no mesmo chunk (em vez de um chunk `results: asis` à parte) pra não criar
+# um card vazio extra que rouba espaço vertical dos cards de verdade.
 img_data_uri <- function(path) paste0("data:image/png;base64,", base64enc::base64encode(path))
 
 net_images <- lapply(names(objs), function(tgt) {
@@ -397,9 +401,10 @@ cat(
 )
 ```
 
-## Row {height="60px"}
+## Row
 
 ```{r}
+#| height: 60px
 #| results: asis
 #| expandable: false
 cat(paste0(
@@ -421,7 +426,7 @@ cat(paste0(
 
 ```{r}
 #| title: "Network"
-#| width: 60%
+#| width: 50%
 #| results: asis
 cat(paste0(
   '<img id="net-img" src="" style="max-width:100%; display:block; margin:auto;">\n',
@@ -442,7 +447,7 @@ cat(paste0(
 
 ```{r}
 #| title: "Regulatory Modules"
-#| width: 40%
+#| width: 50%
 # Mesma tabela de antes (Overview), agora filtrada ao vivo pelos seletores
 # Target/Cell Type já existentes no topo da página — reusa os controles em
 # vez de duplicar, via API do DataTables (column().search().draw()).
@@ -492,10 +497,9 @@ for (tgt in names(objs)) {
     cat(knitr::knit_child(text = expanded, quiet = TRUE))
   }
 }
-```
 
-```{r hm-embed, results='asis'}
-# Mesmo motivo do net-embed (Network Maps) — ver comentário lá.
+# Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
+# Fica no mesmo chunk pra não criar um card vazio extra.
 hm_images <- lapply(names(objs), function(tgt) {
   vals <- lapply(celltypes, function(ct) {
     img_data_uri(paste0("nf_scrank_report_files/figure-html/hm-", tgt, "-", ct, "-1.png"))
@@ -582,10 +586,9 @@ for (tgt in names(objs)) {
   expanded <- knitr::knit_expand(text = delta_template, tgt = tgt)
   cat(knitr::knit_child(text = expanded, quiet = TRUE))
 }
-```
 
-```{r delta-embed, results='asis'}
-# Mesmo motivo do net-embed (Network Maps) — ver comentário lá.
+# Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
+# Fica no mesmo chunk pra não criar um card vazio extra.
 delta_images <- lapply(names(objs), function(tgt) {
   img_data_uri(paste0("nf_scrank_report_files/figure-html/delta-", tgt, "-1.png"))
 })
