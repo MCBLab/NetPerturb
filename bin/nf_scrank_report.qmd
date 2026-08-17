@@ -256,7 +256,7 @@ value_box_html <- function(bg_color, icon, title, value_html) {
     '<div class="card cell html-fill-item html-fill-container bslib-card" ',
     'style="background-color:', bg_color, ' !important; color:#fff;">\n',
     '<div class="card-body html-fill-item html-fill-container" ',
-    'style="display:flex; align-items:center; gap:14px; padding:14px 18px;">\n',
+    'style="display:flex; align-items:center; gap:14px; padding:14px 18px; overflow:hidden;">\n',
     '<i class="bi bi-', icon, '" style="font-size:1.8rem; flex-shrink:0; line-height:1;"></i>\n',
     '<div style="min-width:0;">\n',
     '<p style="font-size:1rem; font-weight:500; margin:0;">', title, '</p>\n',
