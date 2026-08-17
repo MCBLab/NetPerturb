@@ -246,17 +246,22 @@ select_style <- 'style="display:inline-block; width:auto; min-width:150px; paddi
 # nativo escala o valor via clamp() responsivo (cqw), que não bate em
 # tamanho com o texto multi-linha do Reference — só dá pra igualar os dois
 # com font-size explícito nos dois, o que exige construir os dois à mão.
+#
+# Flexbox simples e totalmente controlado, em vez de tentar imitar as
+# classes nativas do bslib (value-box-grid/value-box-showcase) — essas
+# dependem de CSS com container queries que não se comporta bem no
+# tamanho pequeno dessas boxes, causando sobreposição de ícone e texto.
 value_box_html <- function(bg_color, icon, title, value_html) {
   paste0(
-    '<div class="card valuebox cell html-fill-item html-fill-container bslib-card bslib-value-box bg-success showcase-left-center" ',
+    '<div class="card cell html-fill-item html-fill-container bslib-card" ',
     'style="background-color:', bg_color, ' !important; color:#fff;">\n',
-    '<div class="card-body html-fill-item html-fill-container">\n',
-    '<div data-icon="', icon, '" class="html-fill-item html-fill-container value-box-grid">\n',
-    '<div class="value-box-showcase html-fill-item html-fill-container"><i class="bi bi-', icon, '"></i></div>\n',
-    '<div class="value-box-area">\n',
-    '<p class="value-box-title" style="font-size:1rem; font-weight:500;">', title, '</p>\n',
-    '<p class="value-box-value" style="font-size:1.5rem; font-weight:500; margin-bottom:0;">', value_html, '</p>\n',
-    '</div>\n</div>\n</div>\n</div>'
+    '<div class="card-body html-fill-item html-fill-container" ',
+    'style="display:flex; align-items:center; gap:14px; padding:14px 18px;">\n',
+    '<i class="bi bi-', icon, '" style="font-size:1.8rem; flex-shrink:0; line-height:1;"></i>\n',
+    '<div style="min-width:0;">\n',
+    '<p style="font-size:1rem; font-weight:500; margin:0;">', title, '</p>\n',
+    '<div style="font-size:1.5rem; font-weight:500;">', value_html, '</div>\n',
+    '</div>\n</div>\n</div>'
   )
 }
 
@@ -403,7 +408,22 @@ DT::datatable(
   module_number <- as.numeric(gene_clusters[highlight_gene])
   module_show   <- gene_clusters[gene_clusters %in% module_number] |> names()
 
-  Y  <- igraph::graph_from_adjacency_matrix(as.matrix(plot_data[module_show, module_show]), weighted = TRUE, diag = FALSE)
+  # Com poucas células (datasets pequenos de teste), o módulo do alvo pode
+  # colapsar pra um único gene (ele mesmo, sem vizinhos co-clusterizados) —
+  # não há rede pra desenhar nesse caso. Sem esse guard, module_show de
+  # tamanho 1 faz a indexação de matriz abaixo colapsar pra um escalar sem
+  # nome (drop implícito do R), e o igraph acaba rotulando o único vértice
+  # como "1" em vez do nome do gene — mostra uma mensagem clara em vez
+  # disso.
+  if (length(module_show) < 2) {
+    plot.new()
+    text(0.5, 0.5,
+         paste0("Modulo de '", highlight_gene, "' tem so 1 gene neste recorte\n(sem vizinhos co-clusterizados) - nada pra desenhar."),
+         cex = 0.9, col = "gray40")
+    return(invisible(NULL))
+  }
+
+  Y  <- igraph::graph_from_adjacency_matrix(as.matrix(plot_data[module_show, module_show, drop = FALSE]), weighted = TRUE, diag = FALSE)
   gY <- rownames(Y[])
   set.seed(12)
   lNet <- igraph::layout.graphopt(Y, charge = charge)
