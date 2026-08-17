@@ -269,26 +269,6 @@ ref_json <- paste0(
 )
 ```
 
-```{r}
-#| results: asis
-#| expandable: false
-# O grid do bslib dimensiona a linha via var(--bslib-grid-height), calculada
-# em JS a partir da árvore de fill-containers — nos cards que a gente monta
-# à mão (cat/paste0 em vez do pipeline nativo do Quarto), essa variável não
-# fica definida, então a linha cai pro tamanho natural do conteúdo (baixa) em
-# vez de esticar até o fim da página. Força a altura direto via :has(),
-# mirando só as linhas de conteúdo de Network Maps/Heatmaps (não mexe no
-# Overview, que já renderiza correto).
-cat(
-  '<style>\n',
-  '.bslib-grid:has(#net-img), .bslib-grid:has(#regmod-table),\n',
-  '.bslib-grid:has(#toolbar-hm), .bslib-grid:has(#toolbar-delta) {\n',
-  '  height: calc(100vh - 180px) !important;\n',
-  '}\n',
-  '</style>'
-)
-```
-
 # Overview & Data {icon="table"}
 
 ## Row {height="20%"}
@@ -303,7 +283,18 @@ cat(
 # vivo do primeiro carregamento até o fim funciona). Esse chunk roda
 # primeiro no documento, então é aqui que NP nasce; as páginas
 # seguintes só chamam NP.register()/NP.onChange.push().
+#
+# O <style> de altura das linhas de conteúdo (Network Maps/Heatmaps) vai
+# aqui dentro, em vez de um chunk próprio antes do cabeçalho da página —
+# um chunk solto ali virava uma seção fantasma vazia, empurrando o
+# conteúdo de TODAS as páginas pra baixo (mesmo problema do net-embed).
 cat(paste0(
+  '<style>\n',
+  '.bslib-grid:has(#net-img), .bslib-grid:has(#regmod-table),\n',
+  '.bslib-grid:has(#toolbar-hm), .bslib-grid:has(#toolbar-delta) {\n',
+  '  height: calc(100vh - 180px) !important;\n',
+  '}\n',
+  '</style>\n',
   '<input list="targets-list-1" id="target-input-1" value="', html_escape(names(objs)[1]),
   '" style="width:95%; padding:6px; font-size:1.1em;">\n',
   '<datalist id="targets-list-1">\n', options_html(names(objs)), '\n</datalist>\n',
