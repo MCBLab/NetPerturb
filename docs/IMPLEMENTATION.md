@@ -4,6 +4,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Landed | PR |
 |---|---|---|---|
+| 13 | REPORT task | Aug 2026 | — |
 | 12 | nf-test suite | Aug 2026 | — |
 | 11 | hdWGCNA, second attempt | Aug 2026 | — |
 | 10 | Rename to NetPerturb | Jul 2026 | — |
@@ -18,6 +19,16 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 | 1 | Prototype pipeline | Dec 2024 | — |
 
 ---
+
+## Wave 13 — REPORT task
+
+**Aug 2026**
+
+Added `REPORT`, a fifth pipeline step that runs after `MERGE` and turns `perbscore_all_targets.txt` into a self-contained Quarto HTML report: a `DT` table filterable by cell type, target and binding, and a `ggplot2` heatmap of every target scored against every cell type. `bin/report.qmd` is a parameterized Quarto document (`perbscore_file` param) rather than an executable `bin/*.R` script, so it is passed into the process as an explicit `path` input and staged under its own name to avoid colliding with the file it's copied to before rendering.
+
+The container is `rocker/verse:4.4.1`, which already bundles Quarto and tidyverse; `DT` is not part of that image and is installed at task runtime from RSPM's prebuilt binaries rather than baking a dedicated image, since the report is a single lightweight render step. Revisit this if render time or reproducibility becomes a concern.
+
+Scoped deliberately to only `perbscore_all_targets.txt` — no braak-stage or macro-cell-type grouping like the ad hoc `AD_scRank_2025` report this was modelled on, since NetPerturb's own output doesn't carry that structure yet.
 
 ## Wave 12 — nf-test suite
 
