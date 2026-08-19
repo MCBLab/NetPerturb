@@ -15,10 +15,11 @@
 %%metro file:  targets_in  | TXT  | --target
 %%metro files: net_rds     | RDS  | Network weights
 %%metro file:  score_txt   | TXT  | Scores
+%%metro file:  umap_png    | PNG  | UMAP
 %%metro file:  report_html | HTML | Report
 
 %% Lift published outputs off the track so they hang above it as termini
-%%metro off_track: net_rds, score_txt
+%%metro off_track: umap_png, net_rds, score_txt
 
 %% Station -> Nextflow process, for `nf-metro serve` live overlays
 %%metro process: downsample  | DOWNSAMPLE
@@ -36,9 +37,11 @@ graph LR
         obj_in[ ]
         targets_in[ ]
         downsample[Downsample & split]
+        umap_png[ ]
 
         obj_in -->|genie3,sctnet,scrank,hdwgcna| downsample
         targets_in -->|genie3,sctnet,scrank,hdwgcna| downsample
+        downsample -->|genie3,sctnet,scrank,hdwgcna| umap_png
     end
 
     subgraph inference [Network inference]
