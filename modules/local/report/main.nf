@@ -10,6 +10,7 @@ process REPORT {
 
   input:
     path perbscore_table
+    path umap_png
     path report_template, stageAs: "report_template.qmd"
 
   output:
@@ -35,6 +36,7 @@ process REPORT {
     cp ${report_template} report.qmd
     quarto render report.qmd \
       -P perbscore_file:${perbscore_table} \
+      -P umap_file:${umap_png} \
       --output netperturb_report.html
     """
 

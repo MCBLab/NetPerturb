@@ -76,5 +76,5 @@ workflow {
 
     MERGE( RANK_SCORE.out.rank_scores.collect() )
 
-    REPORT( MERGE.out.merged_rank_scores, file("${projectDir}/bin/report.qmd") )
+    REPORT( MERGE.out.merged_rank_scores, DOWNSAMPLE.out.umap, file("${projectDir}/bin/report.qmd") )
 }

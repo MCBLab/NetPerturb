@@ -12,6 +12,7 @@ format:
     theme: flatly
 params:
   perbscore_file: "perbscore_all_targets.txt"
+  umap_file: "umap.png"
 ---
 
 ```{r setup, include=FALSE}
@@ -52,6 +53,12 @@ score_data <- score_data %>%
 
 n_imputed <- sum(score_data$log_score < lower_bound, na.rm = TRUE)
 n_dropped <- sum(!is.finite(score_data$log_score))
+
+# The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
+# that step existed, or one whose plot could not be drawn, still has to render.
+umap_path <- params$umap_file
+has_umap  <- !is.null(umap_path) && nzchar(umap_path) && file.exists(umap_path)
+if (has_umap) umap_path <- normalizePath(umap_path)
 ```
 
 ## Overview
@@ -133,4 +140,18 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_imputed)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   { if (n_bindings > 1) facet_wrap(~binding) }
+```
+
+## Cell identity overview
+
+The identities scored above, as they sit in the embedding. This is the cell set
+after downsampling, so the group sizes are the ones the networks were actually
+inferred from rather than those of the full object.
+
+```{r umap, eval=has_umap, out.width="100%", fig.align="center"}
+knitr::include_graphics(umap_path)
+```
+
+```{r umap-missing, eval=!has_umap, results="asis"}
+cat("No UMAP figure was supplied with this report.")
 ```
