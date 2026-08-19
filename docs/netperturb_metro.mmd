@@ -1,0 +1,90 @@
+%%metro title: MCBLab/NetPerturb
+%%metro style: dark
+%%metro legend: bl
+%%metro compact_offsets: true
+
+%% One metro line per --network method. The four are mutually exclusive:
+%% a run rides exactly one line from end to end.
+%%metro line: genie3  | --network genie3  (GENIE3)         | #2db572
+%%metro line: sctnet  | --network sctnet  (scTenifoldNet)  | #0570b0
+%%metro line: scrank  | --network scrank  (scRank)         | #e6550d
+%%metro line: hdwgcna | --network hdwgcna (hdWGCNA)        | #756bb1
+
+%% Pipeline inputs (--obj, --target) and published outputs
+%%metro file:  obj_in      | RDS  | --obj
+%%metro file:  targets_in  | TXT  | --target
+%%metro files: net_rds     | RDS  | Network weights
+%%metro file:  score_txt   | TXT  | Scores
+%%metro file:  report_html | HTML | Report
+
+%% Lift published outputs off the track so they hang above it as termini
+%%metro off_track: net_rds, score_txt
+
+%% Station -> Nextflow process, for `nf-metro serve` live overlays
+%%metro process: downsample  | DOWNSAMPLE
+%%metro process: genie3_net  | GENIE3
+%%metro process: sctnet_net  | SCTENIFOLDNET
+%%metro process: scrank_net  | SCRANK
+%%metro process: hdwgcna_net | HDWGCNA
+%%metro process: rank_score  | RANK_SCORE
+%%metro process: merge       | MERGE
+%%metro process: report      | REPORT
+
+graph LR
+    subgraph input [Input & downsampling]
+        %%metro exit: right | genie3, sctnet, scrank, hdwgcna
+        obj_in[ ]
+        targets_in[ ]
+        downsample[Downsample & split]
+
+        obj_in -->|genie3,sctnet,scrank,hdwgcna| downsample
+        targets_in -->|genie3,sctnet,scrank,hdwgcna| downsample
+    end
+
+    subgraph inference [Network inference]
+        %%metro entry: left | genie3, sctnet, scrank, hdwgcna
+        %%metro exit: right | genie3, sctnet, scrank, hdwgcna
+        genie3_net[GENIE3]
+        sctnet_net[scTenifoldNet]
+        scrank_net[scRank]
+        hdwgcna_net[hdWGCNA]
+        collect_nets[Collect networks]
+        net_rds[ ]
+
+        genie3_net -->|genie3| collect_nets
+        sctnet_net -->|sctnet| collect_nets
+        scrank_net -->|scrank| collect_nets
+        hdwgcna_net -->|hdwgcna| collect_nets
+        collect_nets -->|genie3,sctnet,scrank,hdwgcna| net_rds
+    end
+
+    subgraph scoring [Perturbation scoring]
+        %%metro entry: left | genie3, sctnet, scrank, hdwgcna
+        %%metro exit: right | genie3, sctnet, scrank, hdwgcna
+        rank_score[Rank score per target]
+        merge[Merge]
+        score_txt[ ]
+
+        rank_score -->|genie3,sctnet,scrank,hdwgcna| merge
+        merge -->|genie3,sctnet,scrank,hdwgcna| score_txt
+    end
+
+    subgraph reporting [Reporting]
+        %%metro entry: left | genie3, sctnet, scrank, hdwgcna
+        report[Quarto report]
+        report_html[ ]
+
+        report -->|genie3,sctnet,scrank,hdwgcna| report_html
+    end
+
+    %% The per-identity objects fan out into whichever method was selected.
+    downsample -->|genie3| genie3_net
+    downsample -->|sctnet| sctnet_net
+    downsample -->|scrank| scrank_net
+    downsample -->|hdwgcna| hdwgcna_net
+
+    %% All per-identity networks are collected and scored against every target.
+    collect_nets -->|genie3,sctnet,scrank,hdwgcna| rank_score
+
+    %% The merged score table is rendered into the HTML report.
+    merge -->|genie3,sctnet,scrank,hdwgcna| report

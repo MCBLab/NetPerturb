@@ -4,6 +4,67 @@
 
 Previous GRN tools are often difficult to scale for large Single-Cell RNA-seq (scRNA-seq) datasets. In this context, `NetPerturb` was built to enable high-throughput perturbation scoring in a user-friendly, parallelized, and computationally effective way. The pipeline uses Singularity containers, making installation trivial and results highly reproducible across high-performance computing (HPC) environments.
 
+## Pipeline Overview
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/netperturb_metro_dark.png">
+  <img alt="NetPerturb metro map" src="docs/images/netperturb_metro_light.png">
+</picture>
+
+Each coloured line is one `--network` method. The four are mutually exclusive, so a
+run rides exactly one line from `--obj`/`--target` through to the HTML report: they
+share downsampling, scoring and reporting, and diverge only at network inference.
+
+<details>
+<summary>Regenerating this diagram</summary>
+
+The map is defined in [`docs/netperturb_metro.mmd`](docs/netperturb_metro.mmd) and
+rendered with [nf-metro](https://github.com/seqeralabs/nf-metro) (`pip install nf-metro`):
+
+```bash
+# FS bumps every text size and the label metrics that drive spacing, so the
+# layout re-flows rather than just overprinting bigger glyphs.
+FS=1.25
+
+# Theme-aware SVG and an interactive pan/zoom page
+nf-metro render docs/netperturb_metro.mmd -o docs/images/netperturb_metro.svg --font-scale $FS --embed-font --responsive
+nf-metro render docs/netperturb_metro.mmd -o docs/images/netperturb_metro.html --format html --font-scale $FS --animate
+
+# The baked light/dark PNGs used above (needs `pip install cairosvg`;
+# --no-chrome-css bakes the colours, since rasterisers cannot resolve var())
+for m in light dark; do
+  nf-metro render docs/netperturb_metro.mmd -o /tmp/nm_$m.svg --mode $m --font-scale $FS --no-chrome-css --embed-font
+  cairosvg /tmp/nm_$m.svg -s 2 -o docs/images/netperturb_metro_$m.png
+done
+
+# Print/poster assets: vector SVG and PDF, plus a 4x raster fallback
+cp /tmp/nm_light.svg docs/images/netperturb_metro_poster.svg
+cairosvg /tmp/nm_light.svg -f pdf -o docs/images/netperturb_metro_poster.pdf
+cairosvg /tmp/nm_light.svg -s 4  -o docs/images/netperturb_metro_poster@4x.png
+```
+
+For print, use `docs/images/netperturb_metro_poster.pdf` or `.svg` — both are true
+vector, so they stay sharp at any poster size. Raise `FS` above if the text still
+reads small at your final dimensions; past roughly `1.4` the station and output
+captions begin to collide.
+
+Every station carries a `%%metro process:` mapping, so the map can also track a live
+run. Serve it and point Nextflow's weblog at it:
+
+```bash
+nf-metro serve docs/netperturb_metro.mmd --port 8080
+nextflow run main.nf -profile test,singularity -with-weblog http://localhost:8080/events
+```
+
+After changing the pipeline's processes, re-check the mappings still line up:
+
+```bash
+nextflow run main.nf -profile test -preview -with-dag dag.mmd
+nf-metro check-mapping docs/netperturb_metro.mmd --dag dag.mmd
+```
+
+</details>
+
 ## Pipeline Summary
 
 The workflow executes the following core modules:
