@@ -12,6 +12,8 @@ process REPORT {
     path perbscore_table
     path umap_png
     path report_template, stageAs: "report_template.qmd"
+    val network
+    val score_quantile
 
   output:
     path "netperturb_report.html", emit: report
@@ -37,6 +39,8 @@ process REPORT {
     quarto render report.qmd \
       -P perbscore_file:${perbscore_table} \
       -P umap_file:${umap_png} \
+      -P network:${network} \
+      -P score_quantile:${score_quantile} \
       --output netperturb_report.html
     """
 
