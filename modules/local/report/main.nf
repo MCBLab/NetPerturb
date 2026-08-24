@@ -10,6 +10,7 @@ process REPORT {
 
   input:
     path perbscore_table
+    path connections_table
     path umap_png
     path report_template, stageAs: "report_template.qmd"
     val network
@@ -38,6 +39,7 @@ process REPORT {
     cp ${report_template} report.qmd
     quarto render report.qmd \
       -P perbscore_file:${perbscore_table} \
+      -P connections_file:${connections_table} \
       -P umap_file:${umap_png} \
       -P network:${network} \
       -P score_quantile:${score_quantile} \

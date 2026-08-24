@@ -12,7 +12,8 @@ target <- args[2]
 species <- args[3]
 column <- args[4]
 binding <- args[5]
-rds_files <- args[6:length(args)]
+top_n <- args[6]
+rds_files <- args[7:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
@@ -42,6 +43,84 @@ names(obj@net) <- cell_types
 obj@para$ct.keep = names(obj@net)
 
 # saveRDS(obj, paste0("merged_obj.", target_id, ".RDS"))
+
+# Top connections per cell type -------------------------------------------
+# scRank's init_mod() reads a target's neighbours straight off its row in the
+# cell type network -- colnames(net)[abs(net[target, ]) > 0] -- and then goes
+# on to modularise a single cell type. Only that neighbour row is wanted here,
+# for every cell type rather than one, so the row is read directly. This runs
+# before rank_celltype so the connections survive a target whose ranking
+# fails; rank_celltype does not touch obj@net anyway.
+top_n <- suppressWarnings(as.integer(top_n))
+if (is.na(top_n) || top_n < 1) {
+  top_n <- 15
+}
+
+connections <- list()
+
+for (ct in cell_types) {
+  net <- obj@net[[ct]]
+
+  if (is.null(net) || is.null(rownames(net)) || nrow(net) == 0) {
+    message("No network for ", ct, "; no connections recorded.")
+    next
+  }
+
+  for (gene in target_rank) {
+    if (!(gene %in% rownames(net))) {
+      message("Target ", gene, " is absent from the ", ct, " network.")
+      next
+    }
+
+    weights <- as.numeric(net[gene, ])
+    names(weights) <- colnames(net)
+
+    # A gene is not its own connection, and a zero weight is the absence of an
+    # edge rather than a weak one.
+    weights <- weights[names(weights) != gene]
+    weights <- weights[is.finite(weights) & weights != 0]
+
+    if (length(weights) == 0) {
+      message("Target ", gene, " has no non-zero edge in ", ct, ".")
+      next
+    }
+
+    # Ranked on magnitude: a strong repressive edge matters as much as a strong
+    # activating one, and the direction is kept in the weight itself.
+    weights <- weights[order(abs(weights), decreasing = TRUE)]
+    weights <- weights[seq_len(min(top_n, length(weights)))]
+
+    connections[[length(connections) + 1]] <- data.frame(
+      cell_type   = ct,
+      target      = target[1],
+      binding     = binding,
+      target_gene = gene,
+      partner     = names(weights),
+      weight      = as.numeric(weights),
+      rank        = seq_along(weights),
+      stringsAsFactors = FALSE
+    )
+  }
+}
+
+top_connections <- if (length(connections) > 0) {
+  do.call(rbind, connections)
+} else {
+  data.frame(
+    cell_type = character(), target = character(), binding = character(),
+    target_gene = character(), partner = character(), weight = numeric(),
+    rank = integer(), stringsAsFactors = FALSE
+  )
+}
+
+write.table(
+  top_connections,
+  paste0("top_connections.", target_id, ".txt"),
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = TRUE,
+  sep = "\t"
+)
 
 all_ranks <- data.frame()
 

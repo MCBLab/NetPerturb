@@ -12,6 +12,7 @@ format:
     theme: flatly
 params:
   perbscore_file: "perbscore_all_targets.txt"
+  connections_file: "top_connections_all_targets.txt"
   umap_file: "umap.png"
   network: ""
   score_quantile: 0.75
@@ -25,6 +26,11 @@ library(tidyr)
 library(ggplot2)
 library(DT)
 library(scales)
+
+# plotly draws the connection networks. A container built before that section
+# existed still has to render the rest of the report, so its absence is a
+# missing figure rather than an error.
+has_plotly <- requireNamespace("plotly", quietly = TRUE)
 
 perb_score <- read.delim(params$perbscore_file, header = TRUE, sep = "\t")
 
@@ -83,6 +89,38 @@ if (!nzchar(network_key)) {
   network_label <- network_key
 }
 network_value <- if (nzchar(network_key)) network_key else "not supplied"
+
+# The strongest edges RANK_SCORE pulled off each cell type network, one row per
+# cell type x target gene x partner. A run started before RANK_SCORE emitted
+# them has no such file.
+connections_path <- params$connections_file
+connections <- if (!is.null(connections_path) && nzchar(connections_path) &&
+                   file.exists(connections_path)) {
+  read.delim(connections_path, header = TRUE, sep = "\t")
+} else {
+  data.frame()
+}
+
+has_connections <- nrow(connections) > 0
+
+if (has_connections) {
+  connections <- connections %>%
+    mutate(
+      abs_weight = abs(weight),
+      direction  = ifelse(weight >= 0, "Positive", "Negative")
+    ) %>%
+    arrange(target, cell_type, target_gene, rank)
+
+  n_conn_targets    <- n_distinct(connections$target)
+  n_conn_cell_types <- n_distinct(connections$cell_type)
+  n_conn_views      <- nrow(distinct(connections, target, cell_type))
+  max_kept          <- max(connections$rank)
+} else {
+  n_conn_targets    <- 0
+  n_conn_cell_types <- 0
+  n_conn_views      <- 0
+  max_kept          <- 0
+}
 
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
@@ -191,6 +229,276 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
     axis.text.x = element_text(angle = 45, hjust = 1)
   ) +
   { if (n_bindings > 1) facet_wrap(~binding) }
+```
+
+## Target connection networks
+
+The strongest edges each target holds in each cell type network, taken from the
+target's row of that network — the same neighbourhood `scRank::init_mod()` reads
+when it modularises a subnetwork, but kept per cell type and capped at the
+`r max_kept` strongest edges. Use the menu to switch between the
+`r n_conn_views` target and cell type combinations.
+
+The target sits at the centre and its partners around it. An edge's colour and
+dash carry the sign of the weight, a solid blue edge being a positive one and a
+dashed red edge a negative one; a partner's size follows the strength of its
+edge, scaled within the combination on display, so sizes rank partners against
+each other rather than across cell types. Hover any node or edge for the exact
+weight; every value is also in the table below.
+
+```{r network, eval=has_connections && has_plotly}
+# Blue and red are reserved for the sign of the weight, the one thing on this
+# figure carrying meaning through colour, so the nodes stay neutral.
+edge_pos_colour <- "#2a78d6"
+edge_neg_colour <- "#e34948"
+node_fill       <- "#e8e7e3"
+node_line       <- "#52514e"
+target_fill     <- "#3f3e3b"
+surface         <- "#fcfcfb"
+
+# The subnetwork of one target is a star, so it needs no force layout: the
+# target genes go in the middle and their partners onto a ring around them.
+star_positions <- function(edges) {
+  centre <- sort(unique(edges$target_gene))
+  ring   <- setdiff(unique(edges$partner), centre)
+
+  centre_pos <- if (length(centre) == 1) {
+    data.frame(gene = centre, x = 0, y = 0, label_at = "bottom center")
+  } else {
+    angle <- (seq_along(centre) - 1) * 2 * pi / length(centre) + pi / 2
+    data.frame(gene = centre, x = 0.22 * cos(angle), y = 0.22 * sin(angle),
+               label_at = "bottom center")
+  }
+
+  ring_pos <- if (length(ring) > 0) {
+    angle <- (seq_along(ring) - 1) * 2 * pi / length(ring) + pi / 2
+    # A label pushed straight out from the centre clears both its own node and
+    # the edge running into it, which "top center" on every node does not.
+    label_at <- ifelse(
+      cos(angle) > 0.5, "middle right",
+      ifelse(cos(angle) < -0.5, "middle left",
+             ifelse(sin(angle) > 0, "top center", "bottom center"))
+    )
+    data.frame(gene = ring, x = cos(angle), y = sin(angle), label_at = label_at)
+  } else {
+    data.frame(gene = character(), x = numeric(), y = numeric(),
+               label_at = character())
+  }
+
+  rbind(centre_pos, ring_pos)
+}
+
+# Every segment of a plotly line trace shares one colour and width, so all the
+# edges of one sign are drawn as a single trace with NA breaking them apart.
+edge_path <- function(edges, pos) {
+  if (nrow(edges) == 0) {
+    return(list(x = NA_real_, y = NA_real_))
+  }
+  from <- pos[match(edges$target_gene, pos$gene), ]
+  to   <- pos[match(edges$partner, pos$gene), ]
+  list(
+    x = as.vector(rbind(from$x, to$x, NA_real_)),
+    y = as.vector(rbind(from$y, to$y, NA_real_))
+  )
+}
+
+marker_size <- function(w, lo = 16, hi = 34) {
+  if (length(w) == 0) return(numeric(0))
+  span <- range(w)
+  if (!is.finite(diff(span)) || diff(span) == 0) return(rep((lo + hi) / 2, length(w)))
+  lo + (w - span[1]) / diff(span) * (hi - lo)
+}
+
+views <- connections %>%
+  distinct(target, cell_type) %>%
+  arrange(target, cell_type) %>%
+  mutate(label = paste0(target, "  ·  ", cell_type))
+
+fig <- plotly::plot_ly(width = NULL, height = 640)
+
+# The dropdown hides and shows the real traces, so their legend entries would
+# come and go with them. These two carry the legend instead and never move.
+# They are parked far outside the fixed axis range rather than left empty: a
+# trace with no coordinates loses its name, and with it its legend entry.
+legend_x <- c(-99, -98)
+legend_y <- c(-99, -99)
+
+fig <- fig %>%
+  plotly::add_trace(
+    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
+    line = list(color = edge_pos_colour, width = 2.5),
+    name = "Positive weight", hoverinfo = "skip", showlegend = TRUE
+  ) %>%
+  plotly::add_trace(
+    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
+    line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+    name = "Negative weight", hoverinfo = "skip", showlegend = TRUE
+  )
+
+view_traces <- vector("list", nrow(views))
+next_trace  <- 2L  # the two legend traces above
+
+for (i in seq_len(nrow(views))) {
+  edges <- connections %>%
+    filter(target == views$target[i], cell_type == views$cell_type[i])
+
+  pos <- star_positions(edges)
+  visible <- i == 1
+
+  positive <- edge_path(filter(edges, weight >= 0), pos)
+  negative <- edge_path(filter(edges, weight < 0), pos)
+
+  hover <- paste0(
+    edges$target_gene, " — ", edges$partner,
+    "<br>weight ", signif(edges$weight, 4),
+    "<br>rank ", edges$rank
+  )
+  mid <- data.frame(
+    x = (pos$x[match(edges$target_gene, pos$gene)] + pos$x[match(edges$partner, pos$gene)]) / 2,
+    y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
+  )
+
+  # A partner reached by more than one target gene is drawn once, at its
+  # strongest edge.
+  partners <- edges %>%
+    group_by(partner) %>%
+    summarise(abs_weight = max(abs_weight), .groups = "drop") %>%
+    left_join(pos, by = c(partner = "gene"))
+
+  partner_hover <- edges %>%
+    group_by(partner) %>%
+    summarise(
+      text = paste0(
+        partner[1], "<br>",
+        paste0(target_gene, " — ", signif(weight, 4), collapse = "<br>")
+      ),
+      .groups = "drop"
+    )
+  partners <- left_join(partners, partner_hover, by = "partner")
+
+  centres <- pos[pos$gene %in% edges$target_gene, ]
+
+  fig <- fig %>%
+    plotly::add_trace(
+      x = positive$x, y = positive$y, type = "scatter", mode = "lines",
+      line = list(color = edge_pos_colour, width = 2.5),
+      hoverinfo = "skip", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = negative$x, y = negative$y, type = "scatter", mode = "lines",
+      line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+      hoverinfo = "skip", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = mid$x, y = mid$y, type = "scatter", mode = "markers",
+      marker = list(size = 14, color = "rgba(0,0,0,0)"),
+      text = hover, hoverinfo = "text", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = partners$x, y = partners$y, type = "scatter", mode = "markers+text",
+      marker = list(
+        size = marker_size(partners$abs_weight),
+        color = node_fill, opacity = 1,
+        line = list(color = node_line, width = 1.5)
+      ),
+      text = partners$partner, textposition = partners$label_at,
+      textfont = list(size = 11, color = "#0b0b0b"),
+      hovertext = partners$text, hoverinfo = "text",
+      showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = centres$x, y = centres$y, type = "scatter", mode = "markers+text",
+      marker = list(
+        size = 34, color = target_fill, opacity = 1,
+        line = list(color = surface, width = 2)
+      ),
+      text = centres$gene, textposition = "bottom center",
+      textfont = list(size = 13, color = "#0b0b0b"),
+      hovertext = paste0(centres$gene, "<br>target"), hoverinfo = "text",
+      showlegend = FALSE, visible = visible
+    )
+
+  view_traces[[i]] <- next_trace + seq_len(5)
+  next_trace <- next_trace + 5L
+}
+
+n_traces <- next_trace
+
+# The title is restated on every button: a layout update replaces the title
+# whole, so leaving out its placement would recentre it on the first switch.
+title_style <- function(text) {
+  list(text = text, x = 0, xanchor = "left",
+       font = list(size = 15, color = "#0b0b0b"))
+}
+
+buttons <- lapply(seq_len(nrow(views)), function(i) {
+  visible <- rep(FALSE, n_traces)
+  visible[1:2] <- TRUE
+  visible[view_traces[[i]]] <- TRUE
+
+  list(
+    method = "update",
+    args = list(
+      list(visible = as.list(visible)),
+      list(title = title_style(views$label[i]))
+    ),
+    label = views$label[i]
+  )
+})
+
+fig %>%
+  plotly::layout(
+    title = title_style(views$label[1]),
+    # No aspect lock: letting the ring stretch to the page width spreads the
+    # partner labels apart instead of leaving the space either side empty.
+    xaxis = list(visible = FALSE, range = c(-1.75, 1.75)),
+    yaxis = list(visible = FALSE, range = c(-1.35, 1.35)),
+    legend = list(orientation = "h", x = 0, y = -0.02,
+                  font = list(color = "#52514e")),
+    margin = list(l = 20, r = 20, t = 110, b = 40),
+    paper_bgcolor = surface,
+    plot_bgcolor = surface,
+    hoverlabel = list(bgcolor = "#ffffff", bordercolor = "#d6d5d0"),
+    updatemenus = list(list(
+      type = "dropdown", direction = "down", active = 0,
+      x = 1, xanchor = "right", y = 1.12, yanchor = "top",
+      bgcolor = "#ffffff", bordercolor = "#d6d5d0",
+      font = list(size = 12), buttons = buttons
+    ))
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+```{r network-missing, eval=!(has_connections && has_plotly), results="asis"}
+if (!has_connections) {
+  cat("No top connection table was supplied with this report, so no network is shown.")
+} else {
+  cat("plotly is not installed in this container, so the connection networks",
+      "could not be drawn. The table below still lists every connection.")
+}
+```
+
+## Top connections table
+
+Every edge RANK_SCORE kept: up to `r max_kept` per target gene per cell type,
+across `r n_conn_targets` target(s) and `r n_conn_cell_types` cell type(s).
+`weight` is the edge weight in that cell type's network, signed, and `rank`
+orders the edges of one target gene in one cell type by absolute weight.
+
+```{r connections-table, eval=has_connections}
+connections %>%
+  select(cell_type, target, target_gene, partner, weight, rank) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    options = list(pageLength = 15, order = list(list(5, "asc"))),
+    caption = "Top connections per target gene per cell type."
+  ) %>%
+  formatSignif(columns = "weight", digits = 4)
+```
+
+```{r connections-table-empty, eval=!has_connections, results="asis"}
+cat("No top connection table was supplied with this report.")
 ```
 
 ## Cell identity overview

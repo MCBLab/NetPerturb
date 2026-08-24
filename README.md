@@ -87,11 +87,13 @@ Cell identities that are too small to aggregate into metacells, or for which hdW
 ### 3. Perturbation Scoring (`RANK_SCORE`)
 Using the list of target genes (`--target`) provided by the user, this module extracts the specific regulatory weight of the targets from the GENIE3 output. It calculates the perturbation score, which reflects how much the network relies on the specific target gene within that specific cell state.
 
+It also records the target's strongest connections. For each cell identity it reads the target's row of that identity's network — the same neighbourhood `scRank::init_mod()` uses to build a subnetwork, `abs(net[target, ]) > 0` — and keeps the `--top_connections` edges with the largest absolute weight, sign included. The result is a second table, one row per cell identity x target gene x partner.
+
 ### 4. Consolidate Results (`MERGE`)
-This step collects the perturbation scores from all parallel `RANK_SCORE` tasks and merges them into a single, clean text file, ready for downstream visualization.
+This step collects the perturbation scores from all parallel `RANK_SCORE` tasks and merges them into a single, clean text file, ready for downstream visualization. The per-target connection tables are concatenated the same way, into `top_connections_all_targets.txt`.
 
 ### 5. Report (`REPORT`)
-Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. Every figure is embedded in the HTML, so the report is a single portable file.
+Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. It also draws the top connections: an interactive plotly network per target and cell identity, the target at the centre and its strongest partners around it, edge colour and dash carrying the sign of the weight and partner size its strength, with a menu to switch combination and the exact weights on hover — followed by a queryable table of every connection. Every figure is embedded in the HTML, so the report is a single portable file, which the embedded plotly library makes a few megabytes.
 
 ## Quick Start
 1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html) (`>=22.10.1`).
@@ -113,6 +115,7 @@ nextflow run netperturb/main.nf \
   --n_cores 32 \
   --target /path/to/targets.txt \
   --network genie3 \
+  --top_connections 15 \
   --score_quantile 0.75 \
   --outdir results \
   -profile singularity
@@ -143,6 +146,8 @@ Stfa1;Mpo
 
 `--hdwgcna_min_cells`: Minimum number of cells an identity must have for `--network hdwgcna` to attempt metacell aggregation. Defaults to `150`. Identities below it are skipped.
 
+`--top_connections`: Number of strongest edges `RANK_SCORE` keeps per target gene per cell identity, ranked on absolute weight. Defaults to `15`. These are the edges the report's connection networks and connection table are drawn from; raising it makes both denser.
+
 `--score_quantile`: Quantile of the pooled log10 perturbation scores below which scores are cut from the report figures. Defaults to `0.75`, so the cut falls at q3 and the figures show the top quarter of scores. Pooled scores are bimodal, a low mode of near-zero values sitting well below the mode that carries the signal, and the report is only useful once the low one is gone. The distribution figure draws the cut over the full set of scores, so the line can be checked against where the two modes actually separate and this value tuned to land in the valley between them. The score table is never cut.
 
 `--n_cells`: Maximum number of cells to keep per cellular identity during downsampling. If an identity has fewer cells than this value, the pipeline uses all available cells for that identity.
@@ -169,7 +174,17 @@ sensitive	Cstdc5	antagonist	1.30868421341405e-06
 resistant	Cstdc5	antagonist	2.91128461301128e-06
 ```
 
-report/netperturb_report.html: A self-contained Quarto report built from `perbscore_all_targets.txt`, with a queryable table of every score, a cell type x target heatmap of the scores above the `--score_quantile` cut, and the `--network` inference method the run used.
+rank_scores/top_connections_all_targets.txt: The strongest edges each target holds in each cell identity's network, up to `--top_connections` per target gene per identity, ranked on absolute weight.
+
+```sh
+# Example
+cell_type	target	binding	target_gene	partner	weight	rank
+sensitive	Brd4	antagonist	Brd4	Myc	0.8123	1
+sensitive	Brd4	antagonist	Brd4	Ccnd1	-0.6640	2
+resistant	Brd4	antagonist	Brd4	Myc	0.4471	1
+```
+
+report/netperturb_report.html: A self-contained Quarto report built from both tables, with a queryable table of every score, a cell type x target heatmap of the scores above the `--score_quantile` cut, an interactive network of each target's top connections per cell identity, a queryable table of those connections, and the `--network` inference method the run used.
 
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
 

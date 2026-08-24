@@ -1,0 +1,3 @@
+cell_type	target	binding	target_gene	partner	weight	rank
+sensitive	Stfa1;Mpo	antagonist	Stfa1	Elane	0.6640	1
+resistant	Stfa1;Mpo	antagonist	Mpo	Prtn3	0.5218	1

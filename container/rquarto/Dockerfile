@@ -28,7 +28,7 @@ WORKDIR /app
 # 5. Install required R packages (e.g., rmarkdown, knitr)
 # Uses the repo already configured in rocker/r-ver (Posit Package Manager),
 # which serves precompiled Linux binaries -- no source compilation needed.
-RUN R -e "pkgs <- c('rmarkdown', 'knitr', 'DT', 'dplyr', 'tidyr', 'ggplot2'); \
+RUN R -e "pkgs <- c('rmarkdown', 'knitr', 'DT', 'dplyr', 'tidyr', 'ggplot2', 'plotly'); \
     install.packages(pkgs, Ncpus = parallel::detectCores()); \
     missing <- pkgs[!pkgs %in% rownames(installed.packages())]; \
     if (length(missing)) stop('failed to install: ', paste(missing, collapse=', '))"

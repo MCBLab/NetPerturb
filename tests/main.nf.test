@@ -145,6 +145,16 @@ nextflow_pipeline {
 
             // the ';' target survives the round trip through the file name
             assert lines.count { it.contains("Stfa1;Mpo") } == 2
+
+            // the connection tables are merged alongside the scores
+            def connections = path("${outputDir}/rank_scores/top_connections_all_targets.txt")
+            assert connections.exists()
+
+            def connection_lines = connections.readLines()
+            assert connection_lines.size() == 7
+            assert connection_lines[0] ==
+                "cell_type\ttarget\tbinding\ttarget_gene\tpartner\tweight\trank"
+            assert connection_lines.count { it.startsWith("cell_type\t") } == 1
         }
     }
 

@@ -12,10 +12,11 @@ nextflow_process {
             process {
                 """
                 input[0] = file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt")
-                input[1] = file("\${projectDir}/tests/fixtures/umap.png")
-                input[2] = file("\${projectDir}/bin/report.qmd")
-                input[3] = "genie3"
-                input[4] = 0.75
+                input[1] = file("\${projectDir}/tests/fixtures/top_connections.Brd4.txt")
+                input[2] = file("\${projectDir}/tests/fixtures/umap.png")
+                input[3] = file("\${projectDir}/bin/report.qmd")
+                input[4] = "genie3"
+                input[5] = 0.75
                 """
             }
         }
