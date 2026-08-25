@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 library(Seurat)
-library(scRank)
 library(dplyr)
 library(ggplot2)
 
@@ -34,19 +33,51 @@ downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") 
 ncells <- length(downsampled_cells)
 seurat_downsample <- seuratObj[, downsampled_cells]
 
-non_targets <- targets[!targets %in% rownames(seuratObj)]
+# Gene set carried downstream. This reproduces the feature selection that
+# scRank::CreateScRank does internally (R/method.R), so no scRank object has to
+# be built here: highly variable genes, every TF and every drug target known for
+# the species, and the requested targets.
+if (!species %in% c("human", "mouse")) {
+  stop("species must be 'human' or 'mouse', got: ", species)
+}
 
-obj <- CreateScRank(input = seurat_downsample,
-                    species = species, 
-                    cell_type = column,
-                    target = target)
+# Variable features the object already carries are reused; they are computed
+# only when it has none. nfeatures cannot exceed the number of genes present.
+hvg <- if (length(VariableFeatures(seurat_downsample)) > 0) {
+  VariableFeatures(seurat_downsample)
+} else {
+  VariableFeatures(FindVariableFeatures(seurat_downsample,
+                                        selection.method = "vst",
+                                        nfeatures = min(2000, nrow(seurat_downsample)),
+                                        verbose = FALSE))
+}
+hvg <- head(hvg, 2000)
 
-genes_4_use <- unique(c(obj@para$gene4use, targets))
-genes_4_use <- setdiff(genes_4_use, non_targets)
+utile_database <- scRank::utile_database
+tf_gene <- utile_database$Gene_TF[[species]]$Symbol
+drug_gene <- if (species == "human") {
+  utile_database$Drug_Target$human$Symbol
+} else {
+  utile_database$Drug_Target$mouse$mousegene
+}
+
+genes_4_use <- unique(c(target, hvg, tf_gene, drug_gene))
+
+# Drop mitochondrial and ribosomal genes. The match is guarded because `-x` on
+# an empty index vector would empty the whole set instead of removing nothing.
+mt_rb <- grep("^RP[[:digit:]]+|^RPL|^RPS|^MT-", toupper(genes_4_use))
+if (length(mt_rb) > 0) {
+  genes_4_use <- genes_4_use[-mt_rb]
+}
+
+# Targets are added back after that filter so a target is never dropped for
+# looking ribosomal, and anything missing from the object is then dropped.
+genes_4_use <- unique(c(genes_4_use, targets))
+genes_4_use <- genes_4_use[genes_4_use %in% rownames(seurat_downsample)]
 
 split_obj <- SplitObject(seurat_downsample, split.by = column)
 
-# Create scRank object
+# Create Seurat split objects
 sc_obj <- lapply(split_obj, function(seuobj){
   obj <- seuobj
   obj@misc$gene4use <- genes_4_use
