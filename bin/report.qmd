@@ -72,6 +72,23 @@ n_kept    <- sum(is.finite(score_data$log_score_kept))
 n_below   <- n_scored - n_kept
 n_dropped <- sum(!is.finite(score_data$log_score))
 
+# The strongest scores in the run. "Overall" is the whole pooled set, the same
+# population the retention cut is taken from, so this threshold does not move
+# with score_quantile. Change top_quantile alone to mark a different fraction.
+top_quantile <- 0.975
+top_label    <- paste0("Top ", signif((1 - top_quantile) * 100, 3), "%")
+
+top_cut <- if (has_scores) {
+  unname(quantile(score_data$log_score, top_quantile, na.rm = TRUE))
+} else {
+  NA_real_
+}
+
+score_data <- score_data %>%
+  mutate(is_top = is.finite(log_score) & log_score >= top_cut)
+
+n_top <- sum(score_data$is_top)
+
 # The network inference method the run was launched with (--network). The
 # report also has to render when it is not supplied, e.g. when the qmd is
 # knitted by hand against a table someone already has.
@@ -172,6 +189,10 @@ modes actually separate — move it with `--score_quantile` if the red line does
 not fall in the valley between them. The right panel is what the rest of the
 report works with, on its own axis.
 
+The green dashed line in both panels is the `r top_label` threshold
+(`r if (has_scores) signif(top_cut, 4) else NA`), the `r n_top` strongest
+score(s) in the run. Those are the scores the heatmap asterisks mark.
+
 ```{r distribution, fig.width=10, fig.height=4, eval=has_scores}
 dist_data <- score_data %>%
   select(log_score, log_score_kept) %>%
@@ -183,10 +204,28 @@ dist_data <- score_data %>%
     labels = c("All scores", "Retained high mode")
   ))
 
-cut_line <- data.frame(
-  stage = factor("All scores", levels = levels(dist_data$stage)),
-  xintercept = score_cut
+# The retention cut belongs only to the panel it acts on; the top threshold is
+# drawn in both, so the strongest scores can be placed against the whole set
+# and against the mode the report keeps.
+stages <- levels(dist_data$stage)
+
+ref_lines <- rbind(
+  data.frame(
+    stage = factor("All scores", levels = stages),
+    xintercept = score_cut,
+    line = "Quantile cut"
+  ),
+  data.frame(
+    stage = factor(stages, levels = stages),
+    xintercept = top_cut,
+    line = top_label
+  )
 )
+
+# Red and green are a poor pair for the commonest colour blindness, so the two
+# lines differ in dash as well as hue and the legend names both.
+ref_colours   <- setNames(c("#e34948", "#008300"), c("Quantile cut", top_label))
+ref_linetypes <- setNames(c("solid", "dashed"), c("Quantile cut", top_label))
 
 # A density curve is what makes the two modes readable, but it needs a few
 # points per panel to mean anything.
@@ -195,17 +234,24 @@ show_density <- min(table(dist_data$stage)) >= 3
 ggplot(dist_data, aes(x = value)) +
   geom_histogram(
     aes(y = after_stat(density)),
-    bins = 30, fill = "steelblue", color = "white"
+    bins = 20, fill = "steelblue", color = "white"
   ) +
   { if (show_density) geom_density(color = "grey25", linewidth = 0.6) } +
-  geom_vline(data = cut_line, aes(xintercept = xintercept), color = "red") +
+  geom_vline(
+    data = ref_lines,
+    aes(xintercept = xintercept, colour = line, linetype = line),
+    linewidth = 0.7
+  ) +
+  scale_colour_manual(name = NULL, values = ref_colours) +
+  scale_linetype_manual(name = NULL, values = ref_linetypes) +
   facet_wrap(~stage, scales = "free") +
   labs(
     title = "Distribution of perturbation scores across all targets",
     x = "log10(perturbation score)",
     y = "Density"
   ) +
-  theme_classic(base_size = 12)
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom")
 ```
 
 ```{r distribution-empty, eval=!has_scores, results="asis"}
@@ -216,11 +262,17 @@ cat("No positive perturbation score is available, so no distribution is shown.")
 
 Scores are log10-transformed and cut as above, so the colour scale spans the
 high mode only. Tiles below the cut, and those whose score is non-positive, are
-shown as missing (gray).
+shown as missing (gray). An asterisk marks a score in the `r top_label` of every
+score in the run — `r n_top` tile(s), at or above
+`r if (has_scores) signif(top_cut, 4) else NA` on the log10 scale.
 
 ```{r heatmap, fig.width=10, fig.height=max(4, 0.4 * n_cell_types)}
 ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   geom_tile(color = "white", linewidth = 0.6) +
+  geom_text(
+    data = filter(score_data, is_top),
+    aes(label = "*"), colour = "#0b0b0b", size = 6, vjust = 0.75
+  ) +
   scale_fill_viridis_c(name = "log10(perb_score)", na.value = "gray80") +
   labs(x = "Target", y = "Cell type") +
   theme_minimal(base_size = 12) +
