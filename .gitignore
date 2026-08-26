@@ -17,3 +17,4 @@ logs/
 bench_s3/
 work_bench/
 logs_bench/
+benchmarks/
