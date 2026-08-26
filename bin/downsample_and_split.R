@@ -25,6 +25,7 @@ if (seuratObj == 'AML_object.rda') {
 }
 
 # Downsample cells by celltype
+set.seed(42)
 downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") %>%
   group_by(!!sym(column)) %>%
   slice_sample(n = n_cells) %>%
