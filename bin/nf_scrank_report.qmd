@@ -239,32 +239,6 @@ options_html <- function(values) {
 # manual pra ficar legível.
 select_style <- 'style="display:inline-block; width:auto; min-width:150px; padding:6px; font-size:1.05em;"'
 
-# Constrói as duas boxes "Cell Types"/"Reference" a partir do mesmo template
-# HTML, pra garantir tipografia idêntica entre as duas (título e valor com
-# mesmo tamanho/peso de fonte). Cell Types precisa desse tratamento manual
-# em vez do valuebox nativo do Quarto (`#| content: valuebox`) porque o
-# nativo escala o valor via clamp() responsivo (cqw), que não bate em
-# tamanho com o texto multi-linha do Reference — só dá pra igualar os dois
-# com font-size explícito nos dois, o que exige construir os dois à mão.
-#
-# Flexbox simples e totalmente controlado, em vez de tentar imitar as
-# classes nativas do bslib (value-box-grid/value-box-showcase) — essas
-# dependem de CSS com container queries que não se comporta bem no
-# tamanho pequeno dessas boxes, causando sobreposição de ícone e texto.
-value_box_html <- function(bg_color, icon, title, value_html) {
-  paste0(
-    '<div class="card cell html-fill-item html-fill-container bslib-card" ',
-    'style="background-color:', bg_color, ' !important; color:#fff;">\n',
-    '<div class="card-body html-fill-item html-fill-container" ',
-    'style="display:flex; align-items:center; gap:14px; padding:14px 18px; overflow:hidden;">\n',
-    '<i class="bi bi-', icon, '" style="font-size:1.8rem; flex-shrink:0; line-height:1;"></i>\n',
-    '<div style="min-width:0;">\n',
-    '<p style="font-size:1rem; font-weight:500; margin:0;">', title, '</p>\n',
-    '<div style="font-size:1.5rem; font-weight:500;">', value_html, '</div>\n',
-    '</div>\n</div>\n</div>'
-  )
-}
-
 ref_json <- paste0(
   "{", paste0(
     '"', html_escape(ref_df$target), '":{"top_ct":"', html_escape(ref_df$top_ct),
@@ -276,7 +250,11 @@ ref_json <- paste0(
 
 # Overview & Data {icon="table"}
 
-## Row {height="20%"}
+## Row
+
+### Column {width="40%"}
+
+#### Row {height="20%"}
 
 ```{r}
 #| title: "Target"
@@ -339,56 +317,13 @@ cat(paste0(
   '})();\n',
   '</script>'
 ))
-```
 
-```{r}
-#| results: asis
-#| expandable: false
-cat(value_box_html("#3498db", "diagram-3", "Cell Types", as.character(length(celltypes))))
-```
-
-```{r}
-#| results: asis
-#| expandable: false
-cat(paste0(
-  value_box_html("#18bc9c", "star", "Reference", '<div id="ref-output-1" style="line-height:1.3;"></div>'),
-  '<script>\n',
-  '(function() {\n',
-  '  var output = document.getElementById("ref-output-1");\n',
-  '  function update(target) {\n',
-  '    var d = window.NP.refData[target];\n',
-  '    if (d) output.innerHTML = "Sensitive: " + d.bot_ct + "<br>Resistant: " + d.top_ct;\n',
-  '  }\n',
-  '  window.NP.onChange.push(update);\n',
-  '  update(window.NP.target);\n',
-  '})();\n',
-  '</script>'
-))
-```
-
-## Row
-
-```{r}
-#| title: "Perturbation Scores"
-DT::datatable(
-  perbscore_df,
-  options  = list(pageLength = 10, autoWidth = TRUE),
-  rownames = FALSE
-) |> DT::formatSignif("Perturbation Score", digits = 4)
-```
-
-# Network Maps {icon="diagram-2"}
-
-## Row
-
-```{r}
-#| height: 60px
-#| results: asis
-#| expandable: false
-# Geração dos PNGs (network-gen) e o embed em base64 (net-embed) rodam aqui
-# dentro, em vez de um chunk próprio antes deste Row — um chunk solto sem
-# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real da
-# página pra baixo (mesmo problema já corrigido no chunk "Target").
+# Geração dos PNGs de rede (função + loop + embed base64) roda aqui, no
+# primeiro chunk do documento que precisa deles — os painéis
+# Resistant/Sensitive desta página aparecem antes de Network Maps no
+# HTML final, então window.NP_IMG.net precisa estar pronto a partir
+# daqui (scripts rodam na ordem em que aparecem no documento). O chunk
+# correspondente em Network Maps só monta o toolbar agora.
 
 # Versão própria do modo "network" do plot_net() (scRank) — não é nosso
 # pacote pra alterar. O original usa o peso bruto da aresta como
@@ -446,9 +381,7 @@ DT::datatable(
 
 # Gera os PNGs de cada combinação target x celltype sem exibi-los inline
 # (fig.show='hide' ainda salva o arquivo em *_files/figure-html/, só não
-# insere a imagem na posição do chunk). A página abaixo usa dois seletores
-# (target, celltype) para trocar qual imagem fica visível — evita uma
-# barra de abas larga que não escala com muitos targets/celltypes.
+# insere a imagem na posição do chunk).
 f <- paste(rep("`", 3), collapse = "")
 
 net_template <- paste0(
@@ -487,7 +420,104 @@ cat(
   'window.NP_IMG.net = ', jsonlite::toJSON(net_images, auto_unbox = TRUE), ';\n',
   '</script>'
 )
+```
 
+```{r}
+#| title: "Cell Types"
+#| results: asis
+#| expandable: false
+cat(paste0(
+  '<div style="font-size:2rem; font-weight:600; text-align:center; padding-top:8px;">',
+  length(celltypes), '</div>'
+))
+```
+
+```{r}
+#| title: "Reference"
+#| results: asis
+#| expandable: false
+cat(paste0(
+  '<div id="ref-output-1" style="font-size:1.1rem; line-height:1.6; padding-top:4px;"></div>',
+  '<script>\n',
+  '(function() {\n',
+  '  var output = document.getElementById("ref-output-1");\n',
+  '  function update(target) {\n',
+  '    var d = window.NP.refData[target];\n',
+  '    if (d) output.innerHTML = "Sensitive: " + d.top_ct + "<br>Resistant: " + d.bot_ct;\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+#### Row
+
+```{r}
+#| title: "Perturbation Scores"
+DT::datatable(
+  perbscore_df,
+  options  = list(pageLength = 10, autoWidth = TRUE),
+  rownames = FALSE
+) |> DT::formatSignif("Perturbation Score", digits = 4)
+```
+
+### Column {width="60%"}
+
+#### Row
+
+```{r}
+#| title: "Resistant"
+#| results: asis
+cat(paste0(
+  '<img id="net-img-resistant" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var img = document.getElementById("net-img-resistant");\n',
+  '  function update(target) {\n',
+  '    var d = window.NP.refData[target];\n',
+  '    if (d) img.src = window.NP_IMG.net[target][d.bot_ct];\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+```{r}
+#| title: "Sensitive"
+#| results: asis
+cat(paste0(
+  '<img id="net-img-sensitive" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block; margin:auto;">\n',
+  '<script>\n',
+  '(function() {\n',
+  '  var img = document.getElementById("net-img-sensitive");\n',
+  '  function update(target) {\n',
+  '    var d = window.NP.refData[target];\n',
+  '    if (d) img.src = window.NP_IMG.net[target][d.top_ct];\n',
+  '  }\n',
+  '  window.NP.onChange.push(update);\n',
+  '  update(window.NP.target);\n',
+  '})();\n',
+  '</script>'
+))
+```
+
+# Network Maps {icon="diagram-2"}
+
+## Row
+
+```{r}
+#| height: 60px
+#| results: asis
+#| expandable: false
+# .network_plot_nf_scrank(), os PNGs por combinação target x celltype e o
+# embed em base64 (window.NP_IMG.net) já foram gerados no primeiro chunk
+# da página Overview & Data (que roda antes desta no documento, pois os
+# painéis Resistant/Sensitive de lá também precisam dessas imagens) — aqui
+# só falta montar o toolbar de seleção desta página.
 cat(paste0(
   '<style>\n',
   '  .card:has(#toolbar-net) { border: none; box-shadow: none; background: transparent; }\n',
@@ -568,87 +598,102 @@ htmltools::tagList(tbl, filter_script)
 ### Column
 
 ```{r}
-#| height: 60px
+#| title: "Perturbation Score Heatmap (log10, top 2.5% global)"
 #| results: asis
-#| expandable: false
-# Geração dos PNGs (heatmap-gen) e o embed em base64 (hm-embed) rodam aqui
-# dentro, em vez de chunks próprios antes deste Row — um chunk solto sem
-# saída visível vira uma seção fantasma vazia, empurrando o conteúdo real
-# da página pra baixo (mesmo problema já corrigido em Network Maps).
-f <- paste(rep("`", 3), collapse = "")
+# Heatmap-resumo: substitui o antigo heatmap de correlação gene-gene por
+# combinação target/celltype (um PNG por combinação, trocado via seletor)
+# por um único heatmap agregando todos os targets (linhas) x cell
+# type/stage (colunas), classificando cada target como seletivo/não
+# seletivo pelo top 2.5% do perturbation score global e por preferência
+# de estágio (Early/Late, inferido do nome do cell type) — visão geral
+# por cima da tabela de scores. Não depende de seletor: a imagem é fixa
+# por relatório, então esta coluna não tem toolbar (diferente do
+# Δcor ao lado, que ainda varia por target).
+perb_hm <- read.delim(params$perbscore, stringsAsFactors = FALSE) |>
+  dplyr::filter(binding == "antagonist") |>
+  dplyr::mutate(
+    stage           = ifelse(grepl("^Early", cell_type), "Early", "Late"),
+    cell_type_clean = gsub("^Early_Braak_|^Late_Braak_", "", cell_type)
+  )
 
-hm_template <- paste0(
-  f, "{r hm-{{tgt}}-{{ct}}, fig.width=10, fig.height=7, fig.show='hide'}\n",
-  'plot_net(objs[["{{tgt}}"]], mode = "heatmap", celltype = "{{ct}}")\n',
-  f, "\n\n"
+threshold_global <- stats::quantile(perb_hm$perb_score, 0.975)
+perb_top <- perb_hm |> dplyr::filter(perb_score >= threshold_global)
+
+hm_result <- perb_top |>
+  dplyr::group_by(target) |>
+  dplyr::summarise(
+    n_celltypes = dplyr::n_distinct(cell_type_clean),
+    top_stages  = paste(unique(stage), collapse = "/"),
+    max_score   = max(perb_score),
+    .groups = "drop"
+  ) |>
+  dplyr::mutate(
+    selectivity = ifelse(n_celltypes <= 2, "Seletivo", "Não seletivo"),
+    stage_pref  = dplyr::case_when(
+      top_stages == "Early" ~ "Early only",
+      top_stages == "Late"  ~ "Late only",
+      TRUE                  ~ "Both stages"
+    )
+  )
+
+hm_mat_df <- perb_hm |>
+  dplyr::mutate(col_name = paste0(cell_type_clean, "_", stage)) |>
+  dplyr::select(target, col_name, perb_score) |>
+  dplyr::filter(target %in% hm_result$target) |>
+  tidyr::pivot_wider(names_from = col_name, values_from = perb_score, values_fill = 0)
+
+hm_mat <- as.matrix(hm_mat_df[, -1])
+rownames(hm_mat) <- hm_mat_df$target
+hm_mat_log <- log10(hm_mat + 1e-20)
+hm_mat_log <- hm_mat_log[, sort(colnames(hm_mat_log)), drop = FALSE]
+
+hm_row_meta <- hm_result |>
+  dplyr::filter(target %in% rownames(hm_mat_log)) |>
+  dplyr::arrange(
+    factor(stage_pref, levels = c("Early only", "Both stages", "Late only")),
+    dplyr::desc(max_score)
+  )
+hm_mat_log <- hm_mat_log[hm_row_meta$target, , drop = FALSE]
+
+hm_col_stage <- ifelse(grepl("Early", colnames(hm_mat_log)), "Early", "Late")
+hm_col_annot <- ComplexHeatmap::HeatmapAnnotation(
+  Stage = hm_col_stage,
+  col   = list(Stage = c("Early" = "#2196F3", "Late" = "#F44336"))
+)
+hm_row_annot <- ComplexHeatmap::rowAnnotation(
+  Selectivity = hm_row_meta$selectivity,
+  col = list(Selectivity = c("Seletivo" = "#4CAF50", "Não seletivo" = "#FF9800"))
 )
 
-for (tgt in names(objs)) {
-  for (ct in celltypes) {
-    expanded <- knitr::knit_expand(text = hm_template, tgt = tgt, ct = ct)
-    cat(knitr::knit_child(text = expanded, quiet = TRUE))
-  }
-}
-
-# Mesmo motivo do embed em network-gen (Network Maps) — ver comentário lá.
-hm_images <- lapply(names(objs), function(tgt) {
-  vals <- lapply(celltypes, function(ct) {
-    img_data_uri(paste0("nf_scrank_report_files/figure-html/hm-", tgt, "-", ct, "-1.png"))
-  })
-  names(vals) <- celltypes
-  vals
-})
-names(hm_images) <- names(objs)
-
-cat(
-  '<script>\n',
-  'window.NP_IMG = window.NP_IMG || {};\n',
-  'window.NP_IMG.hm = ', jsonlite::toJSON(hm_images, auto_unbox = TRUE), ';\n',
-  '</script>'
-)
-
-cat(paste0(
-  '<style>\n',
-  '  .card:has(#toolbar-hm) { border: none; box-shadow: none; background: transparent; }\n',
-  '  .card:has(#toolbar-hm) .card-body { padding: 4px; align-items: flex-start; }\n',
-  '  #toolbar-hm p { margin: 0; }\n',
-  '</style>',
-  '<div id="toolbar-hm" style="display:inline-flex; width:fit-content; align-items:center; align-self:flex-start; gap:16px; padding:8px 14px; border:1px solid #dee2e6; border-radius:8px; background:#fff;">',
-  '<label>Target: <select id="target-select-hm" class="form-select" ', select_style, '>\n',
-  options_html(names(objs)), '\n</select></label>\n',
-  '<label>Cell Type: <select id="celltype-select-hm" class="form-select" ', select_style, '>\n',
-  options_html(celltypes), '\n</select></label>\n</div>\n',
-  '<script>window.NP.register(document.getElementById("target-select-hm"));</script>'
+dir.create("nf_scrank_report_files/figure-html", showWarnings = FALSE, recursive = TRUE)
+png("nf_scrank_report_files/figure-html/hm-overview-1.png", width = 1800, height = 1400, res = 130)
+ComplexHeatmap::draw(ComplexHeatmap::Heatmap(
+  hm_mat_log,
+  name                 = "log10(score)",
+  top_annotation       = hm_col_annot,
+  left_annotation      = hm_row_annot,
+  row_split            = factor(hm_row_meta$stage_pref, levels = c("Early only", "Both stages", "Late only")),
+  row_title_gp         = grid::gpar(fontsize = 11, fontface = "bold"),
+  cluster_columns      = FALSE,
+  cluster_rows         = TRUE,
+  cluster_row_slices   = FALSE,
+  show_row_dend        = FALSE,
+  column_labels        = gsub("_Early$|_Late$", "", colnames(hm_mat_log)),
+  show_row_names       = TRUE,
+  show_column_names    = TRUE,
+  column_names_gp      = grid::gpar(fontsize = 8),
+  row_names_gp         = grid::gpar(fontsize = 9),
+  row_names_max_width  = grid::unit(5, "cm")
 ))
-```
+dev.off()
 
-```{r}
-#| results: asis
-# Imagem inteira precisa caber sem cortar (inclusive a legenda de módulos,
-# que faz parte do PNG gerado pelo ComplexHeatmap) — max-height:100% +
-# object-fit:contain encolhe a imagem pra caber no card em vez de vazar
-# pra scroll interno. Link em volta abre o PNG em tamanho real numa aba
-# nova, como alternativa leve a um zoom/pan dedicado.
+hm_overview_uri <- img_data_uri("nf_scrank_report_files/figure-html/hm-overview-1.png")
+
 cat(paste0(
   '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;">\n',
-  '<a id="hm-link" href="" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
-  '<img id="hm-img" src="" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
-  '</a>\n</div>\n',
-  '<script>\n',
-  '(function() {\n',
-  '  var c = document.getElementById("celltype-select-hm");\n',
-  '  var img = document.getElementById("hm-img");\n',
-  '  var link = document.getElementById("hm-link");\n',
-  '  function update(target) {\n',
-  '    var src = window.NP_IMG.hm[target][c.value];\n',
-  '    img.src = src;\n',
-  '    link.href = src;\n',
-  '  }\n',
-  '  window.NP.onChange.push(update);\n',
-  '  c.addEventListener("change", function() { update(window.NP.target); });\n',
-  '  update(window.NP.target);\n',
-  '})();\n',
-  '</script>'
+  '<a href="', hm_overview_uri, '" target="_blank" rel="noopener" title="Abrir em tamanho real">\n',
+  '<img src="', hm_overview_uri, '" style="max-width:100%; max-height:100%; object-fit:contain; display:block;">\n',
+  '</a>\n</div>'
 ))
 ```
 
