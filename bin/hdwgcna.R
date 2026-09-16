@@ -53,6 +53,26 @@ if (length(genes_4_use) > 6000) {
 # hdWGCNA fails on cell identities that are too small or too homogeneous to
 # aggregate into metacells, which is expected rather than exceptional here.
 built <- tryCatch({
+  # Metacells are aggregated from a KNN graph built in a reduced space, and
+  # MetacellsByGroups looks for 'pca'. An object that reaches the pipeline
+  # without having been through the standard Seurat processing carries no
+  # reductions at all, so one is computed here over the same gene universe the
+  # network is built on. It is derived on a copy: MetacellsByGroups aggregates
+  # raw counts and NormalizeMetacells does its own normalisation, so the
+  # object's own layers must be left exactly as they are.
+  if (!"pca" %in% Reductions(sc_obj)) {
+    message("No pca reduction found; computing one for metacell aggregation.")
+    scratch <- NormalizeData(sc_obj, verbose = FALSE)
+    scratch <- ScaleData(scratch, features = genes_4_use, verbose = FALSE)
+    # npcs cannot reach either dimension of the matrix being decomposed, and a
+    # small cell identity is short on cells.
+    npcs <- max(2, min(30, ncol(scratch) - 1, length(genes_4_use) - 1))
+    scratch <- RunPCA(scratch, features = genes_4_use, npcs = npcs,
+                      verbose = FALSE)
+    sc_obj[["pca"]] <- scratch[["pca"]]
+    rm(scratch)
+  }
+
   sc_obj <- SetupForWGCNA(
     sc_obj,
     gene_select = "custom",
