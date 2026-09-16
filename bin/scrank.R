@@ -27,18 +27,30 @@ obj <- CreateScRank(input = sc_obj,
 
 obj <- Constr_net(obj, n.core = n_cores)
 
-weight <- obj@net[cell_type][[1]]
+# obj@net is keyed by the raw, unsanitized value of the identity column
+# (e.g. "8, endothelial cells"), not by `cell_type` (derived from the
+# already-sanitized input filename, e.g. "8__endothelial_cells") — those
+# never match whenever the raw label has a space/comma/etc., which
+# silently fell through to the zero-matrix fallback below for every
+# affected cell type. Each invocation processes exactly one cell type's
+# split object, so obj@net normally has exactly one element regardless
+# of its name; index by position instead of by name. Constr_net() can
+# also return a genuinely EMPTY list (population too small to build any
+# network — e.g. a 25-cell cluster), so guard the length before indexing
+# rather than indexing first and checking for NULL: `[[1]]` on an empty
+# list errors instead of returning NULL.
+weight <- if (length(obj@net) >= 1) obj@net[[1]] else NULL
 
 # If NULL, create gene x gene zero matrix
 if (is.null(weight)) {
-  
+
   genes <- obj@para$gene4use
   n <- length(genes)
-  
+
   weight <- matrix(0, nrow = n, ncol = n)
   rownames(weight) <- genes
   colnames(weight) <- genes
-  
+
   message(paste0("Weight was NULL for ", cell_type, " — replaced with zero matrix"))
 }
 
