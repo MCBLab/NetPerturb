@@ -25,12 +25,35 @@ print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
 
 sc_objs <- lapply(rds_files, readRDS)
 
+# The container pairs Seurat v4 with SeuratObject v5, so an object saved with a
+# v5 assay is invisible to every Seurat v4 entry point (see the same fix in
+# downsample_and_split.R). This script re-reads the original object directly
+# (rather than the already-converted per-celltype splits DOWNSAMPLE wrote), so
+# it needs its own conversion before CreateScRank touches it.
+as_v3_assay <- function(obj) {
+  assay <- DefaultAssay(obj)
+  if (!inherits(obj[[assay]], "Assay5")) {
+    return(obj)
+  }
+  message("Converting v5 assay '", assay, "' to a v3 assay for Seurat v4.")
+  key <- Key(obj[[assay]])
+  tmp <- paste0(assay, ".v3")
+  obj[[tmp]] <- as(obj[[assay]], "Assay")
+  DefaultAssay(obj) <- tmp
+  obj[[assay]] <- NULL
+  obj <- do.call(RenameAssays, c(list(object = obj), setNames(assay, tmp)))
+  Key(obj[[assay]]) <- key
+  obj
+}
+
 if (seuratObj == 'AML_object.rda') {
   load(seuratObj)
   seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target_rank[1]),]
 } else {
   seuratObj <- readRDS(seuratObj)
 }
+
+seuratObj <- as_v3_assay(seuratObj)
 
 obj <- CreateScRank(input = seuratObj,
                     species = species, 
@@ -122,17 +145,25 @@ write.table(
   sep = "\t"
 )
 
-all_ranks <- data.frame()
+# Explicit, empty-but-named columns so a target that fails for every cell
+# type still leaves a properly headered (if empty) table, rather than the
+# zero-column data.frame() a bare initializer would write out.
+all_ranks <- data.frame(
+  cell_type = character(), target = character(), binding = character(),
+  perb_score = numeric(), stringsAsFactors = FALSE
+)
+
+n_failed <- 0
 
 for (target_sc in target) {
-  message("Target ", target_sc, " found. Proceeding with rank_celltype.") 
+  message("Target ", target_sc, " found. Proceeding with rank_celltype.")
   # Set the target
   obj@para$target <- strsplit(target_sc, split = ";")[[1]]
-  
+
   # Try running rank_celltype
   tryCatch({
     obj <- rank_celltype(obj, n.core = 4)
-    
+
     # Extract data and convert to long format
     perb_scores <- obj@cell_type_rank$perb_score
     df_long <- data.frame(
@@ -141,23 +172,35 @@ for (target_sc in target) {
       binding = binding,
       perb_score = as.numeric(perb_scores)
     )
-    
+
     # Append to the main data frame
     all_ranks <- rbind(all_ranks, df_long)
-    
+
     message("Finished: ", target_sc)
-    
+
   }, error = function(e) {
     message("Failed for target ", target_sc, ": ", e$message)
+    n_failed <<- n_failed + 1
   })
 }
 
 # Save results (even if partial)
 write.table(
-  all_ranks, 
-  paste0("perbscore_all_targets.", target_id, ".txt"), 
-  quote = FALSE, 
-  row.names = FALSE, 
-  col.names = TRUE, 
+  all_ranks,
+  paste0("perbscore_all_targets.", target_id, ".txt"),
+  quote = FALSE,
+  row.names = FALSE,
+  col.names = TRUE,
   sep = "\t"
 )
+
+# rank_celltype's failures are usually a worker in its own parallel backend
+# (mclapply) getting killed rather than a real absence of signal for that
+# target. Exiting 0 here would let Nextflow cache an empty result as a
+# success, silently dropping the target from every downstream table on
+# every future -resume. Every target in this invocation failing is worth
+# retrying instead of caching, so fail loudly; a partial result (at least
+# one target succeeded) is still saved and still exits clean.
+if (n_failed == length(target) && n_failed > 0) {
+  quit(save = "no", status = 1)
+}
