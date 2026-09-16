@@ -17,12 +17,44 @@ target <- strsplit(targets[1], split = ";")[[1]]
 
 targets <- unlist(strsplit(targets, split = ";"))
 
+# The container pairs Seurat v4 with SeuratObject v5, so an object saved with a
+# v5 assay is invisible to every Seurat v4 entry point: they resolve assays with
+# FilterObjects(classes.keep = "Assay"), Assay5 does not inherit from Assay, and
+# the search comes back empty ("RNA is not an assay present in the given object.
+# Available assays are:"). Converting the assay once here keeps the rest of this
+# script, and the per-cell-type objects it writes, on ground Seurat v4 handles.
+#
+# The assay cannot be replaced under its own name while it is still an Assay5,
+# so the converted copy goes in beside it and is renamed once the original is
+# gone. as() joins split layers on the way, which reading a counts layer
+# directly would not: LayerData() returns only the first layer of an object
+# whose layers are split by sample.
+as_v3_assay <- function(obj) {
+  assay <- DefaultAssay(obj)
+  if (!inherits(obj[[assay]], "Assay5")) {
+    return(obj)
+  }
+  message("Converting v5 assay '", assay, "' to a v3 assay for Seurat v4.")
+  key <- Key(obj[[assay]])
+  tmp <- paste0(assay, ".v3")
+  obj[[tmp]] <- as(obj[[assay]], "Assay")
+  DefaultAssay(obj) <- tmp
+  obj[[assay]] <- NULL
+  obj <- do.call(RenameAssays, c(list(object = obj), setNames(assay, tmp)))
+  # The original key is still taken while both assays coexist, so the copy is
+  # given a derived one; put the original back now that it is free again.
+  Key(obj[[assay]]) <- key
+  obj
+}
+
 if (seuratObj == 'AML_object.rda') {
     load(seuratObj)
     seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target),]
 } else {
     seuratObj <- readRDS(seuratObj)
 }
+
+seuratObj <- as_v3_assay(seuratObj)
 
 # Downsample cells by celltype
 downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") %>%
