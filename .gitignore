@@ -12,3 +12,10 @@ nf-test
 .nf-test.log
 test.nf
 site
+CLAUDE.md
+logs/
+benchmarks/
+benchmark_runs/
+work_bench/
+logs_bench/
+nf_home/
