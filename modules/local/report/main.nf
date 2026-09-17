@@ -15,6 +15,7 @@ process REPORT {
     path report_template, stageAs: "report_template.qmd"
     val network
     val score_quantile
+    path sctknk_table
 
   output:
     path "netperturb_report.html", emit: report
@@ -43,6 +44,7 @@ process REPORT {
       -P umap_file:${umap_png} \
       -P network:${network} \
       -P score_quantile:${score_quantile} \
+      -P sctknk_file:${sctknk_table} \
       --output netperturb_report.html
     """
 

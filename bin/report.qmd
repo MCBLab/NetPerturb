@@ -16,6 +16,7 @@ params:
   umap_file: "umap.png"
   network: ""
   score_quantile: 0.75
+  sctknk_file: ""
 ---
 
 ```{r setup, include=FALSE}
@@ -95,7 +96,7 @@ n_top <- sum(score_data$is_top)
 network_key   <- if (is.null(params$network)) "" else trimws(as.character(params$network))
 network_names <- c(
   genie3  = "GENIE3",
-  sctnet  = "scTenifoldNet",
+  sctknk  = "scTenifoldKnk",
   scrank  = "scRank",
   hdwgcna = "hdWGCNA"
 )
@@ -144,6 +145,26 @@ if (has_connections) {
 umap_path <- params$umap_file
 has_umap  <- !is.null(umap_path) && nzchar(umap_path) && file.exists(umap_path)
 if (has_umap) umap_path <- normalizePath(umap_path)
+
+# scTenifoldKnk's differentially-regulated (DR) gene table, from --run_sctknk
+# or a --network sctknk run. A header-only sentinel file (no rows) stands in
+# when it was not requested for this run at all, same shape as a real run
+# that just found nothing, so both render the same "nothing to show" message.
+sctknk_path <- params$sctknk_file
+sctknk_dr <- if (!is.null(sctknk_path) && nzchar(sctknk_path) &&
+                  file.exists(sctknk_path)) {
+  read.delim(sctknk_path, header = TRUE, sep = "\t")
+} else {
+  data.frame()
+}
+
+has_sctknk <- nrow(sctknk_dr) > 0
+
+if (has_sctknk) {
+  n_sctknk_targets    <- n_distinct(sctknk_dr$target)
+  n_sctknk_cell_types <- n_distinct(sctknk_dr$cell_type)
+  n_sctknk_sig        <- sum(sctknk_dr$p.adj < 0.05, na.rm = TRUE)
+}
 ```
 
 ## Overview
@@ -551,6 +572,37 @@ connections %>%
 
 ```{r connections-table-empty, eval=!has_connections, results="asis"}
 cat("No top connection table was supplied with this report.")
+```
+
+## scTenifoldKnk differentially-regulated genes
+
+A separate, target-specific analysis: for each cell type x target pair,
+scTenifoldKnk builds the wild-type network, knocks the target out of it
+directly (zeroing its outgoing edges), and compares the two networks by
+manifold alignment. `distance` is how far a gene moves between the two;
+`p.value`/`p.adj` (Benjamini-Hochberg) test that distance against the
+chi-square null. This does not produce a `perb_score` and is not folded into
+any of the tables or figures above -- it is a separate way of asking the same
+question. Currently `r if (has_sctknk) n_sctknk_sig else 0` gene(s) clear
+FDR < 0.05, across `r if (has_sctknk) n_sctknk_targets else 0` target(s) and
+`r if (has_sctknk) n_sctknk_cell_types else 0` cell type(s).
+
+```{r sctknk-table, eval=has_sctknk}
+sctknk_dr %>%
+  arrange(target, cell_type, p.value) %>%
+  select(cell_type, target, gene, distance, p.value, p.adj) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    options = list(pageLength = 15, order = list(list(4, "asc"))),
+    caption = "scTenifoldKnk differentially-regulated genes per cell type x target."
+  ) %>%
+  formatSignif(columns = c("distance", "p.value", "p.adj"), digits = 4)
+```
+
+```{r sctknk-table-empty, eval=!has_sctknk, results="asis"}
+cat("scTenifoldKnk was not run for this session, so no differentially-regulated",
+    "gene table is shown. Pass --run_sctknk true (or --network sctknk) to generate one.")
 ```
 
 ## Cell identity overview
