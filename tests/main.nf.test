@@ -37,7 +37,7 @@ nextflow_pipeline {
                 .unique()
 
             assert processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCTENIFOLDKNK")
             assert !processes.contains("SCRANK")
             assert !processes.contains("HDWGCNA")
         }
@@ -70,7 +70,7 @@ nextflow_pipeline {
 
             assert processes.contains("HDWGCNA")
             assert !processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCTENIFOLDKNK")
             assert !processes.contains("SCRANK")
         }
     }
