@@ -16,7 +16,8 @@ nextflow_process {
                 input[2] = "mouse"
                 input[3] = "labels"
                 input[4] = "antagonist"
-                input[5] = [
+                input[5] = 15
+                input[6] = [
                     file("\${projectDir}/tests/fixtures/sensitive.RDS"),
                     file("\${projectDir}/tests/fixtures/resistant.RDS")
                 ]
@@ -30,6 +31,10 @@ nextflow_process {
 
             // ';' is not filename safe, rank_score.R replaces it before writing
             assert file(process.out.rank_scores[0]).name == "perbscore_all_targets.Stfa1_Mpo.txt"
+
+            // the connection table is named off the same sanitised target
+            assert process.out.top_connections.size() == 1
+            assert file(process.out.top_connections[0]).name == "top_connections.Stfa1_Mpo.txt"
         }
     }
 
@@ -45,7 +50,8 @@ nextflow_process {
                 input[2] = "mouse"
                 input[3] = "labels"
                 input[4] = "agonist"
-                input[5] = [ file("\${projectDir}/tests/fixtures/sensitive.RDS") ]
+                input[5] = 15
+                input[6] = [ file("\${projectDir}/tests/fixtures/sensitive.RDS") ]
                 """
             }
         }
@@ -57,6 +63,11 @@ nextflow_process {
             assert lines[0].split("\t") == ["cell_type", "target", "binding", "perb_score"]
             assert lines.every { it.startsWith("cell_type") || it.contains("Brd4") }
             assert lines.every { it.startsWith("cell_type") || it.contains("agonist") }
+
+            def connections = path(process.out.top_connections[0]).readLines()
+            assert connections[0].split("\t") == [
+                "cell_type", "target", "binding", "target_gene", "partner", "weight", "rank"
+            ]
         }
     }
 }

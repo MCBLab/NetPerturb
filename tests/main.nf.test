@@ -145,6 +145,43 @@ nextflow_pipeline {
 
             // the ';' target survives the round trip through the file name
             assert lines.count { it.contains("Stfa1;Mpo") } == 2
+
+            // the connection tables are merged alongside the scores
+            def connections = path("${outputDir}/rank_scores/top_connections_all_targets.txt")
+            assert connections.exists()
+
+            def connection_lines = connections.readLines()
+            assert connection_lines.size() == 7
+            assert connection_lines[0] ==
+                "cell_type\ttarget\tbinding\ttarget_gene\tpartner\tweight\trank"
+            assert connection_lines.count { it.startsWith("cell_type\t") } == 1
+        }
+    }
+
+    test("REPORT renders the merged table once MERGE finishes") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+            assert names.count { it.startsWith("REPORT") } == 1
+
+            assert path("${outputDir}/report/netperturb_report.html").exists()
         }
     }
 

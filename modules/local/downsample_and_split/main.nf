@@ -18,6 +18,7 @@ process DOWNSAMPLE {
 
   output:
     path "*.RDS", emit: scrank_obj
+    path "*.png", emit: umap
 
   when:
   task.ext.when == null || task.ext.when  
@@ -33,6 +34,7 @@ process DOWNSAMPLE {
     """
     touch sensitive.RDS
     touch resistant.RDS
+    touch umap.png
     """
 }
 

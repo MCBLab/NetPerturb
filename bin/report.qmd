@@ -1,0 +1,568 @@
+---
+title: "NetPerturb Report"
+subtitle: "Perturbation scores across targets and cell types"
+date: today
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: left
+    number-sections: true
+    page-layout: full
+    theme: flatly
+params:
+  perbscore_file: "perbscore_all_targets.txt"
+  connections_file: "top_connections_all_targets.txt"
+  umap_file: "umap.png"
+  network: ""
+  score_quantile: 0.75
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(DT)
+library(scales)
+
+# plotly draws the connection networks. A container built before that section
+# existed still has to render the rest of the report, so its absence is a
+# missing figure rather than an error.
+has_plotly <- requireNamespace("plotly", quietly = TRUE)
+
+perb_score <- read.delim(params$perbscore_file, header = TRUE, sep = "\t")
+
+n_cell_types <- n_distinct(perb_score$cell_type)
+n_targets    <- n_distinct(perb_score$target)
+n_bindings   <- n_distinct(perb_score$binding)
+
+# Pool every score from every target on a log10 scale; non-positive scores
+# cannot be logged and are carried as NA.
+score_data <- perb_score %>%
+  mutate(log_score = ifelse(perb_score > 0, log10(perb_score), NA_real_))
+
+has_scores <- any(is.finite(score_data$log_score))
+
+# Pooled scores are bimodal: a low mode of near-zero scores from genes the
+# network barely leans on, and a high mode that carries the signal. Imputing
+# the low mode up to a bound only stacked it against that bound and left it in
+# the picture, so it is cut instead. Everything below the score_quantile
+# quantile of the pooled log10 scores is dropped and the high mode is plotted
+# on its own; the default 0.75 cuts at q3.
+score_quantile <- suppressWarnings(as.numeric(params$score_quantile))
+if (!isTRUE(is.finite(score_quantile)) || score_quantile < 0 || score_quantile >= 1) {
+  score_quantile <- 0.75
+}
+
+score_cut <- if (has_scores) {
+  unname(quantile(score_data$log_score, score_quantile, na.rm = TRUE))
+} else {
+  NA_real_
+}
+
+score_data <- score_data %>%
+  mutate(log_score_kept = ifelse(
+    is.finite(log_score) & log_score >= score_cut, log_score, NA_real_
+  ))
+
+n_scored  <- sum(is.finite(score_data$log_score))
+n_kept    <- sum(is.finite(score_data$log_score_kept))
+n_below   <- n_scored - n_kept
+n_dropped <- sum(!is.finite(score_data$log_score))
+
+# The strongest scores in the run. "Overall" is the whole pooled set, the same
+# population the retention cut is taken from, so this threshold does not move
+# with score_quantile. Change top_quantile alone to mark a different fraction.
+top_quantile <- 0.975
+top_label    <- paste0("Top ", signif((1 - top_quantile) * 100, 3), "%")
+
+top_cut <- if (has_scores) {
+  unname(quantile(score_data$log_score, top_quantile, na.rm = TRUE))
+} else {
+  NA_real_
+}
+
+score_data <- score_data %>%
+  mutate(is_top = is.finite(log_score) & log_score >= top_cut)
+
+n_top <- sum(score_data$is_top)
+
+# The network inference method the run was launched with (--network). The
+# report also has to render when it is not supplied, e.g. when the qmd is
+# knitted by hand against a table someone already has.
+network_key   <- if (is.null(params$network)) "" else trimws(as.character(params$network))
+network_names <- c(
+  genie3  = "GENIE3",
+  sctnet  = "scTenifoldNet",
+  scrank  = "scRank",
+  hdwgcna = "hdWGCNA"
+)
+network_label <- unname(network_names[network_key])
+if (!nzchar(network_key)) {
+  network_label <- "an unreported method"
+} else if (is.na(network_label)) {
+  network_label <- network_key
+}
+network_value <- if (nzchar(network_key)) network_key else "not supplied"
+
+# The strongest edges RANK_SCORE pulled off each cell type network, one row per
+# cell type x target gene x partner. A run started before RANK_SCORE emitted
+# them has no such file.
+connections_path <- params$connections_file
+connections <- if (!is.null(connections_path) && nzchar(connections_path) &&
+                   file.exists(connections_path)) {
+  read.delim(connections_path, header = TRUE, sep = "\t")
+} else {
+  data.frame()
+}
+
+has_connections <- nrow(connections) > 0
+
+if (has_connections) {
+  connections <- connections %>%
+    mutate(
+      abs_weight = abs(weight),
+      direction  = ifelse(weight >= 0, "Positive", "Negative")
+    ) %>%
+    arrange(target, cell_type, target_gene, rank)
+
+  n_conn_targets    <- n_distinct(connections$target)
+  n_conn_cell_types <- n_distinct(connections$cell_type)
+  n_conn_views      <- nrow(distinct(connections, target, cell_type))
+  max_kept          <- max(connections$rank)
+} else {
+  n_conn_targets    <- 0
+  n_conn_cell_types <- 0
+  n_conn_views      <- 0
+  max_kept          <- 0
+}
+
+# The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
+# that step existed, or one whose plot could not be drawn, still has to render.
+umap_path <- params$umap_file
+has_umap  <- !is.null(umap_path) && nzchar(umap_path) && file.exists(umap_path)
+if (has_umap) umap_path <- normalizePath(umap_path)
+```
+
+## Overview
+
+This report summarizes `r nrow(perb_score)` perturbation scores from
+`r params$perbscore_file`, covering `r n_targets` target(s) across
+`r n_cell_types` cell type(s), scored under `r n_bindings` binding
+mode(s) (`r paste(sort(unique(perb_score$binding)), collapse = ", ")`).
+
+The gene regulatory networks these scores were computed from were inferred with
+**`r network_label`** (`--network`: `r network_value`). Every score below is
+relative to that network type, so scores from a run using a different inference
+method are not directly comparable.
+
+## Perturbation score table
+
+Use the column filters below to query by cell type, target, or binding.
+
+```{r table}
+perb_score %>%
+  arrange(target, cell_type) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    options = list(pageLength = 15, order = list(list(1, "asc"))),
+    caption = "All target x cell type perturbation scores."
+  ) %>%
+  formatSignif(columns = "perb_score", digits = 4)
+```
+
+## Perturbation score distribution
+
+All `r n_scored` log10 scores from every target and cell type pooled into one
+distribution. Pooled scores are typically bimodal: a low mode of near-zero
+values from genes the network barely leans on, and a high mode carrying the
+signal. Only the high mode is kept, cut at the `r score_quantile` quantile
+(red line, `r if (has_scores) signif(score_cut, 4) else NA`). That retains
+`r n_kept` score(s) and drops `r n_below` below the cut; a further `r n_dropped`
+non-positive score(s) cannot be logged and are not shown either.
+
+The left panel is every score, so the cut can be checked against where the two
+modes actually separate — move it with `--score_quantile` if the red line does
+not fall in the valley between them. The right panel is what the rest of the
+report works with, on its own axis.
+
+The green dashed line in both panels is the `r top_label` threshold
+(`r if (has_scores) signif(top_cut, 4) else NA`), the `r n_top` strongest
+score(s) in the run. Those are the scores the heatmap asterisks mark.
+
+```{r distribution, fig.width=10, fig.height=4, eval=has_scores}
+dist_data <- score_data %>%
+  select(log_score, log_score_kept) %>%
+  pivot_longer(everything(), names_to = "stage", values_to = "value") %>%
+  filter(is.finite(value)) %>%
+  mutate(stage = factor(
+    stage,
+    levels = c("log_score", "log_score_kept"),
+    labels = c("All scores", "Retained high mode")
+  ))
+
+# The retention cut belongs only to the panel it acts on; the top threshold is
+# drawn in both, so the strongest scores can be placed against the whole set
+# and against the mode the report keeps.
+stages <- levels(dist_data$stage)
+
+ref_lines <- rbind(
+  data.frame(
+    stage = factor("All scores", levels = stages),
+    xintercept = score_cut,
+    line = "Quantile cut"
+  ),
+  data.frame(
+    stage = factor(stages, levels = stages),
+    xintercept = top_cut,
+    line = top_label
+  )
+)
+
+# Red and green are a poor pair for the commonest colour blindness, so the two
+# lines differ in dash as well as hue and the legend names both.
+ref_colours   <- setNames(c("#e34948", "#008300"), c("Quantile cut", top_label))
+ref_linetypes <- setNames(c("solid", "dashed"), c("Quantile cut", top_label))
+
+# A density curve is what makes the two modes readable, but it needs a few
+# points per panel to mean anything.
+show_density <- min(table(dist_data$stage)) >= 3
+
+ggplot(dist_data, aes(x = value)) +
+  geom_histogram(
+    aes(y = after_stat(density)),
+    bins = 20, fill = "steelblue", color = "white"
+  ) +
+  { if (show_density) geom_density(color = "grey25", linewidth = 0.6) } +
+  geom_vline(
+    data = ref_lines,
+    aes(xintercept = xintercept, colour = line, linetype = line),
+    linewidth = 0.7
+  ) +
+  scale_colour_manual(name = NULL, values = ref_colours) +
+  scale_linetype_manual(name = NULL, values = ref_linetypes) +
+  facet_wrap(~stage, scales = "free") +
+  labs(
+    title = "Distribution of perturbation scores across all targets",
+    x = "log10(perturbation score)",
+    y = "Density"
+  ) +
+  theme_classic(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+```{r distribution-empty, eval=!has_scores, results="asis"}
+cat("No positive perturbation score is available, so no distribution is shown.")
+```
+
+## Perturbation score heatmap
+
+Scores are log10-transformed and cut as above, so the colour scale spans the
+high mode only. Tiles below the cut, and those whose score is non-positive, are
+shown as missing (gray). An asterisk marks a score in the `r top_label` of every
+score in the run — `r n_top` tile(s), at or above
+`r if (has_scores) signif(top_cut, 4) else NA` on the log10 scale.
+
+```{r heatmap, fig.width=10, fig.height=max(4, 0.4 * n_cell_types)}
+ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  geom_text(
+    data = filter(score_data, is_top),
+    aes(label = "*"), colour = "#0b0b0b", size = 6, vjust = 0.75
+  ) +
+  scale_fill_viridis_c(name = "log10(perb_score)", na.value = "gray80") +
+  labs(x = "Target", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  ) +
+  { if (n_bindings > 1) facet_wrap(~binding) }
+```
+
+## Target connection networks
+
+The strongest edges each target holds in each cell type network, taken from the
+target's row of that network — the same neighbourhood `scRank::init_mod()` reads
+when it modularises a subnetwork, but kept per cell type and capped at the
+`r max_kept` strongest edges. Use the menu to switch between the
+`r n_conn_views` target and cell type combinations.
+
+The target sits at the centre and its partners around it. An edge's colour and
+dash carry the sign of the weight, a solid blue edge being a positive one and a
+dashed red edge a negative one; a partner's size follows the strength of its
+edge, scaled within the combination on display, so sizes rank partners against
+each other rather than across cell types. Hover any node or edge for the exact
+weight; every value is also in the table below.
+
+```{r network, eval=has_connections && has_plotly}
+# Blue and red are reserved for the sign of the weight, the one thing on this
+# figure carrying meaning through colour, so the nodes stay neutral.
+edge_pos_colour <- "#2a78d6"
+edge_neg_colour <- "#e34948"
+node_fill       <- "#e8e7e3"
+node_line       <- "#52514e"
+target_fill     <- "#3f3e3b"
+surface         <- "#fcfcfb"
+
+# The subnetwork of one target is a star, so it needs no force layout: the
+# target genes go in the middle and their partners onto a ring around them.
+star_positions <- function(edges) {
+  centre <- sort(unique(edges$target_gene))
+  ring   <- setdiff(unique(edges$partner), centre)
+
+  centre_pos <- if (length(centre) == 1) {
+    data.frame(gene = centre, x = 0, y = 0, label_at = "bottom center")
+  } else {
+    angle <- (seq_along(centre) - 1) * 2 * pi / length(centre) + pi / 2
+    data.frame(gene = centre, x = 0.22 * cos(angle), y = 0.22 * sin(angle),
+               label_at = "bottom center")
+  }
+
+  ring_pos <- if (length(ring) > 0) {
+    angle <- (seq_along(ring) - 1) * 2 * pi / length(ring) + pi / 2
+    # A label pushed straight out from the centre clears both its own node and
+    # the edge running into it, which "top center" on every node does not.
+    label_at <- ifelse(
+      cos(angle) > 0.5, "middle right",
+      ifelse(cos(angle) < -0.5, "middle left",
+             ifelse(sin(angle) > 0, "top center", "bottom center"))
+    )
+    data.frame(gene = ring, x = cos(angle), y = sin(angle), label_at = label_at)
+  } else {
+    data.frame(gene = character(), x = numeric(), y = numeric(),
+               label_at = character())
+  }
+
+  rbind(centre_pos, ring_pos)
+}
+
+# Every segment of a plotly line trace shares one colour and width, so all the
+# edges of one sign are drawn as a single trace with NA breaking them apart.
+edge_path <- function(edges, pos) {
+  if (nrow(edges) == 0) {
+    return(list(x = NA_real_, y = NA_real_))
+  }
+  from <- pos[match(edges$target_gene, pos$gene), ]
+  to   <- pos[match(edges$partner, pos$gene), ]
+  list(
+    x = as.vector(rbind(from$x, to$x, NA_real_)),
+    y = as.vector(rbind(from$y, to$y, NA_real_))
+  )
+}
+
+marker_size <- function(w, lo = 16, hi = 34) {
+  if (length(w) == 0) return(numeric(0))
+  span <- range(w)
+  if (!is.finite(diff(span)) || diff(span) == 0) return(rep((lo + hi) / 2, length(w)))
+  lo + (w - span[1]) / diff(span) * (hi - lo)
+}
+
+views <- connections %>%
+  distinct(target, cell_type) %>%
+  arrange(target, cell_type) %>%
+  mutate(label = paste0(target, "  ·  ", cell_type))
+
+fig <- plotly::plot_ly(width = NULL, height = 640)
+
+# The dropdown hides and shows the real traces, so their legend entries would
+# come and go with them. These two carry the legend instead and never move.
+# They are parked far outside the fixed axis range rather than left empty: a
+# trace with no coordinates loses its name, and with it its legend entry.
+legend_x <- c(-99, -98)
+legend_y <- c(-99, -99)
+
+fig <- fig %>%
+  plotly::add_trace(
+    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
+    line = list(color = edge_pos_colour, width = 2.5),
+    name = "Positive weight", hoverinfo = "skip", showlegend = TRUE
+  ) %>%
+  plotly::add_trace(
+    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
+    line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+    name = "Negative weight", hoverinfo = "skip", showlegend = TRUE
+  )
+
+view_traces <- vector("list", nrow(views))
+next_trace  <- 2L  # the two legend traces above
+
+for (i in seq_len(nrow(views))) {
+  edges <- connections %>%
+    filter(target == views$target[i], cell_type == views$cell_type[i])
+
+  pos <- star_positions(edges)
+  visible <- i == 1
+
+  positive <- edge_path(filter(edges, weight >= 0), pos)
+  negative <- edge_path(filter(edges, weight < 0), pos)
+
+  hover <- paste0(
+    edges$target_gene, " — ", edges$partner,
+    "<br>weight ", signif(edges$weight, 4),
+    "<br>rank ", edges$rank
+  )
+  mid <- data.frame(
+    x = (pos$x[match(edges$target_gene, pos$gene)] + pos$x[match(edges$partner, pos$gene)]) / 2,
+    y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
+  )
+
+  # A partner reached by more than one target gene is drawn once, at its
+  # strongest edge.
+  partners <- edges %>%
+    group_by(partner) %>%
+    summarise(abs_weight = max(abs_weight), .groups = "drop") %>%
+    left_join(pos, by = c(partner = "gene"))
+
+  partner_hover <- edges %>%
+    group_by(partner) %>%
+    summarise(
+      text = paste0(
+        partner[1], "<br>",
+        paste0(target_gene, " — ", signif(weight, 4), collapse = "<br>")
+      ),
+      .groups = "drop"
+    )
+  partners <- left_join(partners, partner_hover, by = "partner")
+
+  centres <- pos[pos$gene %in% edges$target_gene, ]
+
+  fig <- fig %>%
+    plotly::add_trace(
+      x = positive$x, y = positive$y, type = "scatter", mode = "lines",
+      line = list(color = edge_pos_colour, width = 2.5),
+      hoverinfo = "skip", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = negative$x, y = negative$y, type = "scatter", mode = "lines",
+      line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+      hoverinfo = "skip", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = mid$x, y = mid$y, type = "scatter", mode = "markers",
+      marker = list(size = 14, color = "rgba(0,0,0,0)"),
+      text = hover, hoverinfo = "text", showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = partners$x, y = partners$y, type = "scatter", mode = "markers+text",
+      marker = list(
+        size = marker_size(partners$abs_weight),
+        color = node_fill, opacity = 1,
+        line = list(color = node_line, width = 1.5)
+      ),
+      text = partners$partner, textposition = partners$label_at,
+      textfont = list(size = 11, color = "#0b0b0b"),
+      hovertext = partners$text, hoverinfo = "text",
+      showlegend = FALSE, visible = visible
+    ) %>%
+    plotly::add_trace(
+      x = centres$x, y = centres$y, type = "scatter", mode = "markers+text",
+      marker = list(
+        size = 34, color = target_fill, opacity = 1,
+        line = list(color = surface, width = 2)
+      ),
+      text = centres$gene, textposition = "bottom center",
+      textfont = list(size = 13, color = "#0b0b0b"),
+      hovertext = paste0(centres$gene, "<br>target"), hoverinfo = "text",
+      showlegend = FALSE, visible = visible
+    )
+
+  view_traces[[i]] <- next_trace + seq_len(5)
+  next_trace <- next_trace + 5L
+}
+
+n_traces <- next_trace
+
+# The title is restated on every button: a layout update replaces the title
+# whole, so leaving out its placement would recentre it on the first switch.
+title_style <- function(text) {
+  list(text = text, x = 0, xanchor = "left",
+       font = list(size = 15, color = "#0b0b0b"))
+}
+
+buttons <- lapply(seq_len(nrow(views)), function(i) {
+  visible <- rep(FALSE, n_traces)
+  visible[1:2] <- TRUE
+  visible[view_traces[[i]]] <- TRUE
+
+  list(
+    method = "update",
+    args = list(
+      list(visible = as.list(visible)),
+      list(title = title_style(views$label[i]))
+    ),
+    label = views$label[i]
+  )
+})
+
+fig %>%
+  plotly::layout(
+    title = title_style(views$label[1]),
+    # No aspect lock: letting the ring stretch to the page width spreads the
+    # partner labels apart instead of leaving the space either side empty.
+    xaxis = list(visible = FALSE, range = c(-1.75, 1.75)),
+    yaxis = list(visible = FALSE, range = c(-1.35, 1.35)),
+    legend = list(orientation = "h", x = 0, y = -0.02,
+                  font = list(color = "#52514e")),
+    margin = list(l = 20, r = 20, t = 110, b = 40),
+    paper_bgcolor = surface,
+    plot_bgcolor = surface,
+    hoverlabel = list(bgcolor = "#ffffff", bordercolor = "#d6d5d0"),
+    updatemenus = list(list(
+      type = "dropdown", direction = "down", active = 0,
+      x = 1, xanchor = "right", y = 1.12, yanchor = "top",
+      bgcolor = "#ffffff", bordercolor = "#d6d5d0",
+      font = list(size = 12), buttons = buttons
+    ))
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+```{r network-missing, eval=!(has_connections && has_plotly), results="asis"}
+if (!has_connections) {
+  cat("No top connection table was supplied with this report, so no network is shown.")
+} else {
+  cat("plotly is not installed in this container, so the connection networks",
+      "could not be drawn. The table below still lists every connection.")
+}
+```
+
+## Top connections table
+
+Every edge RANK_SCORE kept: up to `r max_kept` per target gene per cell type,
+across `r n_conn_targets` target(s) and `r n_conn_cell_types` cell type(s).
+`weight` is the edge weight in that cell type's network, signed, and `rank`
+orders the edges of one target gene in one cell type by absolute weight.
+
+```{r connections-table, eval=has_connections}
+connections %>%
+  select(cell_type, target, target_gene, partner, weight, rank) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    options = list(pageLength = 15, order = list(list(5, "asc"))),
+    caption = "Top connections per target gene per cell type."
+  ) %>%
+  formatSignif(columns = "weight", digits = 4)
+```
+
+```{r connections-table-empty, eval=!has_connections, results="asis"}
+cat("No top connection table was supplied with this report.")
+```
+
+## Cell identity overview
+
+The identities scored above, as they sit in the embedding. This is the cell set
+after downsampling, so the group sizes are the ones the networks were actually
+inferred from rather than those of the full object.
+
+```{r umap, eval=has_umap, out.width="100%", fig.align="center"}
+knitr::include_graphics(umap_path)
+```
+
+```{r umap-missing, eval=!has_umap, results="asis"}
+cat("No UMAP figure was supplied with this report.")
+```
