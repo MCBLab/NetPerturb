@@ -3,15 +3,16 @@
 %%metro legend: bl
 %%metro compact_offsets: true
 
-%% genie3/scrank/hdwgcna are mutually exclusive: a run rides exactly one of
-%% them end to end. sctknk is different -- it is its own line, run either
-%% alone (--network sctknk, terminating at sctknk_txt) or alongside one of
-%% the other three (--run_sctknk true, additionally transferring into that
-%% run's report -- the dashed segment below).
+%% genie3/scrank/hdwgcna are the --network methods and are mutually
+%% exclusive: a run rides exactly one of them end to end. sctknk is not one
+%% of them -- it is its own line, switched on with --sctknk, and runs either
+%% alone (terminating at sctknk_txt) or in parallel with one of the other
+%% three (additionally transferring into that run's report -- the dashed
+%% segment below).
 %%metro line: genie3  | --network genie3            (GENIE3)         | #2db572
 %%metro line: scrank  | --network scrank            (scRank)         | #e6550d
 %%metro line: hdwgcna | --network hdwgcna           (hdWGCNA)        | #756bb1
-%%metro line: sctknk  | --network sctknk / --run_sctknk (scTenifoldKnk) | #0570b0
+%%metro line: sctknk  | --sctknk                    (scTenifoldKnk)  | #0570b0
 
 %% Pipeline inputs (--obj, --target) and published outputs
 %%metro file:  obj_in      | RDS  | --obj
@@ -110,8 +111,8 @@ graph LR
     %% The merged score table is rendered into the HTML report.
     merge -->|genie3,scrank,hdwgcna| report
 
-    %% --run_sctknk transfers the DR gene table into that same report as an
-    %% extra section; dashed because this leg only runs when that flag is
-    %% set, not on every sctknk run (a standalone --network sctknk run stops
-    %% at sctknk_txt above and never reaches report).
+    %% When a --network track is running too, sctknk transfers its DR gene
+    %% table into that same report as an extra section; dashed because this
+    %% leg only runs in that case (a --sctknk run with no --network stops at
+    %% sctknk_txt above and never reaches report).
     merge_sctknk -.->|sctknk| report

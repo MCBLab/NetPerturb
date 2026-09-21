@@ -33,9 +33,18 @@ workflow {
     target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
     target_ch = Channel.fromList(target_list)
     network = params.network
+    sctknk = params.sctknk
 
-    if( !(network in ['genie3', 'sctknk', 'scrank', 'hdwgcna']) ) {
-        error "Invalid --network '${params.network}'. Supported values: genie3, sctknk, scrank or hdwgcna"
+    // The two tracks are independent. --network picks at most one rank-score
+    // method and runs it through RANK_SCORE/MERGE/REPORT; --sctknk adds the
+    // scTenifoldKnk track beside it. Either runs on its own, both run in
+    // parallel when both are asked for, but at least one has to be asked for.
+    if( network != null && !(network in ['genie3', 'scrank', 'hdwgcna']) ) {
+        error "Invalid --network '${network}'. Supported values: genie3, scrank or hdwgcna"
+    }
+
+    if( network == null && !sctknk ) {
+        error "Nothing to run. Pass --network (genie3, scrank or hdwgcna), --sctknk, or both."
     }
 
     DOWNSAMPLE( obj, target, column, species, n_cells )
@@ -45,15 +54,11 @@ workflow {
     .set { sc_obj }
 
     // scTenifoldKnk knocks out the target gene as part of building its
-    // network, so unlike the other three methods it is target-specific by
+    // network, so unlike the rank-score methods it is target-specific by
     // construction and runs once per (cell type, target) pair rather than
-    // once per cell type. --network sctknk runs it alone (table only, no
-    // RANK_SCORE/REPORT); --run_sctknk runs it alongside whichever of the
-    // other three methods --network selects, feeding its table into that
-    // run's REPORT as well.
-    want_sctknk = (network == 'sctknk') || params.run_sctknk
-
-    if( want_sctknk ) {
+    // once per cell type. Its table never enters RANK_SCORE -- it goes to its
+    // own merge, and from there into REPORT when --network is running too.
+    if( sctknk ) {
         sc_obj
         .combine( target_ch )
         .set { sctknk_input }
@@ -63,7 +68,7 @@ workflow {
         MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK.out.dr_table.collect() )
     }
 
-    if( network != 'sctknk' ) {
+    if( network ) {
 
         if( network == 'genie3' ) {
            GENIE3( sc_obj, n_cores )
@@ -94,7 +99,7 @@ workflow {
         // REPORT always takes a scTenifoldKnk table path; when it was not
         // requested this is a sentinel empty file report.qmd recognises and
         // renders as "not run for this session" rather than a real table.
-        sctknk_table = want_sctknk
+        sctknk_table = sctknk
             ? MERGE_SCTENIFOLDKNK.out.merged_dr_table
             : file("${projectDir}/assets/NO_SCTKNK_TABLE")
 

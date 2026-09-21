@@ -11,9 +11,11 @@ Previous GRN tools are often difficult to scale for large Single-Cell RNA-seq (s
   <img alt="NetPerturb metro map" src="docs/images/netperturb_metro_light.png">
 </picture>
 
-Each coloured line is one `--network` method. The four are mutually exclusive, so a
-run rides exactly one line from `--obj`/`--target` through to the HTML report: they
-share downsampling, scoring and reporting, and diverge only at network inference.
+The three warm lines are the `--network` methods. They are mutually exclusive, so a
+run rides exactly one of them from `--obj`/`--target` through to the HTML report:
+they share downsampling, scoring and reporting, and diverge only at network
+inference. The blue `sctknk` line is separate — `--sctknk` switches it on, and it
+runs in parallel with whichever `--network` line was chosen, or on its own.
 
 <details>
 <summary>Regenerating this diagram</summary>
@@ -72,10 +74,26 @@ The workflow executes the following core modules:
 ### 1. Object Parsing and Downsampling (`DOWNSAMPLE`)
 This is the initial step of the process. It ingests a fully processed Seurat object (`.rds`) and identifies the user-defined metadata column containing the cell identities (e.g., cell types or clones). To ensure statistical robustness and equitable GRN inference, it randomly downsamples the cells from each identity to a specified maximum number (`--n_cells`), balancing the computational load. It also writes a UMAP of the retained cells coloured by `--column` to `downsample/umap_<column>.png`, so the identities entering the analysis, and their relative sizes after downsampling, can be checked at a glance. An embedding already present on the object is reused; one is computed only if the object carries none. Drawing this figure is guarded, so a plotting failure leaves a placeholder image rather than stopping the run.
 
-### 2. Network Inference (`GENIE3`, `SCRANK`, `HDWGCNA`, `SCTENIFOLDKNK`)
+### 2. Network Inference (`GENIE3`, `SCRANK`, `HDWGCNA`) and Knockout (`SCTENIFOLDKNK`)
 This is the heavy-lifting computational core. For each downsampled cellular identity, the pipeline infers a gene regulatory network using the method selected with `--network`: `genie3` runs [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html), `scrank` uses the scRank network strategy, and `hdwgcna` runs [hdWGCNA](https://smorabit.github.io/hdWGCNA/) on metacells. Each of these three returns regulatory interaction weights between genes for each cell state, which `RANK_SCORE` (below) turns into a `perb_score` for the requested target(s).
 
-`sctknk` is different: [scTenifoldKnk](https://github.com/cailab-tamu/scTenifoldKnk) performs an actual in-silico knockout — it builds the wild-type network, zeros the target gene's outgoing edges, and compares the two networks by manifold alignment to get a genome-wide table of differentially-regulated genes with FDR. Because the knockout is target-specific, it runs once per cell identity x target pair rather than once per cell identity, and its output does not feed `RANK_SCORE` — it goes straight to its own merge step (`sctknk/sctenifoldknk_all_targets.txt`). It currently supports one target gene at a time; a `;`-joined combined target (see `--target` below) is skipped for this method. Run it standalone with `--network sctknk` (table only, no `RANK_SCORE`/`REPORT`), or alongside any of the other three with `--run_sctknk true`, which also adds its results as a section in that run's `REPORT`.
+[scTenifoldKnk](https://github.com/cailab-tamu/scTenifoldKnk) is not one of those methods and is not selected with `--network`; it is a parallel track switched on with `--sctknk`. Rather than scoring how much a network leans on a target, it performs an actual in-silico knockout — it builds the wild-type network, zeros the target gene's outgoing edges, and compares the two networks by manifold alignment to get a genome-wide table of differentially-regulated genes with FDR. Because the knockout is target-specific, it runs once per cell identity x target pair rather than once per cell identity, and its output does not feed `RANK_SCORE` — it goes straight to its own merge step (`sctknk/sctenifoldknk_all_targets.txt`). It currently supports one target gene at a time; a `;`-joined combined target (see `--target` below) is skipped for this method.
+
+The two tracks are independent, so any combination of them can be run:
+
+```bash
+# a rank-score method on its own
+nextflow run main.nf --network genie3 ...
+
+# a rank-score method with scTenifoldKnk alongside it, in parallel
+nextflow run main.nf --network genie3 --sctknk ...
+nextflow run main.nf --network scrank --sctknk ...
+
+# scTenifoldKnk on its own: DR gene table only, no RANK_SCORE/REPORT
+nextflow run main.nf --sctknk ...
+```
+
+When both run, they share `DOWNSAMPLE` and the scTenifoldKnk table is added as a section in that run's `REPORT`. Passing neither is an error.
 
 The hdWGCNA module aggregates cells into metacells, builds an unsigned co-expression network and then adapts its topological overlap matrix (TOM) to what scRank expects from a network. Four things happen to the raw TOM:
 
@@ -117,6 +135,7 @@ nextflow run netperturb/main.nf \
   --n_cores 32 \
   --target /path/to/targets.txt \
   --network genie3 \
+  --sctknk \
   --top_connections 15 \
   --score_quantile 0.75 \
   --outdir results \
@@ -142,9 +161,9 @@ Cstdc5
 Stfa1;Mpo
 ```
 
-`--network`: Network inference method to use. Supported values are `genie3`, `scrank`, `hdwgcna`, and `sctknk`. `sctknk` is a standalone mode: see `--run_sctknk` to add its output to a `genie3`/`scrank`/`hdwgcna` run instead.
+`--network`: Network inference method driving the perturbation-scoring track. Supported values are `genie3`, `scrank` and `hdwgcna`. Optional only if `--sctknk` is given; otherwise the run has nothing to do and aborts.
 
-`--run_sctknk`: Also runs `sctknk` alongside whichever of `genie3`/`scrank`/`hdwgcna` `--network` selects, adding its differentially-regulated gene table as a section in that run's report. Defaults to `false`. Ignored when `--network sctknk` is used directly.
+`--sctknk`: Switches on the scTenifoldKnk track, which runs in parallel with whichever method `--network` selects and adds its differentially-regulated gene table as a section in that run's report. Defaults to `false`. With `--sctknk` and no `--network` it runs on its own, producing the table only — no `RANK_SCORE` or `REPORT`.
 
 `--cut_ratio`: Quantile of absolute edge weight below which edges are cut, used by `--network hdwgcna`. Defaults to `0.95`, the same threshold scRank applies to its own networks, which keeps the strongest 5% of edges. Lower it to retain a denser network. Because a TOM has a different weight distribution than the regression coefficients scRank normally works with, this value is worth tuning on your data.
 
@@ -180,7 +199,7 @@ resistant	Cstdc5	antagonist	2.91128461301128e-06
 
 rank_scores/top_connections_all_targets.txt: The strongest edges each target holds in each cell identity's network, up to `--top_connections` per target gene per identity, ranked on absolute weight.
 
-sctknk/sctenifoldknk_all_targets.txt: Written by `--network sctknk` or `--run_sctknk true`. One row per cell identity x target x differentially-regulated gene, with the manifold-alignment `distance`, `Z`-score, fold-change, and `p.value`/`p.adj`.
+sctknk/sctenifoldknk_all_targets.txt: Written when `--sctknk` is passed. One row per cell identity x target x differentially-regulated gene, with the manifold-alignment `distance`, `Z`-score, fold-change, and `p.value`/`p.adj`.
 
 ```sh
 # Example
@@ -204,7 +223,7 @@ The pipeline is covered by [nf-test](https://www.nf-test.com/). The default suit
 nf-test test
 ```
 
-It checks the wiring rather than the science: that `--network` selects exactly one inference process, that each line of the target file becomes its own `RANK_SCORE` task, that `MERGE` gathers them under a single header, that an unsupported `--network` aborts before any task is launched, and that every network module names its output so `rank_score.R` can still recover the cell identity from the file name.
+It checks the wiring rather than the science: that `--network` selects exactly one inference process, that `--sctknk` adds its track without disturbing that choice and runs alone when `--network` is omitted, that each line of the target file becomes its own `RANK_SCORE` task, that `MERGE` gathers them under a single header, that an unsupported `--network` aborts before any task is launched, and that every network module names its output so `rank_score.R` can still recover the cell identity from the file name.
 
 The end to end run is opt-in, since it downloads the test object and pulls containers. It is excluded from the default suite and has its own config:
 

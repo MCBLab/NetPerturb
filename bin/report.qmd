@@ -96,7 +96,6 @@ n_top <- sum(score_data$is_top)
 network_key   <- if (is.null(params$network)) "" else trimws(as.character(params$network))
 network_names <- c(
   genie3  = "GENIE3",
-  sctknk  = "scTenifoldKnk",
   scrank  = "scRank",
   hdwgcna = "hdWGCNA"
 )
@@ -146,10 +145,10 @@ umap_path <- params$umap_file
 has_umap  <- !is.null(umap_path) && nzchar(umap_path) && file.exists(umap_path)
 if (has_umap) umap_path <- normalizePath(umap_path)
 
-# scTenifoldKnk's differentially-regulated (DR) gene table, from --run_sctknk
-# or a --network sctknk run. A header-only sentinel file (no rows) stands in
-# when it was not requested for this run at all, same shape as a real run
-# that just found nothing, so both render the same "nothing to show" message.
+# scTenifoldKnk's differentially-regulated (DR) gene table, from a --sctknk
+# run. A header-only sentinel file (no rows) stands in when it was not
+# requested for this run at all, same shape as a real run that just found
+# nothing, so both render the same "nothing to show" message.
 sctknk_path <- params$sctknk_file
 sctknk_dr <- if (!is.null(sctknk_path) && nzchar(sctknk_path) &&
                   file.exists(sctknk_path)) {
@@ -602,7 +601,7 @@ sctknk_dr %>%
 
 ```{r sctknk-table-empty, eval=!has_sctknk, results="asis"}
 cat("scTenifoldKnk was not run for this session, so no differentially-regulated",
-    "gene table is shown. Pass --run_sctknk true (or --network sctknk) to generate one.")
+    "gene table is shown. Pass --sctknk to generate one.")
 ```
 
 ## Cell identity overview
