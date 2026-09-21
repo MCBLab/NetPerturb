@@ -70,7 +70,9 @@ graph LR
         %%metro entry: left | sctknk
         %%metro exit: right | sctknk
         %% Target-specific by construction, so this runs once per cell
-        %% identity x target pair rather than once per identity.
+        %% identity x gene pair rather than once per identity. scTenifoldKnk
+        %% knocks out exactly one gene per run, so a ';'-joined target is
+        %% split into one knockout per gene, deduplicated across the file.
         sctenifoldknk[scTenifoldKnk]
         merge_sctknk[Merge]
         sctknk_txt[ ]
@@ -82,7 +84,7 @@ graph LR
     subgraph scoring [Perturbation scoring]
         %%metro entry: left | genie3, scrank, hdwgcna
         %%metro exit: right | genie3, scrank, hdwgcna
-        rank_score[Rank score per target]
+        rank_score[Rank score & top edges]
         merge[Merge]
         score_txt[ ]
         conn_txt[ ]
@@ -101,8 +103,8 @@ graph LR
     end
 
     %% The per-identity objects fan out into whichever method was selected;
-    %% sctknk additionally fans out over every target, not shown as a
-    %% separate line here since the map tracks pipeline stages, not targets.
+    %% sctknk additionally fans out over every knocked-out gene, not shown as
+    %% a separate line here since the map tracks pipeline stages, not genes.
     downsample -->|genie3| genie3_net
     downsample -->|scrank| scrank_net
     downsample -->|hdwgcna| hdwgcna_net
@@ -111,11 +113,20 @@ graph LR
     %% All per-identity networks are collected and scored against every target.
     collect_nets -->|genie3,scrank,hdwgcna| rank_score
 
-    %% The merged score table is rendered into the HTML report.
+    %% Only the merged score table reaches the report. The top-connections
+    %% table beside it is published for downstream use and no longer rendered:
+    %% its figure was repointed at the knockout networks below. REPORT also
+    %% embeds the UMAP published in section 1; that feed is left off the map,
+    %% since a section 1 -> section 5 edge would sweep the whole width and read
+    %% as a route rather than as the side artefact it is.
     merge -->|genie3,scrank,hdwgcna| report
 
     %% When a --network track is running too, sctknk transfers its DR gene
-    %% table into that same report as its last two sections; dashed because this
-    %% leg only runs in that case (a --sctknk run with no --network stops at
-    %% sctknk_txt above and never reaches report).
-    merge_sctknk -.->|sctknk| report
+    %% table into that same report as its last two sections. This leg only runs
+    %% in that case -- a --sctknk run with no --network stops at sctknk_txt
+    %% above and never reaches report -- but it is drawn as an ordinary segment
+    %% because nf-metro's grammar takes only -->, --- and ==>, and discards the
+    %% arrow kind anyway: a Mermaid dashed -.-> is dropped with a warning and
+    %% the leg disappears from the map entirely, which is what happened here
+    %% until now.
+    merge_sctknk -->|sctknk| report

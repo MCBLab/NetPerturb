@@ -43,6 +43,8 @@ What `log2FC` means here is worth recording, because it is not what the name sug
 
 The stub suite grew with the track: the workflow-level tests now also cover `--sctknk` running beside `--network`, running alone, `sctknk` no longer being a `--network` value, and the error when neither is passed. Twenty tests in the default suite, plus the opt-in end-to-end run.
 
+The metro map caught up in the same wave, and one thing it had never shown came out in the process: the leg carrying the knockout table into the report was written as a Mermaid dashed `-.->`, and nf-metro's grammar takes only `-->`, `---` and `==>`. Every render since had dropped that leg with a warning, so the blue line stopped at its own table and never reached the report on the picture. It is an ordinary segment now — the arrow kind is discarded by the parser anyway, so there was no dashed style to keep — with the conditionality left to the comment beside it.
+
 ## Wave 19 — scTenifoldKnk replaces scTenifoldNet
 
 **Sep 2026** · branch `sctknk`, not yet on `main`
