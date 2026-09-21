@@ -19,6 +19,10 @@ n_cores   <- as.integer(args[3])
 
 cell_type <- sub("\\.RDS$", "", basename(seuratObj))
 
+# Number of principal components pcNet regresses on, named here because the
+# degenerate-shape guard below has to compare the gene count against it.
+n_comp <- 3
+
 sc_obj <- readRDS(seuratObj)
 
 # gene4use is the same gene universe DOWNSAMPLE hands to every other network
@@ -27,7 +31,23 @@ sc_obj <- readRDS(seuratObj)
 genes_4_use <- intersect(sc_obj@misc$gene4use, rownames(sc_obj))
 
 mat <- as.matrix(sc_obj[genes_4_use, ]@assays$RNA$counts)
-mat <- mat[rowSums(mat) > 0, ]
+mat <- mat[rowSums(mat) > 0, , drop = FALSE]
+
+# scTenifoldKnk CPM-normalises by dividing every cell by its own total count,
+# and scTenifoldNet::cpmNormalization is a bare t(t(X)/colSums(X)) with no
+# guard for a total of zero. A cell with no counts left becomes a column of
+# NaN, and makeNetworks' per-bootstrap `Z[apply(Z, 1, sum) > 0, ]` then
+# subsets with NA (NaN > 0 is NA) and dies with "missing value where
+# TRUE/FALSE needed", before the first network is built. gene4use is only a
+# few hundred genes, so a cell that is perfectly healthy transcriptome-wide
+# can easily carry zero counts across just those. This cannot re-zero a gene:
+# every gene kept above has a count in some cell, and that cell is kept here.
+empty_cells <- sum(colSums(mat) == 0)
+if (empty_cells > 0) {
+  message("Dropping ", empty_cells, " cell(s) with no counts across gene4use in ",
+          cell_type, " (CPM cannot normalise them).")
+  mat <- mat[, colSums(mat) > 0, drop = FALSE]
+}
 
 target_id <- gsub("[^A-Za-z0-9_.-]+", "_", target)
 out_file  <- paste0(cell_type, "_sctenifoldknk_", target_id, ".txt")
@@ -68,6 +88,17 @@ if (!target %in% rownames(mat)) {
   quit(save = "no", status = 0)
 }
 
+# pcNet requires nc_nComp < nGenes, and scale() needs more than one cell to
+# get a standard deviation from. A cell type left this thin after the filters
+# above has nothing to build a network from, so skip it rather than let
+# scTenifoldKnk fail partway through.
+if (nrow(mat) <= n_comp || ncol(mat) < 3) {
+  message("Too little data left in ", cell_type, " (", nrow(mat), " genes x ",
+          ncol(mat), " cells) to build a network; skipping.")
+  write_dr(empty_dr)
+  quit(save = "no", status = 0)
+}
+
 # qc = FALSE: DOWNSAMPLE already curated cells and genes upstream (the same
 # input every other network method trusts as-is); scQC()'s defaults
 # (minLibSize = 1000 UMI, 5th-percentile gene filtering, outlier-cell
@@ -84,7 +115,7 @@ result <- tryCatch({
     qc          = FALSE,
     nc_nNet     = 10,
     nc_nCells   = min(500, ncol(mat)),
-    nc_nComp    = 3,
+    nc_nComp    = n_comp,
     nCores      = n_cores
   )
 }, error = function(e) {
@@ -95,9 +126,16 @@ result <- tryCatch({
 
 dr <- if (is.null(result)) NULL else result$diffRegulation
 
+# A pair that still fails is skipped rather than aborted on, the same way the
+# guards above skip one they can rule out in advance. This runs once per
+# (cell type, target) pair, so failing the task would take a whole sweep down
+# over a single degenerate combination; the reason is already on the log
+# above, and the pair simply contributes no rows to the merged table.
 if (is.null(dr) || nrow(dr) == 0) {
+  message("No differentially-regulated genes returned for ", target, " in ",
+          cell_type, "; writing an empty table for this pair.")
   write_dr(empty_dr)
-  quit(save = "no", status = 1)
+  quit(save = "no", status = 0)
 }
 
 # dRegulation() already returns dr sorted by p.value.
