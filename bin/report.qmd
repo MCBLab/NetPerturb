@@ -12,11 +12,11 @@ format:
     theme: flatly
 params:
   perbscore_file: "perbscore_all_targets.txt"
-  connections_file: "top_connections_all_targets.txt"
   umap_file: "umap.png"
   network: ""
   score_quantile: 0.75
   sctknk_file: ""
+  sctknk_top_genes: 25
 ---
 
 ```{r setup, include=FALSE}
@@ -28,7 +28,7 @@ library(ggplot2)
 library(DT)
 library(scales)
 
-# plotly draws the connection networks. A container built before that section
+# plotly draws the knockout networks. A container built before that section
 # existed still has to render the rest of the report, so its absence is a
 # missing figure rather than an error.
 has_plotly <- requireNamespace("plotly", quietly = TRUE)
@@ -107,38 +107,6 @@ if (!nzchar(network_key)) {
 }
 network_value <- if (nzchar(network_key)) network_key else "not supplied"
 
-# The strongest edges RANK_SCORE pulled off each cell type network, one row per
-# cell type x target gene x partner. A run started before RANK_SCORE emitted
-# them has no such file.
-connections_path <- params$connections_file
-connections <- if (!is.null(connections_path) && nzchar(connections_path) &&
-                   file.exists(connections_path)) {
-  read.delim(connections_path, header = TRUE, sep = "\t")
-} else {
-  data.frame()
-}
-
-has_connections <- nrow(connections) > 0
-
-if (has_connections) {
-  connections <- connections %>%
-    mutate(
-      abs_weight = abs(weight),
-      direction  = ifelse(weight >= 0, "Positive", "Negative")
-    ) %>%
-    arrange(target, cell_type, target_gene, rank)
-
-  n_conn_targets    <- n_distinct(connections$target)
-  n_conn_cell_types <- n_distinct(connections$cell_type)
-  n_conn_views      <- nrow(distinct(connections, target, cell_type))
-  max_kept          <- max(connections$rank)
-} else {
-  n_conn_targets    <- 0
-  n_conn_cell_types <- 0
-  n_conn_views      <- 0
-  max_kept          <- 0
-}
-
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
 umap_path <- params$umap_file
@@ -149,20 +117,89 @@ if (has_umap) umap_path <- normalizePath(umap_path)
 # run. A header-only sentinel file (no rows) stands in when it was not
 # requested for this run at all, same shape as a real run that just found
 # nothing, so both render the same "nothing to show" message.
+# The named-but-empty frame matters: everything below filters on p.adj, so a
+# bare data.frame() with no columns would fail with "object 'p.adj' not found"
+# rather than fall through to the "not run" message. Same reasoning, and the
+# same 8 columns, as empty_dr in bin/sctenifoldknk.R. The size check is for
+# MERGE_SCTENIFOLDKNK's stub, which touches a zero-byte file that read.delim
+# refuses with "no lines available in input".
+sctknk_empty <- data.frame(
+  cell_type = character(), target = character(), gene = character(),
+  distance = numeric(), Z = numeric(), FC = numeric(),
+  p.value = numeric(), p.adj = numeric(), stringsAsFactors = FALSE
+)
+
 sctknk_path <- params$sctknk_file
 sctknk_dr <- if (!is.null(sctknk_path) && nzchar(sctknk_path) &&
-                  file.exists(sctknk_path)) {
+                  file.exists(sctknk_path) && file.size(sctknk_path) > 0) {
   read.delim(sctknk_path, header = TRUE, sep = "\t")
 } else {
-  data.frame()
+  sctknk_empty
 }
 
 has_sctknk <- nrow(sctknk_dr) > 0
 
+# How many genes the network figure draws around each target. The table below
+# it is never capped.
+sctknk_top_genes <- suppressWarnings(as.integer(params$sctknk_top_genes))
+if (!isTRUE(is.finite(sctknk_top_genes)) || !isTRUE(sctknk_top_genes >= 1)) {
+  sctknk_top_genes <- 25L
+}
+
+# dRegulation() reports FC as a gene's squared manifold-alignment distance over
+# the mean squared distance of the run, so it is a ratio to the average rather
+# than a differential-expression fold change, and it carries no direction: a
+# gene that moved a long way scores high whichever way it moved. log2 of it is
+# what the figure sizes nodes by and what the table reports.
 if (has_sctknk) {
-  n_sctknk_targets    <- n_distinct(sctknk_dr$target)
-  n_sctknk_cell_types <- n_distinct(sctknk_dr$cell_type)
-  n_sctknk_sig        <- sum(sctknk_dr$p.adj < 0.05, na.rm = TRUE)
+  sctknk_dr <- sctknk_dr %>%
+    mutate(log2FC = ifelse(is.finite(FC) & FC > 0, log2(FC), NA_real_))
+} else {
+  # No rows, but the 8 columns are there either way, so only log2FC has to be
+  # added to keep the select() in the table below working.
+  sctknk_dr$log2FC <- numeric()
+}
+
+# p.value is pchisq(FC, df = 1) and p.adj is BH over that, so the FDR cut is a
+# monotone function of FC: filtering here is the same as taking everything
+# above a log2FC threshold. Both sections below start from this frame.
+sctknk_sig <- sctknk_dr %>%
+  filter(!is.na(p.adj), p.adj < 0.05) %>%
+  arrange(target, cell_type, p.value)
+
+has_sctknk_sig <- nrow(sctknk_sig) > 0
+n_sctknk_sig   <- nrow(sctknk_sig)
+
+# Counted over the significant rows, not over everything knocked out: a target
+# that came back with nothing would otherwise be counted in a sentence that
+# says how far the hits reach.
+n_sctknk_targets    <- n_distinct(sctknk_sig$target)
+n_sctknk_cell_types <- n_distinct(sctknk_sig$cell_type)
+
+# Ring nodes for the figure. The knocked-out gene is always in its own DR table
+# and always moves furthest, so it would be drawn as a spoke back to itself;
+# it is dropped here and kept in the table, where it reads as confirmation the
+# knockout took. The ring is then capped, since a target can clear FDR on
+# hundreds of genes and every view is embedded in the HTML up front.
+sctknk_net <- if (has_sctknk_sig) {
+  sctknk_sig %>%
+    filter(gene != target, is.finite(log2FC)) %>%
+    group_by(target, cell_type) %>%
+    slice_max(log2FC, n = sctknk_top_genes, with_ties = FALSE) %>%
+    ungroup()
+} else {
+  sctknk_sig
+}
+
+has_sctknk_net <- nrow(sctknk_net) > 0
+
+# Counted off sctknk_net rather than sctknk_sig, because that is the frame the
+# dropdown is built from: a combination whose only significant gene was the
+# knocked-out gene itself has a row in the table but no menu entry.
+n_sctknk_views <- if (has_sctknk_net) {
+  nrow(distinct(sctknk_net, target, cell_type))
+} else {
+  0
 }
 ```
 
@@ -206,8 +243,8 @@ non-positive score(s) cannot be logged and are not shown either.
 
 The left panel is every score, so the cut can be checked against where the two
 modes actually separate — move it with `--score_quantile` if the red line does
-not fall in the valley between them. The right panel is what the rest of the
-report works with, on its own axis.
+not fall in the valley between them. The right panel is what the heatmap below
+works with, on its own axis.
 
 The green dashed line in both panels is the `r top_label` threshold
 (`r if (has_scores) signif(top_cut, 4) else NA`), the `r n_top` strongest
@@ -303,33 +340,36 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   { if (n_bindings > 1) facet_wrap(~binding) }
 ```
 
-## Target connection networks
+## Knockout networks
 
-The strongest edges each target holds in each cell type network, taken from the
-target's row of that network — the same neighbourhood `scRank::init_mod()` reads
-when it modularises a subnetwork, but kept per cell type and capped at the
-`r max_kept` strongest edges. Use the menu to switch between the
-`r n_conn_views` target and cell type combinations.
+Each knocked-out gene and the genes its knockout moved. scTenifoldKnk zeroes the
+target's outgoing edges, realigns the knocked-out network against the wild-type
+one, and scores every gene on how far it travelled between the two; the genes
+drawn here are the ones clearing FDR < 0.05. Use the menu to switch between the
+`r n_sctknk_views` target and cell type combinations.
 
-The target sits at the centre and its partners around it. An edge's colour and
-dash carry the sign of the weight, a solid blue edge being a positive one and a
-dashed red edge a negative one; a partner's size follows the strength of its
-edge, scaled within the combination on display, so sizes rank partners against
-each other rather than across cell types. Hover any node or edge for the exact
-weight; every value is also in the table below.
+The knocked-out gene sits at the centre and the genes it moved sit around it. A
+node's size follows its `log2FC`, scaled within the combination on display, so
+sizes rank genes against each other rather than across cell types. The ring is
+capped at the `r sctknk_top_genes` strongest genes per combination; the table in
+the next section is not capped. Hover any node for its exact values.
 
-```{r network, eval=has_connections && has_plotly}
-# Blue and red are reserved for the sign of the weight, the one thing on this
-# figure carrying meaning through colour, so the nodes stay neutral.
-edge_pos_colour <- "#2a78d6"
-edge_neg_colour <- "#e34948"
-node_fill       <- "#e8e7e3"
-node_line       <- "#52514e"
-target_fill     <- "#3f3e3b"
-surface         <- "#fcfcfb"
+`log2FC` here is the log2 ratio of a gene's squared alignment distance to the
+mean squared distance of its run, so it says how far a gene moved and not which
+way it went. It carries no direction, which is why no edge on this figure has a
+sign to read off: every gene shown simply moved further than its run's average.
 
-# The subnetwork of one target is a star, so it needs no force layout: the
-# target genes go in the middle and their partners onto a ring around them.
+```{r sctknk-network, eval=has_sctknk_net && has_plotly}
+# log2FC has no sign and is already carried by node size, so nothing on this
+# figure needs to carry meaning through colour and the palette stays neutral.
+edge_colour <- "#8f8e8a"
+node_fill   <- "#e8e7e3"
+node_line   <- "#52514e"
+target_fill <- "#3f3e3b"
+surface     <- "#fcfcfb"
+
+# The subnetwork of one knockout is a star, so it needs no force layout: the
+# knocked-out gene goes in the middle and the genes it moved onto a ring.
 star_positions <- function(edges) {
   centre <- sort(unique(edges$target_gene))
   ring   <- setdiff(unique(edges$partner), centre)
@@ -361,7 +401,7 @@ star_positions <- function(edges) {
 }
 
 # Every segment of a plotly line trace shares one colour and width, so all the
-# edges of one sign are drawn as a single trace with NA breaking them apart.
+# spokes of a view are drawn as a single trace with NA breaking them apart.
 edge_path <- function(edges, pos) {
   if (nrow(edges) == 0) {
     return(list(x = NA_real_, y = NA_real_))
@@ -381,84 +421,63 @@ marker_size <- function(w, lo = 16, hi = 34) {
   lo + (w - span[1]) / diff(span) * (hi - lo)
 }
 
-views <- connections %>%
+# star_positions() and edge_path() read target_gene and partner, so the DR
+# table is renamed into that shape rather than the helpers being rewritten.
+sctknk_edges <- sctknk_net %>%
+  mutate(target_gene = target, partner = gene)
+
+views <- sctknk_edges %>%
   distinct(target, cell_type) %>%
   arrange(target, cell_type) %>%
   mutate(label = paste0(target, "  ·  ", cell_type))
 
 fig <- plotly::plot_ly(width = NULL, height = 640)
 
-# The dropdown hides and shows the real traces, so their legend entries would
-# come and go with them. These two carry the legend instead and never move.
-# They are parked far outside the fixed axis range rather than left empty: a
-# trace with no coordinates loses its name, and with it its legend entry.
-legend_x <- c(-99, -98)
-legend_y <- c(-99, -99)
-
-fig <- fig %>%
-  plotly::add_trace(
-    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
-    line = list(color = edge_pos_colour, width = 2.5),
-    name = "Positive weight", hoverinfo = "skip", showlegend = TRUE
-  ) %>%
-  plotly::add_trace(
-    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
-    line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
-    name = "Negative weight", hoverinfo = "skip", showlegend = TRUE
-  )
-
+# There is no legend: with no sign to tell edges apart every one of them is
+# alike, so nothing is left for a legend to say. That also means the view
+# traces start at 0 rather than after a pair of parked legend traces.
 view_traces <- vector("list", nrow(views))
-next_trace  <- 2L  # the two legend traces above
+next_trace  <- 0L
 
 for (i in seq_len(nrow(views))) {
-  edges <- connections %>%
+  edges <- sctknk_edges %>%
     filter(target == views$target[i], cell_type == views$cell_type[i])
 
   pos <- star_positions(edges)
   visible <- i == 1
 
-  positive <- edge_path(filter(edges, weight >= 0), pos)
-  negative <- edge_path(filter(edges, weight < 0), pos)
+  spokes <- edge_path(edges, pos)
 
   hover <- paste0(
     edges$target_gene, " — ", edges$partner,
-    "<br>weight ", signif(edges$weight, 4),
-    "<br>rank ", edges$rank
+    "<br>log2FC ", signif(edges$log2FC, 4),
+    "<br>p.adj ", signif(edges$p.adj, 3)
   )
   mid <- data.frame(
     x = (pos$x[match(edges$target_gene, pos$gene)] + pos$x[match(edges$partner, pos$gene)]) / 2,
     y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
   )
 
-  # A partner reached by more than one target gene is drawn once, at its
-  # strongest edge.
-  partners <- edges %>%
-    group_by(partner) %>%
-    summarise(abs_weight = max(abs_weight), .groups = "drop") %>%
-    left_join(pos, by = c(partner = "gene"))
-
-  partner_hover <- edges %>%
-    group_by(partner) %>%
-    summarise(
+  # One row per gene already: sctknk_sig holds a single row per cell type x
+  # target x gene, so no grouping is needed to draw each node once.
+  moved <- edges %>%
+    transmute(
+      partner, log2FC,
       text = paste0(
-        partner[1], "<br>",
-        paste0(target_gene, " — ", signif(weight, 4), collapse = "<br>")
-      ),
-      .groups = "drop"
-    )
-  partners <- left_join(partners, partner_hover, by = "partner")
+        partner,
+        "<br>log2FC ", signif(log2FC, 4),
+        "<br>p.value ", signif(p.value, 3),
+        "<br>p.adj ", signif(p.adj, 3)
+      )
+    ) %>%
+    left_join(pos, by = c(partner = "gene"))
 
   centres <- pos[pos$gene %in% edges$target_gene, ]
 
   fig <- fig %>%
     plotly::add_trace(
-      x = positive$x, y = positive$y, type = "scatter", mode = "lines",
-      line = list(color = edge_pos_colour, width = 2.5),
-      hoverinfo = "skip", showlegend = FALSE, visible = visible
-    ) %>%
-    plotly::add_trace(
-      x = negative$x, y = negative$y, type = "scatter", mode = "lines",
-      line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+      x = spokes$x, y = spokes$y, type = "scatter", mode = "lines",
+      line = list(color = edge_colour, width = 2),
       hoverinfo = "skip", showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
@@ -467,15 +486,15 @@ for (i in seq_len(nrow(views))) {
       text = hover, hoverinfo = "text", showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
-      x = partners$x, y = partners$y, type = "scatter", mode = "markers+text",
+      x = moved$x, y = moved$y, type = "scatter", mode = "markers+text",
       marker = list(
-        size = marker_size(partners$abs_weight),
+        size = marker_size(moved$log2FC),
         color = node_fill, opacity = 1,
         line = list(color = node_line, width = 1.5)
       ),
-      text = partners$partner, textposition = partners$label_at,
+      text = moved$partner, textposition = moved$label_at,
       textfont = list(size = 11, color = "#0b0b0b"),
-      hovertext = partners$text, hoverinfo = "text",
+      hovertext = moved$text, hoverinfo = "text",
       showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
@@ -486,12 +505,12 @@ for (i in seq_len(nrow(views))) {
       ),
       text = centres$gene, textposition = "bottom center",
       textfont = list(size = 13, color = "#0b0b0b"),
-      hovertext = paste0(centres$gene, "<br>target"), hoverinfo = "text",
+      hovertext = paste0(centres$gene, "<br>knocked out"), hoverinfo = "text",
       showlegend = FALSE, visible = visible
     )
 
-  view_traces[[i]] <- next_trace + seq_len(5)
-  next_trace <- next_trace + 5L
+  view_traces[[i]] <- next_trace + seq_len(4)
+  next_trace <- next_trace + 4L
 }
 
 n_traces <- next_trace
@@ -505,9 +524,7 @@ title_style <- function(text) {
 
 buttons <- lapply(seq_len(nrow(views)), function(i) {
   visible <- rep(FALSE, n_traces)
-  visible[1:2] <- TRUE
   visible[view_traces[[i]]] <- TRUE
-
   list(
     method = "update",
     args = list(
@@ -522,11 +539,10 @@ fig %>%
   plotly::layout(
     title = title_style(views$label[1]),
     # No aspect lock: letting the ring stretch to the page width spreads the
-    # partner labels apart instead of leaving the space either side empty.
+    # gene labels apart instead of leaving the space either side empty.
     xaxis = list(visible = FALSE, range = c(-1.75, 1.75)),
     yaxis = list(visible = FALSE, range = c(-1.35, 1.35)),
-    legend = list(orientation = "h", x = 0, y = -0.02,
-                  font = list(color = "#52514e")),
+    showlegend = FALSE,
     margin = list(l = 20, r = 20, t = 110, b = 40),
     paper_bgcolor = surface,
     plot_bgcolor = surface,
@@ -541,68 +557,62 @@ fig %>%
   plotly::config(displayModeBar = FALSE)
 ```
 
-```{r network-missing, eval=!(has_connections && has_plotly), results="asis"}
-if (!has_connections) {
-  cat("No top connection table was supplied with this report, so no network is shown.")
+```{r sctknk-network-missing, eval=!(has_sctknk_net && has_plotly), results="asis"}
+if (!has_sctknk) {
+  cat("scTenifoldKnk was not run for this session, so there is no knockout",
+      "network to draw. Pass `--sctknk` to generate one.")
+} else if (!has_sctknk_sig) {
+  cat("scTenifoldKnk ran, but no gene cleared FDR < 0.05 in any cell type x",
+      "target combination, so there is nothing to draw.")
+} else if (!has_sctknk_net) {
+  cat("The only genes clearing FDR < 0.05 were the knocked-out genes",
+      "themselves, which are excluded from the ring, so there is nothing to",
+      "draw around them.")
 } else {
-  cat("plotly is not installed in this container, so the connection networks",
-      "could not be drawn. The table below still lists every connection.")
+  cat("plotly is not installed in this container, so the knockout networks",
+      "could not be drawn. The table below still lists every gene.")
 }
 ```
 
-## Top connections table
+## Knockout differentially-regulated genes
 
-Every edge RANK_SCORE kept: up to `r max_kept` per target gene per cell type,
-across `r n_conn_targets` target(s) and `r n_conn_cell_types` cell type(s).
-`weight` is the edge weight in that cell type's network, signed, and `rank`
-orders the edges of one target gene in one cell type by absolute weight.
+Every gene clearing FDR < 0.05, across all cell type and target combinations and
+with no cap on how many are listed per combination. `distance` is how far the
+gene moved between the wild-type and knocked-out networks; `log2FC` is that
+distance squared over the run's mean, logged; `p.value` tests it against the
+chi-square null and `p.adj` is the Benjamini-Hochberg adjustment within the run.
 
-```{r connections-table, eval=has_connections}
-connections %>%
-  select(cell_type, target, target_gene, partner, weight, rank) %>%
+`p.value` is a direct function of `log2FC`, so the two rank genes identically and
+the FDR cut above is the same thing as a `log2FC` threshold. Each knocked-out
+gene appears in its own rows, normally at the top, which is the simplest check
+that the knockout took.
+
+Currently `r n_sctknk_sig` gene(s) clear FDR < 0.05, across
+`r n_sctknk_targets` target(s) and `r n_sctknk_cell_types` cell type(s).
+
+```{r sctknk-table, eval=has_sctknk_sig}
+sctknk_sig %>%
+  select(cell_type, target, gene, distance, log2FC, p.value, p.adj) %>%
   datatable(
     filter = "top",
     rownames = FALSE,
+    # 0-based: column 5 is p.value
     options = list(pageLength = 15, order = list(list(5, "asc"))),
-    caption = "Top connections per target gene per cell type."
+    caption = "scTenifoldKnk differentially-regulated genes at FDR < 0.05, per cell type x target."
   ) %>%
-  formatSignif(columns = "weight", digits = 4)
+  formatSignif(columns = c("distance", "log2FC", "p.value", "p.adj"), digits = 4)
 ```
 
-```{r connections-table-empty, eval=!has_connections, results="asis"}
-cat("No top connection table was supplied with this report.")
+```{r sctknk-table-empty, eval=!has_sctknk_sig, results="asis"}
+if (!has_sctknk) {
+  cat("scTenifoldKnk was not run for this session, so no differentially-regulated",
+      "gene table is shown. Pass `--sctknk` to generate one.")
+} else {
+  cat("scTenifoldKnk ran, but no gene cleared FDR < 0.05 in any cell type x",
+      "target combination, so the table is empty.")
+}
 ```
 
-## scTenifoldKnk differentially-regulated genes
-
-A separate, target-specific analysis: for each cell type x target pair,
-scTenifoldKnk builds the wild-type network, knocks the target out of it
-directly (zeroing its outgoing edges), and compares the two networks by
-manifold alignment. `distance` is how far a gene moves between the two;
-`p.value`/`p.adj` (Benjamini-Hochberg) test that distance against the
-chi-square null. This does not produce a `perb_score` and is not folded into
-any of the tables or figures above -- it is a separate way of asking the same
-question. Currently `r if (has_sctknk) n_sctknk_sig else 0` gene(s) clear
-FDR < 0.05, across `r if (has_sctknk) n_sctknk_targets else 0` target(s) and
-`r if (has_sctknk) n_sctknk_cell_types else 0` cell type(s).
-
-```{r sctknk-table, eval=has_sctknk}
-sctknk_dr %>%
-  arrange(target, cell_type, p.value) %>%
-  select(cell_type, target, gene, distance, p.value, p.adj) %>%
-  datatable(
-    filter = "top",
-    rownames = FALSE,
-    options = list(pageLength = 15, order = list(list(4, "asc"))),
-    caption = "scTenifoldKnk differentially-regulated genes per cell type x target."
-  ) %>%
-  formatSignif(columns = c("distance", "p.value", "p.adj"), digits = 4)
-```
-
-```{r sctknk-table-empty, eval=!has_sctknk, results="asis"}
-cat("scTenifoldKnk was not run for this session, so no differentially-regulated",
-    "gene table is shown. Pass --sctknk to generate one.")
-```
 
 ## Cell identity overview
 

@@ -118,12 +118,12 @@ workflow {
 
         REPORT(
             MERGE.out.merged_rank_scores,
-            MERGE.out.merged_top_connections,
             DOWNSAMPLE.out.umap,
             file("${projectDir}/bin/report.qmd"),
             network,
             params.score_quantile,
-            sctknk_table
+            sctknk_table,
+            params.sctknk_top_genes
         )
     }
 }

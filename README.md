@@ -95,7 +95,7 @@ nextflow run main.nf --network scrank --sctknk ...
 nextflow run main.nf --sctknk ...
 ```
 
-When both run, they share `DOWNSAMPLE` and the scTenifoldKnk table is added as a section in that run's `REPORT`. Passing neither is an error.
+When both run, they share `DOWNSAMPLE` and the scTenifoldKnk results become sections 5 and 6 of that run's `REPORT` — the knockout network and the knockout gene table. Passing neither is an error.
 
 The hdWGCNA module aggregates cells into metacells, builds an unsigned co-expression network and then adapts its topological overlap matrix (TOM) to what scRank expects from a network. Four things happen to the raw TOM:
 
@@ -115,7 +115,7 @@ It also records the target's strongest connections. For each cell identity it re
 This step collects the perturbation scores from all parallel `RANK_SCORE` tasks and merges them into a single, clean text file, ready for downstream visualization. The per-target connection tables are concatenated the same way, into `top_connections_all_targets.txt`.
 
 ### 5. Report (`REPORT`)
-Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. It also draws the top connections: an interactive plotly network per target and cell identity, the target at the centre and its strongest partners around it, edge colour and dash carrying the sign of the weight and partner size its strength, with a menu to switch combination and the exact weights on hover — followed by a queryable table of every connection. Every figure is embedded in the HTML, so the report is a single portable file, which the embedded plotly library makes a few megabytes.
+Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. Sections 5 and 6 then go to the knockout track: an interactive plotly network per knocked-out gene and cell identity, the gene at the centre and the genes its knockout moved around it, node size following `log2FC`, with a menu to switch combination and the exact values on hover — followed by a queryable table of every differentially-regulated gene. Both are cut at FDR < 0.05, and the network is further capped at the `--sctknk_top_genes` strongest per combination while the table is not. A run without `--sctknk` shows a short "not run" note in place of each. Every figure is embedded in the HTML, so the report is a single portable file, which the embedded plotly library makes a few megabytes.
 
 ## Quick Start
 1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html) (`>=22.10.1`).
@@ -138,6 +138,7 @@ nextflow run netperturb/main.nf \
   --target /path/to/targets.txt \
   --network genie3 \
   --sctknk \
+  --sctknk_top_genes 25 \
   --top_connections 15 \
   --score_quantile 0.75 \
   --outdir results \
@@ -171,7 +172,9 @@ Stfa1;Mpo
 
 `--hdwgcna_min_cells`: Minimum number of cells an identity must have for `--network hdwgcna` to attempt metacell aggregation. Defaults to `150`. Identities below it are skipped.
 
-`--top_connections`: Number of strongest edges `RANK_SCORE` keeps per target gene per cell identity, ranked on absolute weight. Defaults to `15`. These are the edges the report's connection networks and connection table are drawn from; raising it makes both denser.
+`--top_connections`: Number of strongest edges `RANK_SCORE` keeps per target gene per cell identity, ranked on absolute weight. Defaults to `15`. These are written to `rank_scores/top_connections_all_targets.txt` for downstream use; the report no longer renders them.
+
+`--sctknk_top_genes`: Number of differentially-regulated genes drawn around each knocked-out gene in the report's knockout network, taken from those clearing FDR < 0.05 and ranked on `log2FC`. Defaults to `25`. This caps the figure only — the table below it lists every significant gene.
 
 `--score_quantile`: Quantile of the pooled log10 perturbation scores below which scores are cut from the report figures. Defaults to `0.75`, so the cut falls at q3 and the figures show the top quarter of scores. Pooled scores are bimodal, a low mode of near-zero values sitting well below the mode that carries the signal, and the report is only useful once the low one is gone. The distribution figure draws the cut over the full set of scores, so the line can be checked against where the two modes actually separate and this value tuned to land in the valley between them. The score table is never cut.
 
@@ -199,9 +202,7 @@ sensitive	Cstdc5	antagonist	1.30868421341405e-06
 resistant	Cstdc5	antagonist	2.91128461301128e-06
 ```
 
-rank_scores/top_connections_all_targets.txt: The strongest edges each target holds in each cell identity's network, up to `--top_connections` per target gene per identity, ranked on absolute weight.
-
-sctknk/sctenifoldknk_all_targets.txt: Written when `--sctknk` is passed, and the only file the knockout track publishes. One row per cell identity x knocked-out gene x differentially-regulated gene, with the manifold-alignment `distance`, `Z`-score, fold-change, and `p.value`/`p.adj`. Combined `--target` lines appear here as their individual genes, one knockout each.
+rank_scores/top_connections_all_targets.txt: The strongest edges each target holds in each cell identity's network, up to `--top_connections` per target gene per identity, ranked on absolute weight. Published for downstream use; the report does not render it.
 
 ```sh
 # Example
@@ -211,7 +212,16 @@ sensitive	Brd4	antagonist	Brd4	Ccnd1	-0.6640	2
 resistant	Brd4	antagonist	Brd4	Myc	0.4471	1
 ```
 
-report/netperturb_report.html: A self-contained Quarto report built from both tables, with a queryable table of every score, a cell type x target heatmap of the scores above the `--score_quantile` cut, an interactive network of each target's top connections per cell identity, a queryable table of those connections, and the `--network` inference method the run used.
+sctknk/sctenifoldknk_all_targets.txt: Written when `--sctknk` is passed, and the only file the knockout track publishes. One row per cell identity x knocked-out gene x differentially-regulated gene, with the manifold-alignment `distance`, `Z`-score, `FC`, and `p.value`/`p.adj`. Combined `--target` lines appear here as their individual genes, one knockout each. `FC` is the gene's squared alignment distance over the mean squared distance of that run, so it is a ratio to the average rather than a differential-expression fold change, and it carries no direction. The knocked-out gene appears in its own rows, normally at the top.
+
+```sh
+# Example
+cell_type	target	gene	distance	Z	FC	p.value	p.adj
+resistant	Brd4	Brd4	16.90000	8.42	56.4	5.84e-14	8.76e-11
+resistant	Brd4	G17_Brd4	14.43217	7.09	41.1	1.41e-10	9.83e-08
+```
+
+report/netperturb_report.html: A self-contained Quarto report, with a queryable table of every perturbation score, a cell type x target heatmap of the scores above the `--score_quantile` cut, then the knockout network and the knockout differentially-regulated gene table, both cut at FDR < 0.05, and the `--network` inference method the run used.
 
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
 

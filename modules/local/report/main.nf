@@ -10,12 +10,12 @@ process REPORT {
 
   input:
     path perbscore_table
-    path connections_table
     path umap_png
     path report_template, stageAs: "report_template.qmd"
     val network
     val score_quantile
     path sctknk_table
+    val sctknk_top_genes
 
   output:
     path "netperturb_report.html", emit: report
@@ -40,11 +40,11 @@ process REPORT {
     cp ${report_template} report.qmd
     quarto render report.qmd \
       -P perbscore_file:${perbscore_table} \
-      -P connections_file:${connections_table} \
       -P umap_file:${umap_png} \
       -P network:${network} \
       -P score_quantile:${score_quantile} \
       -P sctknk_file:${sctknk_table} \
+      -P sctknk_top_genes:${sctknk_top_genes} \
       --output netperturb_report.html
     """
 
