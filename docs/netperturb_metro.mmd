@@ -15,11 +15,12 @@
 %%metro file:  targets_in  | TXT  | --target
 %%metro files: net_rds     | RDS  | Network weights
 %%metro file:  score_txt   | TXT  | Scores
+%%metro file:  conn_txt    | TXT  | Top connections
 %%metro file:  umap_png    | PNG  | UMAP
 %%metro file:  report_html | HTML | Report
 
 %% Lift published outputs off the track so they hang above it as termini
-%%metro off_track: umap_png, net_rds, score_txt
+%%metro off_track: umap_png, net_rds, score_txt, conn_txt
 
 %% Station -> Nextflow process, for `nf-metro serve` live overlays
 %%metro process: downsample  | DOWNSAMPLE
@@ -64,12 +65,14 @@ graph LR
     subgraph scoring [Perturbation scoring]
         %%metro entry: left | genie3, sctnet, scrank, hdwgcna
         %%metro exit: right | genie3, sctnet, scrank, hdwgcna
-        rank_score[Rank score per target]
+        rank_score[Rank score & top edges]
         merge[Merge]
         score_txt[ ]
+        conn_txt[ ]
 
         rank_score -->|genie3,sctnet,scrank,hdwgcna| merge
         merge -->|genie3,sctnet,scrank,hdwgcna| score_txt
+        merge -->|genie3,sctnet,scrank,hdwgcna| conn_txt
     end
 
     subgraph reporting [Reporting]
@@ -89,5 +92,8 @@ graph LR
     %% All per-identity networks are collected and scored against every target.
     collect_nets -->|genie3,sctnet,scrank,hdwgcna| rank_score
 
-    %% The merged score table is rendered into the HTML report.
+    %% Both merged tables are rendered into the HTML report. REPORT also embeds
+    %% the UMAP published in section 1; that feed is left off the map, since a
+    %% section 1 -> section 4 edge would sweep the whole width and read as a
+    %% route rather than as the side artefact it is.
     merge -->|genie3,sctnet,scrank,hdwgcna| report
