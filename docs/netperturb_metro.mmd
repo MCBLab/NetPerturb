@@ -19,12 +19,13 @@
 %%metro file:  targets_in  | TXT  | --target
 %%metro files: net_rds     | RDS  | Network weights
 %%metro file:  score_txt   | TXT  | Scores
+%%metro file:  conn_txt    | TXT  | Top connections
 %%metro file:  sctknk_txt  | TXT  | DR genes
 %%metro file:  umap_png    | PNG  | UMAP
 %%metro file:  report_html | HTML | Report
 
 %% Lift published outputs off the track so they hang above it as termini
-%%metro off_track: umap_png, net_rds, score_txt, sctknk_txt
+%%metro off_track: umap_png, net_rds, score_txt, conn_txt, sctknk_txt
 
 %% Station -> Nextflow process, for `nf-metro serve` live overlays
 %%metro process: downsample    | DOWNSAMPLE
@@ -84,9 +85,11 @@ graph LR
         rank_score[Rank score per target]
         merge[Merge]
         score_txt[ ]
+        conn_txt[ ]
 
         rank_score -->|genie3,scrank,hdwgcna| merge
         merge -->|genie3,scrank,hdwgcna| score_txt
+        merge -->|genie3,scrank,hdwgcna| conn_txt
     end
 
     subgraph reporting [Reporting]
