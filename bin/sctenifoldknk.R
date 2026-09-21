@@ -72,11 +72,16 @@ write_dr <- function(dr) {
 # (R/scTenifoldKnk.R: `length(gKO) != 1` is a hard error). It has no mode
 # that knocks out several genes at once the way a ';'-joined scRank target
 # (e.g. "BCL2;EIF4A1") asks for; transcriptomeWide loops each gene through
-# its own separate single-gene KO rather than combining them. So a combined
-# target is skipped here for now rather than silently doing something else.
+# its own separate single-gene KO rather than combining them.
+#
+# main.nf already splits combined targets and hands this script one gene at a
+# time, so the pipeline never reaches this branch. It is kept for the script
+# run directly, where a combined target is skipped rather than passed to
+# scTenifoldKnk to hard-error on.
 if (grepl(";", target, fixed = TRUE)) {
   message("scTenifoldKnk has no simultaneous multi-gene knockout mode; ",
-          "skipping combined target '", target, "' in ", cell_type, ".")
+          "skipping combined target '", target, "' in ", cell_type,
+          " (main.nf splits these into one knockout per gene).")
   write_dr(empty_dr)
   quit(save = "no", status = 0)
 }

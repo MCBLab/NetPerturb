@@ -1,11 +1,17 @@
 process SCTENIFOLDKNK {
   """
-  Runs a virtual knockout of the target gene(s) with scTenifoldKnk and
-  reports the resulting genome-wide differentially-regulated (DR) gene
-  table. Unlike GENIE3/SCRANK/HDWGCNA, the KO is target-specific by
-  construction, so this runs once per (cell type, target) pair rather than
-  once per cell type -- see the .combine() call in main.nf.
+  Runs a virtual knockout of one target gene with scTenifoldKnk and reports
+  the resulting genome-wide differentially-regulated (DR) gene table. Unlike
+  GENIE3/SCRANK/HDWGCNA, the KO is target-specific by construction, so this
+  runs once per (cell type, gene) pair rather than once per cell type -- see
+  the .combine() call in main.nf, which also splits a ';'-joined combined
+  target into one knockout per gene, since scTenifoldKnk takes a single gene.
   """
+
+  // One task per (cell type, gene), so the pair goes in the task name the way
+  // RANK_SCORE puts its target there -- otherwise a failure in the log is just
+  // "SCTENIFOLDKNK (5)" with no way to tell which pair it was.
+  tag "${scobj.baseName}:${target}"
 
   label "r_sctenifoldknk"
 

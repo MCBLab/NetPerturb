@@ -215,9 +215,24 @@ nextflow_pipeline {
             assert names.count { it.startsWith("RANK_SCORE") } == 3
             assert names.count { it.startsWith("REPORT") } == 1
 
-            // and the sctknk track runs beside it, once per identity x target
-            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 6
+            // and the sctknk track runs beside it, once per identity x gene.
+            // test_input.txt names Brd4, Cstdc5 and Stfa1;Mpo, and the combined
+            // line is split, so that is 4 genes across 2 identities.
+            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK") }
+            assert knkTasks.size() == 8
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // each half of "Stfa1;Mpo" gets its own knockout, per identity
+            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Stfa1)")
+            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Mpo)")
+            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Stfa1)")
+            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Mpo)")
+            // and no task is ever handed the combined target itself
+            assert !knkTasks.any { it.contains(";") }
+
+            // RANK_SCORE still gets the combined target intact -- only the
+            // knockout track splits it
+            assert names.contains("RANK_SCORE (Stfa1;Mpo)")
 
             // neither of the other two inference methods is dragged in
             assert !names.any { it.startsWith("SCRANK") }
@@ -250,9 +265,13 @@ nextflow_pipeline {
 
             def names = workflow.trace.tasks().collect { it.@name }
 
-            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 6
+            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // only the merged table is published; the per-pair tables stay in
+            // the work dir
             assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
+            assert path("${outputDir}/sctknk").list().size() == 1
 
             // no --network, so the whole scoring and reporting track stays off
             assert !names.any { it.startsWith("GENIE3") }

@@ -32,6 +32,19 @@ workflow {
     //create a list of targets from the input file, assuming one target per line
     target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
     target_ch = Channel.fromList(target_list)
+
+    // scTenifoldKnk knocks out exactly one gene per run, so it cannot take a
+    // ';'-joined combined target the way RANK_SCORE does. Rather than skip
+    // those lines, the file is flattened to the individual genes it names and
+    // each is knocked out on its own, so "Stfa1;Mpo" yields a separate Stfa1
+    // result and Mpo result. Deduplicated across the whole file, so a gene
+    // that appears both alone and inside a combination is knocked out once.
+    // This is the same split downsample_and_split.R does to build gene4use.
+    sctknk_target_list = target_list
+        .collectMany { line -> line.split(';').collect { gene -> gene.trim() } }
+        .findAll { it }
+        .unique()
+    sctknk_target_ch = Channel.fromList(sctknk_target_list)
     network = params.network
     sctknk = params.sctknk
 
@@ -55,12 +68,12 @@ workflow {
 
     // scTenifoldKnk knocks out the target gene as part of building its
     // network, so unlike the rank-score methods it is target-specific by
-    // construction and runs once per (cell type, target) pair rather than
+    // construction and runs once per (cell type, gene) pair rather than
     // once per cell type. Its table never enters RANK_SCORE -- it goes to its
     // own merge, and from there into REPORT when --network is running too.
     if( sctknk ) {
         sc_obj
-        .combine( target_ch )
+        .combine( sctknk_target_ch )
         .set { sctknk_input }
 
         SCTENIFOLDKNK( sctknk_input, n_cores )
