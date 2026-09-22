@@ -1,7 +1,8 @@
 /*
 Workflow wiring tests. Every one runs with -stub, so no container is pulled and
 no R executes. What they check is the shape of the pipeline: that --network
-picks exactly one inference process, that every target becomes its own task,
+picks exactly one inference process, that --sctknk adds its own track beside
+that choice (or runs alone without it), that every target becomes its own task,
 and that the tables reach MERGE intact.
 
 Trace tasks expose `name` as a public field rather than a getter, so it is read
@@ -37,7 +38,7 @@ nextflow_pipeline {
                 .unique()
 
             assert processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCTENIFOLDKNK")
             assert !processes.contains("SCRANK")
             assert !processes.contains("HDWGCNA")
         }
@@ -70,7 +71,7 @@ nextflow_pipeline {
 
             assert processes.contains("HDWGCNA")
             assert !processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDNET")
+            assert !processes.contains("SCTENIFOLDKNK")
             assert !processes.contains("SCRANK")
         }
     }
@@ -185,6 +186,105 @@ nextflow_pipeline {
         }
     }
 
+    test("--sctknk runs scTenifoldKnk in parallel with the --network track") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // the --network track is untouched: one GENIE3 per identity,
+            // scored and reported exactly as it is without the flag
+            assert names.count { it.startsWith("GENIE3") } == 2
+            assert names.count { it.startsWith("RANK_SCORE") } == 3
+            assert names.count { it.startsWith("REPORT") } == 1
+
+            // and the sctknk track runs beside it, once per identity x gene.
+            // test_input.txt names Brd4, Cstdc5 and Stfa1;Mpo, and the combined
+            // line is split, so that is 4 genes across 2 identities.
+            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK") }
+            assert knkTasks.size() == 8
+            assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // each half of "Stfa1;Mpo" gets its own knockout, per identity
+            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Stfa1)")
+            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Mpo)")
+            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Stfa1)")
+            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Mpo)")
+            // and no task is ever handed the combined target itself
+            assert !knkTasks.any { it.contains(";") }
+
+            // RANK_SCORE still gets the combined target intact -- only the
+            // knockout track splits it
+            assert names.contains("RANK_SCORE (Stfa1;Mpo)")
+
+            // neither of the other two inference methods is dragged in
+            assert !names.any { it.startsWith("SCRANK") }
+            assert !names.any { it.startsWith("HDWGCNA") }
+
+            assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
+            assert path("${outputDir}/report/netperturb_report.html").exists()
+        }
+    }
+
+    test("--sctknk without --network runs the knockout track alone") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                sctknk  = true
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
+            assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // only the merged table is published; the per-pair tables stay in
+            // the work dir. One file rather than two because no --gsea_gmt was
+            // given -- the enrichment publishes beside it when there is one.
+            assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
+            assert path("${outputDir}/sctknk").list().size() == 1
+
+            // no --network, so the whole scoring and reporting track stays off
+            assert !names.any { it.startsWith("GENIE3") }
+            assert !names.any { it.startsWith("SCRANK") }
+            assert !names.any { it.startsWith("HDWGCNA") }
+            assert !names.any { it.startsWith("RANK_SCORE") }
+            assert !names.any { it.startsWith("REPORT") }
+            // MERGE_SCTENIFOLDKNK also starts with "MERGE", so match it exactly
+            assert !names.any { it.replaceFirst(/ \(.*/, "") == "MERGE" }
+        }
+    }
+
     test("an unsupported --network fails before doing any work") {
 
         options "-stub"
@@ -212,4 +312,188 @@ nextflow_pipeline {
             assert workflow.trace.tasks().isEmpty()
         }
     }
+
+    test("sctknk is no longer a --network value") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "sctknk"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+
+            // it moved to its own flag, so --network sctknk is now just a typo
+            assert workflow.stdout.any { it.contains("Invalid --network 'sctknk'") }
+            assert workflow.trace.tasks().isEmpty()
+        }
+    }
+
+    test("neither --network nor --sctknk leaves nothing to run") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+
+            assert workflow.stdout.any { it.contains("Nothing to run.") }
+            assert workflow.trace.tasks().isEmpty()
+        }
+    }
+
+    test("--gsea_gmt adds gene set enrichment to the knockout track") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                network  = "genie3"
+                sctknk   = true
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert names.count { it.startsWith("GSEA_SCTENIFOLDKNK") } == 1
+            assert path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // published beside the knockout table, so the directory now holds
+            // both -- the knockout-alone test above asserts one for want of a GMT
+            assert path("${outputDir}/sctknk").list().size() == 2
+
+            // the knockout fan-out and the scoring track are untouched by it.
+            // GSEA_SCTENIFOLDKNK starts with "GSEA_", so it cannot inflate this
+            // count -- which is why the process is not named SCTENIFOLDKNK_GSEA
+            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("no --gsea_gmt means no enrichment task and a sentinel into REPORT") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert !names.any { it.startsWith("GSEA") }
+            assert !path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // REPORT still runs: it takes assets/NO_GSEA_TABLE instead
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("--gsea_gmt without --sctknk runs no enrichment and does not fail") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                network  = "genie3"
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            // warned rather than fatal: there is no knockout table to enrich,
+            // but the scoring track is perfectly valid on its own
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert !names.any { it.startsWith("GSEA") }
+            assert !names.any { it.startsWith("SCTENIFOLDKNK") }
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("the knockout track enriches on its own, with no report to put it in") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                sctknk   = true
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert names.count { it.startsWith("GSEA_SCTENIFOLDKNK") } == 1
+            assert path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // no --network, so nothing renders it -- the same gap the knockout
+            // table itself has in this mode
+            assert !names.any { it.startsWith("REPORT") }
+        }
+    }
+
 }

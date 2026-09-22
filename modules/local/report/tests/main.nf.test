@@ -1,3 +1,10 @@
+/*
+Both cases run with -stub, and REPORT's stub only touches the HTML -- no quarto
+and no R execute. So these check the process contract (that the declared inputs
+and the emitted file line up) and nothing about the report's contents. The
+template itself is only exercised by rendering it in the rquarto container; see
+the note in tests/main.nf.test.
+*/
 nextflow_process {
 
     name "REPORT"
@@ -12,11 +19,14 @@ nextflow_process {
             process {
                 """
                 input[0] = file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt")
-                input[1] = file("\${projectDir}/tests/fixtures/top_connections.Brd4.txt")
-                input[2] = file("\${projectDir}/tests/fixtures/umap.png")
-                input[3] = file("\${projectDir}/bin/report.qmd")
-                input[4] = "genie3"
-                input[5] = 0.75
+                input[1] = file("\${projectDir}/tests/fixtures/umap.png")
+                input[2] = file("\${projectDir}/bin/report.qmd")
+                input[3] = "genie3"
+                input[4] = 0.75
+                input[5] = file("\${projectDir}/tests/fixtures/sctenifoldknk_all_targets.txt")
+                input[6] = 25
+                input[7] = file("\${projectDir}/tests/fixtures/gsea_all_targets.txt")
+                input[8] = 20
                 """
             }
         }
@@ -27,4 +37,57 @@ nextflow_process {
             assert file(process.out.report[0]).name == "netperturb_report.html"
         }
     }
+
+    test("accepts the sentinel table from a run without --sctknk") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt")
+                input[1] = file("\${projectDir}/tests/fixtures/umap.png")
+                input[2] = file("\${projectDir}/bin/report.qmd")
+                input[3] = "genie3"
+                input[4] = 0.75
+                input[5] = file("\${projectDir}/assets/NO_SCTKNK_TABLE")
+                input[6] = 25
+                input[7] = file("\${projectDir}/tests/fixtures/gsea_all_targets.txt")
+                input[8] = 20
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.report.size() == 1
+        }
+    }
+
+    test("accepts the sentinel GSEA table from a run without --gsea_gmt") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/perbscore_all_targets.Brd4.txt")
+                input[1] = file("\${projectDir}/tests/fixtures/umap.png")
+                input[2] = file("\${projectDir}/bin/report.qmd")
+                input[3] = "genie3"
+                input[4] = 0.75
+                input[5] = file("\${projectDir}/tests/fixtures/sctenifoldknk_all_targets.txt")
+                input[6] = 25
+                input[7] = file("\${projectDir}/assets/NO_GSEA_TABLE")
+                input[8] = 20
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.report.size() == 1
+        }
+    }
+
 }

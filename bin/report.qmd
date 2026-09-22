@@ -12,10 +12,13 @@ format:
     theme: flatly
 params:
   perbscore_file: "perbscore_all_targets.txt"
-  connections_file: "top_connections_all_targets.txt"
   umap_file: "umap.png"
   network: ""
   score_quantile: 0.75
+  sctknk_file: ""
+  sctknk_top_genes: 25
+  gsea_file: ""
+  gsea_top_terms: 20
 ---
 
 ```{r setup, include=FALSE}
@@ -27,7 +30,7 @@ library(ggplot2)
 library(DT)
 library(scales)
 
-# plotly draws the connection networks. A container built before that section
+# plotly draws the knockout networks. A container built before that section
 # existed still has to render the rest of the report, so its absence is a
 # missing figure rather than an error.
 has_plotly <- requireNamespace("plotly", quietly = TRUE)
@@ -95,7 +98,6 @@ n_top <- sum(score_data$is_top)
 network_key   <- if (is.null(params$network)) "" else trimws(as.character(params$network))
 network_names <- c(
   genie3  = "GENIE3",
-  sctnet  = "scTenifoldNet",
   scrank  = "scRank",
   hdwgcna = "hdWGCNA"
 )
@@ -107,43 +109,210 @@ if (!nzchar(network_key)) {
 }
 network_value <- if (nzchar(network_key)) network_key else "not supplied"
 
-# The strongest edges RANK_SCORE pulled off each cell type network, one row per
-# cell type x target gene x partner. A run started before RANK_SCORE emitted
-# them has no such file.
-connections_path <- params$connections_file
-connections <- if (!is.null(connections_path) && nzchar(connections_path) &&
-                   file.exists(connections_path)) {
-  read.delim(connections_path, header = TRUE, sep = "\t")
-} else {
-  data.frame()
-}
-
-has_connections <- nrow(connections) > 0
-
-if (has_connections) {
-  connections <- connections %>%
-    mutate(
-      abs_weight = abs(weight),
-      direction  = ifelse(weight >= 0, "Positive", "Negative")
-    ) %>%
-    arrange(target, cell_type, target_gene, rank)
-
-  n_conn_targets    <- n_distinct(connections$target)
-  n_conn_cell_types <- n_distinct(connections$cell_type)
-  n_conn_views      <- nrow(distinct(connections, target, cell_type))
-  max_kept          <- max(connections$rank)
-} else {
-  n_conn_targets    <- 0
-  n_conn_cell_types <- 0
-  n_conn_views      <- 0
-  max_kept          <- 0
-}
-
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
 umap_path <- params$umap_file
 has_umap  <- !is.null(umap_path) && nzchar(umap_path) && file.exists(umap_path)
 if (has_umap) umap_path <- normalizePath(umap_path)
+
+# scTenifoldKnk's differentially-regulated (DR) gene table, from a --sctknk
+# run. A header-only sentinel file (no rows) stands in when it was not
+# requested for this run at all, same shape as a real run that just found
+# nothing, so both render the same "nothing to show" message.
+# The named-but-empty frame matters: everything below filters on p.adj, so a
+# bare data.frame() with no columns would fail with "object 'p.adj' not found"
+# rather than fall through to the "not run" message. Same reasoning, and the
+# same 8 columns, as empty_dr in bin/sctenifoldknk.R. The size check is for
+# MERGE_SCTENIFOLDKNK's stub, which touches a zero-byte file that read.delim
+# refuses with "no lines available in input".
+sctknk_empty <- data.frame(
+  cell_type = character(), target = character(), gene = character(),
+  distance = numeric(), Z = numeric(), FC = numeric(),
+  p.value = numeric(), p.adj = numeric(), stringsAsFactors = FALSE
+)
+
+sctknk_path <- params$sctknk_file
+sctknk_dr <- if (!is.null(sctknk_path) && nzchar(sctknk_path) &&
+                  file.exists(sctknk_path) && file.size(sctknk_path) > 0) {
+  read.delim(sctknk_path, header = TRUE, sep = "\t")
+} else {
+  sctknk_empty
+}
+
+has_sctknk <- nrow(sctknk_dr) > 0
+
+# How many genes the network figure draws around each target. The table below
+# it is never capped.
+sctknk_top_genes <- suppressWarnings(as.integer(params$sctknk_top_genes))
+if (!isTRUE(is.finite(sctknk_top_genes)) || !isTRUE(sctknk_top_genes >= 1)) {
+  sctknk_top_genes <- 25L
+}
+
+# dRegulation() reports FC as a gene's squared manifold-alignment distance over
+# the mean squared distance of the run, so it is a ratio to the average rather
+# than a differential-expression fold change, and it carries no direction: a
+# gene that moved a long way scores high whichever way it moved. log2 of it is
+# what the figure sizes nodes by and what the table reports.
+if (has_sctknk) {
+  sctknk_dr <- sctknk_dr %>%
+    mutate(log2FC = ifelse(is.finite(FC) & FC > 0, log2(FC), NA_real_))
+} else {
+  # No rows, but the 8 columns are there either way, so only log2FC has to be
+  # added to keep the select() in the table below working.
+  sctknk_dr$log2FC <- numeric()
+}
+
+# p.value is pchisq(FC, df = 1) and p.adj is BH over that, so the FDR cut is a
+# monotone function of FC: filtering here is the same as taking everything
+# above a log2FC threshold. Both sections below start from this frame.
+sctknk_sig <- sctknk_dr %>%
+  filter(!is.na(p.adj), p.adj < 0.05) %>%
+  arrange(target, cell_type, p.value)
+
+has_sctknk_sig <- nrow(sctknk_sig) > 0
+n_sctknk_sig   <- nrow(sctknk_sig)
+
+# Counted over the significant rows, not over everything knocked out: a target
+# that came back with nothing would otherwise be counted in a sentence that
+# says how far the hits reach.
+n_sctknk_targets    <- n_distinct(sctknk_sig$target)
+n_sctknk_cell_types <- n_distinct(sctknk_sig$cell_type)
+
+# Ring nodes for the figure. The knocked-out gene is always in its own DR table
+# and always moves furthest, so it would be drawn as a spoke back to itself;
+# it is dropped here and kept in the table, where it reads as confirmation the
+# knockout took. The ring is then capped, since a target can clear FDR on
+# hundreds of genes and every view is embedded in the HTML up front.
+sctknk_net <- if (has_sctknk_sig) {
+  sctknk_sig %>%
+    filter(gene != target, is.finite(log2FC)) %>%
+    group_by(target, cell_type) %>%
+    slice_max(log2FC, n = sctknk_top_genes, with_ties = FALSE) %>%
+    ungroup()
+} else {
+  sctknk_sig
+}
+
+has_sctknk_net <- nrow(sctknk_net) > 0
+
+# Counted off sctknk_net rather than sctknk_sig, because that is the frame the
+# dropdown is built from: a combination whose only significant gene was the
+# knocked-out gene itself has a row in the table but no menu entry.
+n_sctknk_views <- if (has_sctknk_net) {
+  nrow(distinct(sctknk_net, target, cell_type))
+} else {
+  0
+}
+
+# The enrichment run over the table above, from --gsea_gmt. Same sentinel
+# arrangement and the same reasons: assets/NO_GSEA_TABLE is a header-only file
+# standing in for "no gene sets were given", the named-but-empty frame keeps the
+# filters below from failing on a missing column, and the size check is for the
+# stub's zero-byte file.
+gsea_empty <- data.frame(
+  cell_type = character(), target = character(), pathway = character(),
+  pval = numeric(), padj = numeric(), log2err = numeric(),
+  ES = numeric(), NES = numeric(), size = integer(),
+  leadingEdge = character(), stringsAsFactors = FALSE
+)
+
+gsea_path <- params$gsea_file
+
+# Unlike the knockout table, this one has two ways of being empty that want
+# different sentences: no --gsea_gmt was given at all, or one was and nothing
+# came back -- which is what a GMT for the wrong species looks like from here.
+# The sentinel is staged under its own name, so the file name tells them apart.
+gsea_requested <- !is.null(gsea_path) && nzchar(gsea_path) &&
+  basename(gsea_path) != "NO_GSEA_TABLE"
+
+gsea <- if (!is.null(gsea_path) && nzchar(gsea_path) &&
+              file.exists(gsea_path) && file.size(gsea_path) > 0) {
+  read.delim(gsea_path, header = TRUE, sep = "\t")
+} else {
+  gsea_empty
+}
+
+has_gsea <- nrow(gsea) > 0
+
+gsea_top_terms <- suppressWarnings(as.integer(params$gsea_top_terms))
+if (!isTRUE(is.finite(gsea_top_terms)) || !isTRUE(gsea_top_terms >= 1)) {
+  gsea_top_terms <- 20L
+}
+
+# 0.25, not the 0.05 the DR table above is cut at. That is GSEA's own
+# convention -- the Broad's guidance for the method sets significance at FDR
+# q < 0.25 -- and it exists because a gene set test is not a gene test: the
+# sets in a collection overlap heavily, so the BH correction over them is
+# conservative, and the question here is which processes to follow up rather
+# than which single genes to believe.
+gsea_fdr <- 0.25
+
+gsea_sig <- gsea %>%
+  filter(!is.na(padj), padj < gsea_fdr) %>%
+  mutate(
+    # The leading edge is stored ';'-joined; its length is what the figure
+    # sizes dots by and the only part of it the table keeps. as.character()
+    # rather than the column as read: read.delim types a column of a
+    # header-only table -- which is exactly what assets/NO_GSEA_TABLE is --
+    # as logical, and strsplit() refuses a non-character argument, so without
+    # it a run whose enrichment found nothing fails to render at all.
+    leading_edge_n = lengths(strsplit(as.character(leadingEdge), ";", fixed = TRUE)),
+    # The figure's colour. -log(p.adj + 1), not -log10(p.adj): the pseudocount
+    # bounds it -- p.adj in (0, 1] puts this in [-log(2), 0), rising towards 0
+    # as a set gets more significant -- so fgsea's 1e-50 p-value floor cannot
+    # stretch the scale any more, and no cap is needed. The trade is at the
+    # significant end: log is close to linear near 1, so everything below
+    # p.adj of about 0.01 lands within a hair of 0 and takes the same colour.
+    # The exact p.adj is a column of the table below.
+    neg_log_padj = -log(as.numeric(padj) + 1)
+  ) %>%
+  arrange(target, cell_type, padj)
+
+has_gsea_sig      <- nrow(gsea_sig) > 0
+n_gsea_sets       <- nrow(gsea_sig)
+n_gsea_targets    <- n_distinct(gsea_sig$target)
+n_gsea_cell_types <- n_distinct(gsea_sig$cell_type)
+
+# Set names come out of the GMT in MSigDB's shape -- GOBP_REGULATION_OF_... --
+# which is unreadable at axis size, and long enough to be unreadable in a table
+# column too. Underscores become spaces for the axis label only; the hover
+# keeps the name exactly as it was given, since that is what anyone would
+# search the collection for, and the table keeps it in the cell behind a
+# truncating renderer so its filter still matches the part it does not show.
+#
+# One budget for both, so a name is not cut at two different lengths in one
+# section. The table's renderer is JavaScript and carries the number itself.
+set_label_max <- 50
+
+pretty_set <- function(x) {
+  label <- gsub("_", " ", x)
+  ifelse(nchar(label) > set_label_max,
+         paste0(substr(label, 1, set_label_max - 1), "\u2026"), label)
+}
+
+# Figure rows: the strongest sets per combination. Capped for the same reason
+# the knockout ring is -- every view is embedded in the HTML up front -- while
+# the table below stays uncapped. Ranked on |NES| rather than NES: the ranking
+# behind these scores is two-tailed, so a set at the quiet end of it is as much
+# a result as one at the moved end, and slicing on NES alone would keep only
+# the moved end and silently drop the other half of the figure.
+gsea_fig <- if (has_gsea_sig) {
+  gsea_sig %>%
+    filter(is.finite(NES), is.finite(neg_log_padj)) %>%
+    group_by(target, cell_type) %>%
+    slice_max(abs(NES), n = gsea_top_terms, with_ties = FALSE) %>%
+    ungroup()
+} else {
+  gsea_sig
+}
+
+has_gsea_fig <- nrow(gsea_fig) > 0
+
+n_gsea_views <- if (has_gsea_fig) {
+  nrow(distinct(gsea_fig, target, cell_type))
+} else {
+  0
+}
 ```
 
 ## Overview
@@ -186,8 +355,8 @@ non-positive score(s) cannot be logged and are not shown either.
 
 The left panel is every score, so the cut can be checked against where the two
 modes actually separate — move it with `--score_quantile` if the red line does
-not fall in the valley between them. The right panel is what the rest of the
-report works with, on its own axis.
+not fall in the valley between them. The right panel is what the heatmap below
+works with, on its own axis.
 
 The green dashed line in both panels is the `r top_label` threshold
 (`r if (has_scores) signif(top_cut, 4) else NA`), the `r n_top` strongest
@@ -283,33 +452,36 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   { if (n_bindings > 1) facet_wrap(~binding) }
 ```
 
-## Target connection networks
+## Knockout networks
 
-The strongest edges each target holds in each cell type network, taken from the
-target's row of that network — the same neighbourhood `scRank::init_mod()` reads
-when it modularises a subnetwork, but kept per cell type and capped at the
-`r max_kept` strongest edges. Use the menu to switch between the
-`r n_conn_views` target and cell type combinations.
+Each knocked-out gene and the genes its knockout moved. scTenifoldKnk zeroes the
+target's outgoing edges, realigns the knocked-out network against the wild-type
+one, and scores every gene on how far it travelled between the two; the genes
+drawn here are the ones clearing FDR < 0.05. Use the menu to switch between the
+`r n_sctknk_views` target and cell type combinations.
 
-The target sits at the centre and its partners around it. An edge's colour and
-dash carry the sign of the weight, a solid blue edge being a positive one and a
-dashed red edge a negative one; a partner's size follows the strength of its
-edge, scaled within the combination on display, so sizes rank partners against
-each other rather than across cell types. Hover any node or edge for the exact
-weight; every value is also in the table below.
+The knocked-out gene sits at the centre and the genes it moved sit around it. A
+node's size follows its `log2FC`, scaled within the combination on display, so
+sizes rank genes against each other rather than across cell types. The ring is
+capped at the `r sctknk_top_genes` strongest genes per combination; the table in
+the next section is not capped. Hover any node for its exact values.
 
-```{r network, eval=has_connections && has_plotly}
-# Blue and red are reserved for the sign of the weight, the one thing on this
-# figure carrying meaning through colour, so the nodes stay neutral.
-edge_pos_colour <- "#2a78d6"
-edge_neg_colour <- "#e34948"
-node_fill       <- "#e8e7e3"
-node_line       <- "#52514e"
-target_fill     <- "#3f3e3b"
-surface         <- "#fcfcfb"
+`log2FC` here is the log2 ratio of a gene's squared alignment distance to the
+mean squared distance of its run, so it says how far a gene moved and not which
+way it went. It carries no direction, which is why no edge on this figure has a
+sign to read off: every gene shown simply moved further than its run's average.
 
-# The subnetwork of one target is a star, so it needs no force layout: the
-# target genes go in the middle and their partners onto a ring around them.
+```{r sctknk-network, eval=has_sctknk_net && has_plotly}
+# log2FC has no sign and is already carried by node size, so nothing on this
+# figure needs to carry meaning through colour and the palette stays neutral.
+edge_colour <- "#8f8e8a"
+node_fill   <- "#e8e7e3"
+node_line   <- "#52514e"
+target_fill <- "#3f3e3b"
+surface     <- "#fcfcfb"
+
+# The subnetwork of one knockout is a star, so it needs no force layout: the
+# knocked-out gene goes in the middle and the genes it moved onto a ring.
 star_positions <- function(edges) {
   centre <- sort(unique(edges$target_gene))
   ring   <- setdiff(unique(edges$partner), centre)
@@ -341,7 +513,7 @@ star_positions <- function(edges) {
 }
 
 # Every segment of a plotly line trace shares one colour and width, so all the
-# edges of one sign are drawn as a single trace with NA breaking them apart.
+# spokes of a view are drawn as a single trace with NA breaking them apart.
 edge_path <- function(edges, pos) {
   if (nrow(edges) == 0) {
     return(list(x = NA_real_, y = NA_real_))
@@ -361,84 +533,63 @@ marker_size <- function(w, lo = 16, hi = 34) {
   lo + (w - span[1]) / diff(span) * (hi - lo)
 }
 
-views <- connections %>%
+# star_positions() and edge_path() read target_gene and partner, so the DR
+# table is renamed into that shape rather than the helpers being rewritten.
+sctknk_edges <- sctknk_net %>%
+  mutate(target_gene = target, partner = gene)
+
+views <- sctknk_edges %>%
   distinct(target, cell_type) %>%
   arrange(target, cell_type) %>%
   mutate(label = paste0(target, "  ·  ", cell_type))
 
 fig <- plotly::plot_ly(width = NULL, height = 640)
 
-# The dropdown hides and shows the real traces, so their legend entries would
-# come and go with them. These two carry the legend instead and never move.
-# They are parked far outside the fixed axis range rather than left empty: a
-# trace with no coordinates loses its name, and with it its legend entry.
-legend_x <- c(-99, -98)
-legend_y <- c(-99, -99)
-
-fig <- fig %>%
-  plotly::add_trace(
-    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
-    line = list(color = edge_pos_colour, width = 2.5),
-    name = "Positive weight", hoverinfo = "skip", showlegend = TRUE
-  ) %>%
-  plotly::add_trace(
-    x = legend_x, y = legend_y, type = "scatter", mode = "lines",
-    line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
-    name = "Negative weight", hoverinfo = "skip", showlegend = TRUE
-  )
-
+# There is no legend: with no sign to tell edges apart every one of them is
+# alike, so nothing is left for a legend to say. That also means the view
+# traces start at 0 rather than after a pair of parked legend traces.
 view_traces <- vector("list", nrow(views))
-next_trace  <- 2L  # the two legend traces above
+next_trace  <- 0L
 
 for (i in seq_len(nrow(views))) {
-  edges <- connections %>%
+  edges <- sctknk_edges %>%
     filter(target == views$target[i], cell_type == views$cell_type[i])
 
   pos <- star_positions(edges)
   visible <- i == 1
 
-  positive <- edge_path(filter(edges, weight >= 0), pos)
-  negative <- edge_path(filter(edges, weight < 0), pos)
+  spokes <- edge_path(edges, pos)
 
   hover <- paste0(
     edges$target_gene, " — ", edges$partner,
-    "<br>weight ", signif(edges$weight, 4),
-    "<br>rank ", edges$rank
+    "<br>log2FC ", signif(edges$log2FC, 4),
+    "<br>p.adj ", signif(edges$p.adj, 3)
   )
   mid <- data.frame(
     x = (pos$x[match(edges$target_gene, pos$gene)] + pos$x[match(edges$partner, pos$gene)]) / 2,
     y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
   )
 
-  # A partner reached by more than one target gene is drawn once, at its
-  # strongest edge.
-  partners <- edges %>%
-    group_by(partner) %>%
-    summarise(abs_weight = max(abs_weight), .groups = "drop") %>%
-    left_join(pos, by = c(partner = "gene"))
-
-  partner_hover <- edges %>%
-    group_by(partner) %>%
-    summarise(
+  # One row per gene already: sctknk_sig holds a single row per cell type x
+  # target x gene, so no grouping is needed to draw each node once.
+  moved <- edges %>%
+    transmute(
+      partner, log2FC,
       text = paste0(
-        partner[1], "<br>",
-        paste0(target_gene, " — ", signif(weight, 4), collapse = "<br>")
-      ),
-      .groups = "drop"
-    )
-  partners <- left_join(partners, partner_hover, by = "partner")
+        partner,
+        "<br>log2FC ", signif(log2FC, 4),
+        "<br>p.value ", signif(p.value, 3),
+        "<br>p.adj ", signif(p.adj, 3)
+      )
+    ) %>%
+    left_join(pos, by = c(partner = "gene"))
 
   centres <- pos[pos$gene %in% edges$target_gene, ]
 
   fig <- fig %>%
     plotly::add_trace(
-      x = positive$x, y = positive$y, type = "scatter", mode = "lines",
-      line = list(color = edge_pos_colour, width = 2.5),
-      hoverinfo = "skip", showlegend = FALSE, visible = visible
-    ) %>%
-    plotly::add_trace(
-      x = negative$x, y = negative$y, type = "scatter", mode = "lines",
-      line = list(color = edge_neg_colour, width = 2.5, dash = "dash"),
+      x = spokes$x, y = spokes$y, type = "scatter", mode = "lines",
+      line = list(color = edge_colour, width = 2),
       hoverinfo = "skip", showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
@@ -447,15 +598,15 @@ for (i in seq_len(nrow(views))) {
       text = hover, hoverinfo = "text", showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
-      x = partners$x, y = partners$y, type = "scatter", mode = "markers+text",
+      x = moved$x, y = moved$y, type = "scatter", mode = "markers+text",
       marker = list(
-        size = marker_size(partners$abs_weight),
+        size = marker_size(moved$log2FC),
         color = node_fill, opacity = 1,
         line = list(color = node_line, width = 1.5)
       ),
-      text = partners$partner, textposition = partners$label_at,
+      text = moved$partner, textposition = moved$label_at,
       textfont = list(size = 11, color = "#0b0b0b"),
-      hovertext = partners$text, hoverinfo = "text",
+      hovertext = moved$text, hoverinfo = "text",
       showlegend = FALSE, visible = visible
     ) %>%
     plotly::add_trace(
@@ -466,12 +617,12 @@ for (i in seq_len(nrow(views))) {
       ),
       text = centres$gene, textposition = "bottom center",
       textfont = list(size = 13, color = "#0b0b0b"),
-      hovertext = paste0(centres$gene, "<br>target"), hoverinfo = "text",
+      hovertext = paste0(centres$gene, "<br>knocked out"), hoverinfo = "text",
       showlegend = FALSE, visible = visible
     )
 
-  view_traces[[i]] <- next_trace + seq_len(5)
-  next_trace <- next_trace + 5L
+  view_traces[[i]] <- next_trace + seq_len(4)
+  next_trace <- next_trace + 4L
 }
 
 n_traces <- next_trace
@@ -485,9 +636,7 @@ title_style <- function(text) {
 
 buttons <- lapply(seq_len(nrow(views)), function(i) {
   visible <- rep(FALSE, n_traces)
-  visible[1:2] <- TRUE
   visible[view_traces[[i]]] <- TRUE
-
   list(
     method = "update",
     args = list(
@@ -502,11 +651,10 @@ fig %>%
   plotly::layout(
     title = title_style(views$label[1]),
     # No aspect lock: letting the ring stretch to the page width spreads the
-    # partner labels apart instead of leaving the space either side empty.
+    # gene labels apart instead of leaving the space either side empty.
     xaxis = list(visible = FALSE, range = c(-1.75, 1.75)),
     yaxis = list(visible = FALSE, range = c(-1.35, 1.35)),
-    legend = list(orientation = "h", x = 0, y = -0.02,
-                  font = list(color = "#52514e")),
+    showlegend = FALSE,
     margin = list(l = 20, r = 20, t = 110, b = 40),
     paper_bgcolor = surface,
     plot_bgcolor = surface,
@@ -521,37 +669,362 @@ fig %>%
   plotly::config(displayModeBar = FALSE)
 ```
 
-```{r network-missing, eval=!(has_connections && has_plotly), results="asis"}
-if (!has_connections) {
-  cat("No top connection table was supplied with this report, so no network is shown.")
+```{r sctknk-network-missing, eval=!(has_sctknk_net && has_plotly), results="asis"}
+if (!has_sctknk) {
+  cat("scTenifoldKnk was not run for this session, so there is no knockout",
+      "network to draw. Pass `--sctknk` to generate one.")
+} else if (!has_sctknk_sig) {
+  cat("scTenifoldKnk ran, but no gene cleared FDR < 0.05 in any cell type x",
+      "target combination, so there is nothing to draw.")
+} else if (!has_sctknk_net) {
+  cat("The only genes clearing FDR < 0.05 were the knocked-out genes",
+      "themselves, which are excluded from the ring, so there is nothing to",
+      "draw around them.")
 } else {
-  cat("plotly is not installed in this container, so the connection networks",
-      "could not be drawn. The table below still lists every connection.")
+  cat("plotly is not installed in this container, so the knockout networks",
+      "could not be drawn. The table below still lists every gene.")
 }
 ```
 
-## Top connections table
+## Knockout differentially-regulated genes
 
-Every edge RANK_SCORE kept: up to `r max_kept` per target gene per cell type,
-across `r n_conn_targets` target(s) and `r n_conn_cell_types` cell type(s).
-`weight` is the edge weight in that cell type's network, signed, and `rank`
-orders the edges of one target gene in one cell type by absolute weight.
+Every gene clearing FDR < 0.05, across all cell type and target combinations and
+with no cap on how many are listed per combination. `distance` is how far the
+gene moved between the wild-type and knocked-out networks; `log2FC` is that
+distance squared over the run's mean, logged; `p.value` tests it against the
+chi-square null and `p.adj` is the Benjamini-Hochberg adjustment within the run.
 
-```{r connections-table, eval=has_connections}
-connections %>%
-  select(cell_type, target, target_gene, partner, weight, rank) %>%
+`p.value` is a direct function of `log2FC`, so the two rank genes identically and
+the FDR cut above is the same thing as a `log2FC` threshold. Each knocked-out
+gene appears in its own rows, normally at the top, which is the simplest check
+that the knockout took.
+
+Currently `r n_sctknk_sig` gene(s) clear FDR < 0.05, across
+`r n_sctknk_targets` target(s) and `r n_sctknk_cell_types` cell type(s).
+
+```{r sctknk-table, eval=has_sctknk_sig}
+sctknk_sig %>%
+  select(cell_type, target, gene, distance, log2FC, p.value, p.adj) %>%
   datatable(
     filter = "top",
     rownames = FALSE,
+    # 0-based: column 5 is p.value
     options = list(pageLength = 15, order = list(list(5, "asc"))),
-    caption = "Top connections per target gene per cell type."
+    caption = "scTenifoldKnk differentially-regulated genes at FDR < 0.05, per cell type x target."
   ) %>%
-  formatSignif(columns = "weight", digits = 4)
+  formatSignif(columns = c("distance", "log2FC", "p.value", "p.adj"), digits = 4)
 ```
 
-```{r connections-table-empty, eval=!has_connections, results="asis"}
-cat("No top connection table was supplied with this report.")
+```{r sctknk-table-empty, eval=!has_sctknk_sig, results="asis"}
+if (!has_sctknk) {
+  cat("scTenifoldKnk was not run for this session, so no differentially-regulated",
+      "gene table is shown. Pass `--sctknk` to generate one.")
+} else {
+  cat("scTenifoldKnk ran, but no gene cleared FDR < 0.05 in any cell type x",
+      "target combination, so the table is empty.")
+}
 ```
+
+
+## Knockout gene set enrichment
+
+What the knockout moved, read as processes rather than genes. Every gene is
+ranked by `log2FC` -- the log2 of its squared manifold-alignment distance over
+the run's mean squared distance, so the ranking is the one scTenifoldKnk's own
+paper feeds to GSEA, centred on the average gene rather than on zero -- and each
+gene set is scored on how concentrated it is at either end of that ranking. Use
+the menu to switch between the `r n_gsea_views` target and cell type
+combinations.
+
+`NES` is the enrichment score normalised for set size, and it is signed here.
+Read the sign carefully: the ranking is by how far a gene moved, not by which
+way it moved, so a **positive** `NES` says a set is crowded into the genes the
+knockout disturbed most, and a **negative** one says the set sat still while the
+rest of the network moved. Neither is up- or down-regulation -- there is no
+direction of expression anywhere in the scTenifoldKnk output to recover.
+
+Each dot is one gene set: position on the x-axis is its `NES`, size is how many
+genes of it sit in the leading edge, and colour is `-log(p.adj + 1)`, running
+blue at the weak end of the cut through to red at the significant end. That
+statistic is close to linear near `p.adj` of 0, so it separates the marginal
+sets from the rest and treats everything below about 0.01 as equally
+significant; the exact `p.adj` of every set is a column of the table. Sets are
+drawn only if they clear FDR < `r gsea_fdr`, the `r gsea_top_terms` strongest
+per combination by absolute `NES`. Hover any dot for its exact values; the
+table below carries all of them, uncapped.
+
+One thing to keep in mind reading any of it: the genes ranked here are
+`gene4use`, the highly-variable, transcription-factor and drug-target set the
+pipeline builds up front, not the whole transcriptome. Enrichment is relative to
+that universe, which is already weighted toward regulators.
+
+```{r gsea-figure, eval=has_gsea_fig && has_plotly}
+ink       <- "#0b0b0b"
+ink_muted <- "#52514e"
+surface   <- "#fcfcfb"
+gridline  <- "#e1e0d9"
+baseline  <- "#c3c2b7"
+
+# Blue at the weak end through to red at the significant end -- the convention
+# an enrichment dot plot is read with. Both anchors and the neutral between
+# them are the palette's own blue/red pair; the midpoint is that pair's grey
+# taken a couple of steps down from the surface, because the documented
+# near-white midpoint would put a dot where a reader sees nothing at all.
+dot_scale <- list(
+  list(0.0, "#2a78d6"),
+  list(0.5, "#c3c2b7"),
+  list(1.0, "#e34948")
+)
+
+views <- gsea_fig %>%
+  distinct(target, cell_type) %>%
+  arrange(target, cell_type)
+
+# Size, colour and the x-axis are all scaled once over every view rather than
+# per view. The menu swaps traces in place, so a scale that moved with it would
+# make two dots of the same size, shade or position mean different things one
+# click apart -- the axis would rescale under a reader who is holding the
+# previous view in their head.
+size_max_px <- 26
+size_ref    <- 2 * max(gsea_fig$leading_edge_n, na.rm = TRUE) / size_max_px^2
+
+# The colour range is the whole span the FDR cut can produce -- p.adj just
+# under gsea_fdr at one end, p.adj approaching 0 at the other -- rather than
+# the range this run happens to hold. Derived rather than measured, so a shade
+# means the same thing in a report with three significant sets as in one with
+# three hundred, and nothing can fall off either end of the bar.
+colour_min   <- -log(1 + gsea_fdr)
+colour_max   <- 0
+colour_ticks <- pretty(c(colour_min, colour_max), n = 4)
+colour_ticks <- colour_ticks[colour_ticks >= colour_min & colour_ticks <= colour_max]
+colour_labels <- format(colour_ticks, trim = TRUE)
+
+# Always includes zero: the sign of NES is the whole point of the axis, so the
+# baseline it is signed against has to be on screen even when every set in a
+# view happens to land on one side of it.
+x_span <- range(c(0, gsea_fig$NES), na.rm = TRUE)
+x_pad  <- max(diff(x_span) * 0.08, 0.1)
+x_lim  <- c(x_span[1] - x_pad, x_span[2] + x_pad)
+
+# Dots sit at numeric y positions with the labels supplied per view through the
+# menu, rather than on a categorical axis. A categorical axis is shared by every
+# trace on the figure, so switching views would leave the sets of all the other
+# combinations on it as empty rows.
+view_rows <- vector("list", nrow(views))
+fig <- plotly::plot_ly()
+
+for (i in seq_len(nrow(views))) {
+  d <- gsea_fig %>%
+    filter(target == views$target[i], cell_type == views$cell_type[i]) %>%
+    arrange(NES)
+
+  view_rows[[i]] <- d
+
+  hover <- paste0(
+    d$pathway,
+    "<br>NES ", signif(d$NES, 3),
+    "<br>p.adj ", signif(d$padj, 3),
+    "<br>leading edge ", d$leading_edge_n, " of ", d$size, " gene(s)"
+  )
+
+  fig <- fig %>%
+    plotly::add_trace(
+      x = d$NES, y = seq_len(nrow(d)),
+      type = "scatter", mode = "markers",
+      marker = list(
+        size     = d$leading_edge_n,
+        sizemode = "area",
+        sizeref  = size_ref,
+        # A set can carry a single leading-edge gene, which at this sizeref is
+        # a dot too small to hover, let alone see.
+        sizemin  = 8,
+        color      = d$neg_log_padj,
+        colorscale = dot_scale,
+        cmin = colour_min, cmax = colour_max,
+        # The ring is surface-coloured rather than a border: it keeps two dots
+        # that land on the same NES legible without adding ink that isn't data.
+        line = list(color = surface, width = 2),
+        # Every trace carries the scale; plotly draws the bar only for the one
+        # that is visible, so it survives a view switch unchanged.
+        showscale = TRUE,
+        colorbar = list(
+          title = list(text = "-log(p.adj + 1)", side = "top",
+                       font = list(size = 11, color = ink_muted)),
+          tickvals = colour_ticks, ticktext = colour_labels,
+          tickfont = list(size = 11, color = ink_muted),
+          # Pixels, not a fraction of the plot: the views are different
+          # heights, and a fractional bar would be a squashed stub with its
+          # ticks on top of each other on a combination that found three sets.
+          thickness = 10, lenmode = "pixels", len = 160, outlinewidth = 0,
+          x = 1.02, xanchor = "left", y = 1, yanchor = "top"
+        )
+      ),
+      hovertext = hover, hoverinfo = "text",
+      showlegend = FALSE, visible = i == 1
+    )
+}
+
+# The axis is rebuilt on every switch, so its whole state has to be restated in
+# each button -- the same reason the title is restated in the knockout figure.
+view_layout <- function(i) {
+  d <- view_rows[[i]]
+  n <- nrow(d)
+
+  list(
+    title = list(
+      text = paste0(d$target[1], " knocked out in ", d$cell_type[1]),
+      x = 0, xanchor = "left",
+      font = list(size = 15, color = ink)
+    ),
+    # Height travels with the view rather than being fixed once for the
+    # figure. One slot per set at a constant 34px means a combination with two
+    # sets gets a short figure with normal-sized dots, instead of two dots
+    # marooned in the height a twenty-set view needs.
+    height = 34 * n + 150,
+    yaxis = list(
+      tickvals = seq_len(n),
+      ticktext = pretty_set(d$pathway),
+      # Half a slot of air top and bottom, which is 17px against the 34px
+      # slot below -- more than the radius of the largest dot, so a big dot on
+      # the first or last row is not clipped by the plot edge.
+      range = c(0.45, n + 0.55),
+      tickfont = list(size = 11, color = ink_muted),
+      # One hairline per row, so a dot 300px from its label stays on the right
+      # one. Solid, a single step off the surface: it has to be followable
+      # without competing with the dots.
+      showgrid = TRUE, gridcolor = gridline, gridwidth = 1,
+      zeroline = FALSE, showline = FALSE, title = ""
+    ),
+    xaxis = list(
+      range = x_lim,
+      title = list(text = "NES", font = list(size = 12, color = ink_muted)),
+      tickfont = list(size = 11, color = ink_muted),
+      gridcolor = gridline,
+      # The one rule on the plot drawn heavier than a gridline: it is what the
+      # sign of every dot is read against.
+      zeroline = TRUE, zerolinecolor = baseline, zerolinewidth = 2,
+      showline = FALSE
+    )
+  )
+}
+
+buttons <- lapply(seq_len(nrow(views)), function(i) {
+  visible <- rep(FALSE, nrow(views))
+  visible[i] <- TRUE
+
+  list(
+    method = "update",
+    args = list(list(visible = visible), view_layout(i)),
+    label = paste0(views$target[i], " - ", views$cell_type[i])
+  )
+})
+
+first <- view_layout(1)
+
+fig %>%
+  plotly::layout(
+    title  = first$title,
+    xaxis  = first$xaxis,
+    yaxis  = first$yaxis,
+    height = first$height,
+    margin = list(l = 330, r = 180, t = 90, b = 55),
+    paper_bgcolor = surface,
+    plot_bgcolor  = surface,
+    updatemenus = list(list(
+      active = 0, buttons = buttons,
+      # Anchored by its bottom edge, so the menu grows up into the top
+      # margin instead of down over the first row of dots on a combination
+      # that only found two or three sets.
+      x = 1, xanchor = "right", y = 1.16, yanchor = "bottom",
+      direction = "down", showactive = TRUE,
+      bgcolor = surface, bordercolor = "#d9d8d3"
+    ))
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+```{r gsea-figure-missing, eval=!(has_gsea_fig && has_plotly), results="asis"}
+if (!gsea_requested) {
+  cat("No gene set file was supplied, so no enrichment was run. Pass",
+      "`--gsea_gmt` with a GMT for this run's species alongside `--sctknk`.")
+} else if (!has_gsea) {
+  cat("The enrichment ran and returned nothing. The commonest cause is a gene",
+      "set file whose symbols do not match the data's own -- a human GMT",
+      "against mouse symbols matches nothing. The run log names the symbols on",
+      "each side and counts the overlap.")
+} else if (!has_gsea_sig) {
+  cat("The enrichment ran, but no gene set cleared FDR <", gsea_fdr, "in any",
+      "cell type x target combination, so there is nothing to draw.")
+} else if (!has_gsea_fig) {
+  cat("Every significant gene set came back without a usable NES or p.adj, so",
+      "there is nothing to plot. The table below still lists them.")
+} else {
+  cat("plotly is not installed in this container, so the enrichment figure",
+      "could not be drawn. The table below still lists every gene set.")
+}
+```
+
+Every gene set clearing FDR < `r gsea_fdr`, uncapped -- the figure above shows
+only the strongest `r gsea_top_terms` of each combination. `leading_edge_n` is
+how many of the set's genes sit in the leading edge, the stretch of the ranking
+that carries the set's score, and it is what the figure sizes each dot by. The
+leading edge's gene names are not repeated here; they are in
+`sctknk/gsea_all_targets.txt` alongside `ES` and the unadjusted `pval`. Set
+names longer than 50 characters are shown cut, with the whole name on hover --
+the column filter still searches the part that is not shown.
+
+```{r gsea-table, eval=has_gsea_sig}
+gsea_sig %>%
+  select(cell_type, target, pathway, NES, size, leading_edge_n, padj) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    # Only the pathway column renders as HTML, and only because the truncation
+    # below builds a span for it.
+    escape = -3,
+    options = list(
+      pageLength = 15,
+      # 0-based: column 6 is padj. pval used to carry this sort; it is a
+      # monotone function of padj within a combination, so the order the reader
+      # sees is unchanged by dropping the column.
+      order = list(list(6, "asc")),
+      # Set names arrive in MSigDB's shape -- GOBP_REGULATION_OF_... -- and a
+      # collection's longest run past 120 characters, which widens the column
+      # far enough to push p.adj off a laptop screen. Cut at the same 50 the
+      # figure's axis labels use. Truncating in the renderer rather than in the
+      # data keeps the whole name in the cell, so the column filter still
+      # matches on the part that is not shown and the tooltip can show it.
+      columnDefs = list(list(
+        targets = 2,
+        render = DT::JS(
+          "function(data, type, row) {",
+          "  if (type !== 'display' || data === null) return data;",
+          "  var text = String(data);",
+          "  if (text.length <= 50) return text;",
+          "  return '<span title=\"' + text + '\">' +",
+          "         text.substr(0, 49) + '\u2026</span>';",
+          "}"
+        )
+      ))
+    ),
+    caption = paste0("Gene sets enriched at either end of each knockout's ",
+                     "ranking, FDR < ", gsea_fdr, ".")
+  ) %>%
+  formatSignif(columns = c("NES", "padj"), digits = 4)
+```
+
+```{r gsea-table-empty, eval=!has_gsea_sig, results="asis"}
+if (!gsea_requested) {
+  cat("No gene set file was supplied, so no enrichment was run and there is no",
+      "table to show. Pass `--gsea_gmt` alongside `--sctknk`.")
+} else if (!has_gsea) {
+  cat("The enrichment ran and returned nothing; see the note above the figure.")
+} else {
+  cat("The enrichment ran, but no gene set cleared FDR <", gsea_fdr, "in any",
+      "cell type x target combination, so the table is empty.")
+}
+```
+
 
 ## Cell identity overview
 
