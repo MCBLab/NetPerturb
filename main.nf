@@ -13,6 +13,7 @@ include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
 include { RANK_SCORE } from "./modules/local/rank_score/main.nf"
 include { MERGE } from "./modules/local/merge/main.nf"
 include { MERGE_SCTENIFOLDKNK } from "./modules/local/merge_sctenifoldknk/main.nf"
+include { GSEA_SCTENIFOLDKNK } from "./modules/local/gsea_sctenifoldknk/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
 
 /*
@@ -60,6 +61,13 @@ workflow {
         error "Nothing to run. Pass --network (genie3, scrank or hdwgcna), --sctknk, or both."
     }
 
+    // Enrichment runs on the knockout table, so without that track there is
+    // nothing for a GMT to enrich. Warned rather than fatal: every other part
+    // of the run is still valid.
+    if( params.gsea_gmt && !sctknk ) {
+        log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
+    }
+
     DOWNSAMPLE( obj, target, column, species, n_cells )
 
     DOWNSAMPLE.out.scrank_obj
@@ -79,6 +87,20 @@ workflow {
         SCTENIFOLDKNK( sctknk_input, n_cores )
 
         MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK.out.dr_table.collect() )
+
+        // Ranks each pair's genes by how far the knockout moved them and asks
+        // which gene sets sit at the top of that ranking -- the analysis the
+        // scTenifoldKnk paper runs on its own output. Gene sets come from a
+        // file rather than a web service so the step runs on a node with no
+        // internet, which means no --gsea_gmt is simply no enrichment.
+        if( params.gsea_gmt ) {
+            GSEA_SCTENIFOLDKNK(
+                MERGE_SCTENIFOLDKNK.out.merged_dr_table,
+                file(params.gsea_gmt),
+                params.gsea_min_size,
+                params.gsea_max_size
+            )
+        }
     }
 
     if( network ) {
@@ -116,6 +138,13 @@ workflow {
             ? MERGE_SCTENIFOLDKNK.out.merged_dr_table
             : file("${projectDir}/assets/NO_SCTKNK_TABLE")
 
+        // Same sentinel arrangement for the enrichment table, which has two
+        // ways of not existing: the knockout track was not run at all, or it
+        // was run without a --gsea_gmt to enrich against.
+        gsea_table = (sctknk && params.gsea_gmt)
+            ? GSEA_SCTENIFOLDKNK.out.gsea_table
+            : file("${projectDir}/assets/NO_GSEA_TABLE")
+
         REPORT(
             MERGE.out.merged_rank_scores,
             DOWNSAMPLE.out.umap,
@@ -123,7 +152,9 @@ workflow {
             network,
             params.score_quantile,
             sctknk_table,
-            params.sctknk_top_genes
+            params.sctknk_top_genes,
+            gsea_table,
+            params.gsea_top_terms
         )
     }
 }

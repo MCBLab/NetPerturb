@@ -269,7 +269,8 @@ nextflow_pipeline {
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
 
             // only the merged table is published; the per-pair tables stay in
-            // the work dir
+            // the work dir. One file rather than two because no --gsea_gmt was
+            // given -- the enrichment publishes beside it when there is one.
             assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
             assert path("${outputDir}/sctknk").list().size() == 1
 
@@ -361,4 +362,138 @@ nextflow_pipeline {
             assert workflow.trace.tasks().isEmpty()
         }
     }
+
+    test("--gsea_gmt adds gene set enrichment to the knockout track") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                network  = "genie3"
+                sctknk   = true
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert names.count { it.startsWith("GSEA_SCTENIFOLDKNK") } == 1
+            assert path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // published beside the knockout table, so the directory now holds
+            // both -- the knockout-alone test above asserts one for want of a GMT
+            assert path("${outputDir}/sctknk").list().size() == 2
+
+            // the knockout fan-out and the scoring track are untouched by it.
+            // GSEA_SCTENIFOLDKNK starts with "GSEA_", so it cannot inflate this
+            // count -- which is why the process is not named SCTENIFOLDKNK_GSEA
+            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("no --gsea_gmt means no enrichment task and a sentinel into REPORT") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert !names.any { it.startsWith("GSEA") }
+            assert !path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // REPORT still runs: it takes assets/NO_GSEA_TABLE instead
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("--gsea_gmt without --sctknk runs no enrichment and does not fail") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                network  = "genie3"
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            // warned rather than fatal: there is no knockout table to enrich,
+            // but the scoring track is perfectly valid on its own
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert !names.any { it.startsWith("GSEA") }
+            assert !names.any { it.startsWith("SCTENIFOLDKNK") }
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("the knockout track enriches on its own, with no report to put it in") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                sctknk   = true
+                gsea_gmt = "${projectDir}/tests/fixtures/test_sets.gmt"
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            assert names.count { it.startsWith("GSEA_SCTENIFOLDKNK") } == 1
+            assert path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
+
+            // no --network, so nothing renders it -- the same gap the knockout
+            // table itself has in this mode
+            assert !names.any { it.startsWith("REPORT") }
+        }
+    }
+
 }

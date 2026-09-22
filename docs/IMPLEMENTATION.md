@@ -4,6 +4,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
+| 21 | Gene set enrichment on the knockout table | Sep 2026 | branch `sctknk` |
 | 20 | The knockout track running in parallel | Sep 2026 | branch `sctknk` |
 | 19 | scTenifoldKnk replaces scTenifoldNet | Sep 2026 | branch `sctknk` |
 | 18 | Running it on real data | Sep 2026 | #17 |
@@ -26,6 +27,28 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 | 1 | Prototype pipeline | Dec 2024 | — |
 
 ---
+
+## Wave 21 — Gene set enrichment on the knockout table
+
+**Sep 2026** · branch `sctknk`, not yet on `main`
+
+The knockout track answered "which genes did this move" and stopped there. `GSEA_SCTENIFOLDKNK` takes the answer one step further: for every cell type and knocked-out gene, the genes are ranked by the manifold-alignment distance and that ranked list goes to `fgsea`. This is what scTenifoldKnk's own paper does with its output — *"genes were sorted according to the value of the distance to produce a ranked gene list, which was used as input of the gene set enrichment analysis"* — and the ranking matters: it is the distance itself, uncut, not the genes surviving an FDR threshold.
+
+Three decisions in the ranking are worth recording, because each one is a departure from a default that would have been wrong.
+
+**One-sided scoring.** A distance is never negative, so under fgsea's default `scoreType = "std"` the package warns that every value is positive and then scores a depleted tail that cannot exist. `"pos"` asks the question actually being asked. The consequence reaches the reader, so the report says it outright: `NES` is always positive here, and a set the knockout left alone fails to enrich rather than scoring negative.
+
+**The knocked-out gene is dropped from its own ranking.** It is first by construction — zeroing its edges is what the distance measures — so leaving it in hands a guaranteed top-of-list hit to every gene set that annotates it, which is exactly the set a reader would most want to believe. This is the one place the ranking departs from the paper's literal "sort all genes", and it is the same call wave 20 already made when it dropped the gene from its own network ring and kept it in the table.
+
+**The universe is `gene4use`.** Sets are intersected with the few thousand highly-variable, TF and drug-target genes `DOWNSAMPLE` selects, not the transcriptome, so they arrive smaller than their nominal size and enrichment is relative to the genes the run modelled. That is why `--gsea_min_size` defaults to 10 rather than fgsea's conventional 15, and why the report says so where someone reading a result will see it.
+
+Gene sets come from a `--gsea_gmt` file and are never fetched, so the step runs on a node with no internet; without one it does not run and the report renders a note rather than an empty section. The commonest way it comes back empty is a species mismatch — MSigDB's mouse collections carry MGI symbols and its human ones HGNC — so the script prints the symbols on each side, counts the overlap, and says how many would match if case were folded. It does not fold: `Myc` to `MYC` is right and `Trp53` to `TP53` is not, and a half-working match is worse than none, because the half that lands looks like a real result.
+
+`fgsea()` dispatches to an adaptive sampler, so the script seeds it and runs serial. Nextflow's cache hides that non-determinism on `-resume`, which is an argument for pinning it rather than against: without a seed nobody re-running by hand can reproduce the numbers in the published table. Serial also keeps fgsea's default `nproc = 0` from handing the work to every core on the node, the same oversubscription `conf/modules.config` already documents for `SCTENIFOLDKNK`.
+
+The container is the first on this track to be referenced by a registry tag behind `params.gsea_container` rather than an absolute `.sif` path, which is what wave 19 recorded as the reason the knockout track runs on one machine only.
+
+Still open, and unchanged by this wave: `--sctknk` on its own runs no `REPORT`, so in that mode the enrichment table is published with nothing rendering it — the same gap the DR table has. Closing it means `report.qmd` surviving without `perbscore_file`, which is the whole of its first four sections.
 
 ## Wave 20 — The knockout track running in parallel
 

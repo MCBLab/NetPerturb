@@ -7,8 +7,8 @@
 %% exclusive: a run rides exactly one of them end to end. sctknk is not one
 %% of them -- it is its own line, switched on with --sctknk, and runs either
 %% alone (terminating at sctknk_txt) or in parallel with one of the other
-%% three (additionally transferring into that run's report -- the dashed
-%% segment below).
+%% three (additionally transferring into that run's report -- the segment at
+%% the bottom). Its enrichment station runs only when --gsea_gmt is given.
 %%metro line: genie3  | --network genie3            (GENIE3)         | #2db572
 %%metro line: scrank  | --network scrank            (scRank)         | #e6550d
 %%metro line: hdwgcna | --network hdwgcna           (hdWGCNA)        | #756bb1
@@ -21,11 +21,12 @@
 %%metro file:  score_txt   | TXT  | Scores
 %%metro file:  conn_txt    | TXT  | Top connections
 %%metro file:  sctknk_txt  | TXT  | DR genes
+%%metro file:  gsea_txt    | TXT  | GSEA
 %%metro file:  umap_png    | PNG  | UMAP
 %%metro file:  report_html | HTML | Report
 
 %% Lift published outputs off the track so they hang above it as termini
-%%metro off_track: umap_png, net_rds, score_txt, conn_txt, sctknk_txt
+%%metro off_track: umap_png, net_rds, score_txt, conn_txt, sctknk_txt, gsea_txt
 
 %% Station -> Nextflow process, for `nf-metro serve` live overlays
 %%metro process: downsample    | DOWNSAMPLE
@@ -36,6 +37,7 @@
 %%metro process: rank_score    | RANK_SCORE
 %%metro process: merge         | MERGE
 %%metro process: merge_sctknk  | MERGE_SCTENIFOLDKNK
+%%metro process: gsea          | GSEA_SCTENIFOLDKNK
 %%metro process: report        | REPORT
 
 graph LR
@@ -76,9 +78,16 @@ graph LR
         sctenifoldknk[scTenifoldKnk]
         merge_sctknk[Merge]
         sctknk_txt[ ]
+        gsea[Gene set enrichment]
+        gsea_txt[ ]
 
         sctenifoldknk -->|sctknk| merge_sctknk
         merge_sctknk -->|sctknk| sctknk_txt
+
+        %% Only with --gsea_gmt: the gene sets come from a file and nothing is
+        %% fetched, so no GMT simply means no enrichment.
+        merge_sctknk -->|sctknk| gsea
+        gsea -->|sctknk| gsea_txt
     end
 
     subgraph scoring [Perturbation scoring]
@@ -130,3 +139,4 @@ graph LR
     %% the leg disappears from the map entirely, which is what happened here
     %% until now.
     merge_sctknk -->|sctknk| report
+    gsea -->|sctknk| report

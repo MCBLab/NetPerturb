@@ -1,0 +1,66 @@
+/*
+Both cases run with -stub, so fgsea never executes and nothing here checks the
+enrichment itself -- only that the declared inputs and the emitted file line up,
+and that the column contract has not drifted. The header assertion below is the
+only place in the default suite that pins those ten columns, which are repeated
+in bin/gsea_sctenifoldknk.R, assets/NO_GSEA_TABLE, bin/report.qmd and this
+module's stub.
+
+To exercise the real thing, off the pipeline:
+
+    Rscript bin/gsea_sctenifoldknk.R tests/fixtures/sctenifoldknk_all_targets.txt \
+        tests/fixtures/test_sets.gmt 10 500
+*/
+nextflow_process {
+
+    name "GSEA_SCTENIFOLDKNK"
+    script "modules/local/gsea_sctenifoldknk/main.nf"
+    process "GSEA_SCTENIFOLDKNK"
+
+    test("emits one merged table with the agreed columns") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/sctenifoldknk_all_targets.txt")
+                input[1] = file("\${projectDir}/tests/fixtures/test_sets.gmt")
+                input[2] = 10
+                input[3] = 500
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.gsea_table.size() == 1
+            assert file(process.out.gsea_table[0]).name == "gsea_all_targets.txt"
+
+            def header = path(process.out.gsea_table[0]).readLines()[0]
+            assert header == "cell_type\ttarget\tpathway\tpval\tpadj\tlog2err\tES\tNES\tsize\tleadingEdge"
+        }
+    }
+
+    test("takes the sentinel knockout table without complaint") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/assets/NO_SCTKNK_TABLE")
+                input[1] = file("\${projectDir}/tests/fixtures/test_sets.gmt")
+                input[2] = 10
+                input[3] = 500
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.gsea_table.size() == 1
+        }
+    }
+
+}

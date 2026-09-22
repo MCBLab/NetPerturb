@@ -95,7 +95,7 @@ nextflow run main.nf --network scrank --sctknk ...
 nextflow run main.nf --sctknk ...
 ```
 
-When both run, they share `DOWNSAMPLE` and the scTenifoldKnk results become sections 5 and 6 of that run's `REPORT` — the knockout network and the knockout gene table. Passing neither is an error.
+When both run, they share `DOWNSAMPLE` and the scTenifoldKnk results become sections 5 to 7 of that run's `REPORT` — the knockout network, the knockout gene table, and, with `--gsea_gmt`, the gene set enrichment over that table. Passing neither is an error.
 
 The hdWGCNA module aggregates cells into metacells, builds an unsigned co-expression network and then adapts its topological overlap matrix (TOM) to what scRank expects from a network. Four things happen to the raw TOM:
 
@@ -114,8 +114,15 @@ It also records the target's strongest connections. For each cell identity it re
 ### 4. Consolidate Results (`MERGE`)
 This step collects the perturbation scores from all parallel `RANK_SCORE` tasks and merges them into a single, clean text file, ready for downstream visualization. The per-target connection tables are concatenated the same way, into `top_connections_all_targets.txt`.
 
-### 5. Report (`REPORT`)
-Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. Sections 5 and 6 then go to the knockout track: an interactive plotly network per knocked-out gene and cell identity, the gene at the centre and the genes its knockout moved around it, node size following `log2FC`, with a menu to switch combination and the exact values on hover — followed by a queryable table of every differentially-regulated gene. Both are cut at FDR < 0.05, and the network is further capped at the `--sctknk_top_genes` strongest per combination while the table is not. A run without `--sctknk` shows a short "not run" note in place of each. Every figure is embedded in the HTML, so the report is a single portable file, which the embedded plotly library makes a few megabytes.
+### 5. Gene Set Enrichment (`GSEA_SCTENIFOLDKNK`)
+Optional, and only on the knockout track: pass `--gsea_gmt` with a GMT file and the differentially-regulated genes are read as processes rather than as a list. For each cell identity x knocked-out gene combination, every gene is ranked by the manifold-alignment `distance` — how far the knockout moved it — and that ranked list goes to [fgsea](https://bioconductor.org/packages/release/bioc/html/fgsea.html) against the supplied gene sets. This is the analysis [scTenifoldKnk's own paper](https://doi.org/10.1016/j.patter.2022.100434) runs on its output, and the ranking is the one it describes: the distance itself, uncut, rather than the genes left after an FDR threshold.
+
+Three things follow from that ranking and are worth knowing before reading the result. A distance is never negative, so fgsea runs one-sided (`scoreType = "pos"`) and `NES` is always positive: a set either clusters among the genes the knockout moved, or it fails to, and there is no depleted end to report. The knocked-out gene is dropped from its own ranking, since it sits at the top by construction and would otherwise hand a guaranteed hit to every set that annotates it. And the ranking covers `gene4use` — the highly-variable, transcription-factor and drug-target set `DOWNSAMPLE` builds — not the whole transcriptome, so sets are intersected with that universe before testing and enrichment is relative to the genes this run actually modelled. That is also why `--gsea_min_size` defaults to `10` rather than fgsea's conventional 15.
+
+Gene sets are read from the file given and never fetched, so this runs on a compute node with no internet. The symbols have to match the data's own: MSigDB publishes mouse collections in MGI symbols and human ones in HGNC, and a human GMT against mouse data matches nothing — the run log names the symbols on each side and counts the overlap when that happens. Without `--gsea_gmt` the step does not run and the report says so. Results go to `sctknk/gsea_all_targets.txt`.
+
+### 6. Report (`REPORT`)
+Renders `perbscore_all_targets.txt` into a self-contained Quarto HTML report (`report/netperturb_report.html`): a searchable, filterable table of every cell type x target score, a heatmap of scores across all cell types and targets that were run, and the DOWNSAMPLE UMAP as a closing cell-identity overview. The overview names the `--network` method the run inferred its networks with, since scores are only comparable within one inference method. Pooled scores are bimodal, so the figures keep only the high mode, cut at `--score_quantile`; the table is always the full, uncut set. Sections 5 and 6 then go to the knockout track: an interactive plotly network per knocked-out gene and cell identity, the gene at the centre and the genes its knockout moved around it, node size following `log2FC`, with a menu to switch combination and the exact values on hover — followed by a queryable table of every differentially-regulated gene. Both are cut at FDR < 0.05, and the network is further capped at the `--sctknk_top_genes` strongest per combination while the table is not. Section 7 is the enrichment: a bar of `NES` per gene set, the strongest `--gsea_top_terms` for the combination on display, over a queryable table of every set clearing FDR < 0.05. A run without `--sctknk` shows a short "not run" note in place of each, and one without `--gsea_gmt` does the same for the enrichment alone. Every figure is embedded in the HTML, so the report is a single portable file, which the embedded plotly library makes a few megabytes.
 
 ## Quick Start
 1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html) (`>=22.10.1`).
@@ -139,6 +146,8 @@ nextflow run netperturb/main.nf \
   --network genie3 \
   --sctknk \
   --sctknk_top_genes 25 \
+  --gsea_gmt /path/to/m5.go.bp.v2026.1.Mm.symbols.gmt \
+  --gsea_top_terms 20 \
   --top_connections 15 \
   --score_quantile 0.75 \
   --outdir results \
@@ -175,6 +184,14 @@ Stfa1;Mpo
 `--top_connections`: Number of strongest edges `RANK_SCORE` keeps per target gene per cell identity, ranked on absolute weight. Defaults to `15`. These are written to `rank_scores/top_connections_all_targets.txt` for downstream use; the report no longer renders them.
 
 `--sctknk_top_genes`: Number of differentially-regulated genes drawn around each knocked-out gene in the report's knockout network, taken from those clearing FDR < 0.05 and ranked on `log2FC`. Defaults to `25`. This caps the figure only — the table below it lists every significant gene.
+
+`--gsea_gmt`: Path to a GMT file of gene sets for the enrichment step on the knockout track. No default — without it the step does not run and the report says so. Read from disk and never fetched, so it works on a node with no internet. The symbols must match `--species`: MSigDB publishes mouse collections as `.Mm.symbols.gmt` (MGI symbols) and human ones as `.Hs.symbols.gmt` (HGNC), so `m5.go.bp.*` or `m5.mpt.*` (the mammalian-phenotype sets the scTenifoldKnk paper uses) for mouse, `c5.go.bp.*` or `c2.cp.reactome.*` for human. Requires `--sctknk`; passed without it, the run warns and carries on.
+
+`--gsea_min_size` / `--gsea_max_size`: Gene set size bounds, counted after intersecting each set with that combination's ranked list. Default to `10` and `500`. The lower bound sits below fgsea's conventional 15 on purpose: the ranked list is `gene4use` rather than the transcriptome, so sets arrive smaller than their nominal size and 15 would drop most of a collection before anything was tested.
+
+`--gsea_top_terms`: Number of gene sets drawn per combination in the report's enrichment figure, taken from those clearing FDR < 0.05 and ranked on `NES`. Defaults to `20`. Caps the figure only — the table below it lists every significant set.
+
+`--gsea_container`: Image carrying `fgsea` for the enrichment step, built from `container/gsea/Dockerfile`. Point it at a local `.sif` if the image has not been pushed.
 
 `--score_quantile`: Quantile of the pooled log10 perturbation scores below which scores are cut from the report figures. Defaults to `0.75`, so the cut falls at q3 and the figures show the top quarter of scores. Pooled scores are bimodal, a low mode of near-zero values sitting well below the mode that carries the signal, and the report is only useful once the low one is gone. The distribution figure draws the cut over the full set of scores, so the line can be checked against where the two modes actually separate and this value tuned to land in the valley between them. The score table is never cut.
 
@@ -221,6 +238,17 @@ resistant	Brd4	Brd4	16.90000	8.42	56.4	5.84e-14	8.76e-11
 resistant	Brd4	G17_Brd4	14.43217	7.09	41.1	1.41e-10	9.83e-08
 ```
 
+sctknk/gsea_all_targets.txt: Written when `--sctknk` is passed together with `--gsea_gmt`. One row per cell identity x knocked-out gene x gene set, carrying fgsea's own columns: `ES` and its size-normalised form `NES`, `pval` and the Benjamini-Hochberg `padj`, `size` — the set's size *after* intersection with that combination's ranked list, so smaller than the set's nominal size — and `leadingEdge`, the genes carrying the enrichment, `;`-joined. `NES` is always positive: the ranking is one-sided, so a set that the knockout left alone simply fails to enrich rather than scoring negative.
+
+```sh
+# Example
+cell_type	target	pathway	pval	padj	log2err	ES	NES	size	leadingEdge
+resistant	Brd4	GOBP_CHROMATIN_REMODELING	1e-50	4e-50	NA	1	3.126	30	G17_Brd4;G32_Brd4;G24_Brd4
+sensitive	Brd4	GOBP_CHROMATIN_REMODELING	1.67e-11	3.33e-11	0.863	0.773	3.043	30	G5_Brd4;G1_Brd4
+```
+
+A `pval` of `1e-50` with an `NA` `log2err` is fgsea's floor, not a failure: the true value is smaller than it estimates.
+
 report/netperturb_report.html: A self-contained Quarto report, with a queryable table of every perturbation score, a cell type x target heatmap of the scores above the `--score_quantile` cut, then the knockout network and the knockout differentially-regulated gene table, both cut at FDR < 0.05, and the `--network` inference method the run used.
 
 Other intermediate files (such as split matrices and raw GENIE3 weights) are temporarily stored in the work directory and can be retained or discarded based on standard Nextflow cache management.
@@ -235,7 +263,7 @@ The pipeline is covered by [nf-test](https://www.nf-test.com/). The default suit
 nf-test test
 ```
 
-It checks the wiring rather than the science: that `--network` selects exactly one inference process, that `--sctknk` adds its track without disturbing that choice and runs alone when `--network` is omitted, that each line of the target file becomes its own `RANK_SCORE` task, that `MERGE` gathers them under a single header, that an unsupported `--network` aborts before any task is launched, and that every network module names its output so `rank_score.R` can still recover the cell identity from the file name.
+It checks the wiring rather than the science: that `--network` selects exactly one inference process, that `--sctknk` adds its track without disturbing that choice and runs alone when `--network` is omitted, that each line of the target file becomes its own `RANK_SCORE` task, that `MERGE` gathers them under a single header, that an unsupported `--network` aborts before any task is launched, that `--gsea_gmt` adds the enrichment step to the knockout track while its absence routes a sentinel table to the report instead, and that every network module names its output so `rank_score.R` can still recover the cell identity from the file name.
 
 The end to end run is opt-in, since it downloads the test object and pulls containers. It is excluded from the default suite and has its own config:
 

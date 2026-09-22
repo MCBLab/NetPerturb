@@ -17,6 +17,8 @@ params:
   score_quantile: 0.75
   sctknk_file: ""
   sctknk_top_genes: 25
+  gsea_file: ""
+  gsea_top_terms: 20
 ---
 
 ```{r setup, include=FALSE}
@@ -198,6 +200,80 @@ has_sctknk_net <- nrow(sctknk_net) > 0
 # knocked-out gene itself has a row in the table but no menu entry.
 n_sctknk_views <- if (has_sctknk_net) {
   nrow(distinct(sctknk_net, target, cell_type))
+} else {
+  0
+}
+
+# The enrichment run over the table above, from --gsea_gmt. Same sentinel
+# arrangement and the same reasons: assets/NO_GSEA_TABLE is a header-only file
+# standing in for "no gene sets were given", the named-but-empty frame keeps the
+# filters below from failing on a missing column, and the size check is for the
+# stub's zero-byte file.
+gsea_empty <- data.frame(
+  cell_type = character(), target = character(), pathway = character(),
+  pval = numeric(), padj = numeric(), log2err = numeric(),
+  ES = numeric(), NES = numeric(), size = integer(),
+  leadingEdge = character(), stringsAsFactors = FALSE
+)
+
+gsea_path <- params$gsea_file
+
+# Unlike the knockout table, this one has two ways of being empty that want
+# different sentences: no --gsea_gmt was given at all, or one was and nothing
+# came back -- which is what a GMT for the wrong species looks like from here.
+# The sentinel is staged under its own name, so the file name tells them apart.
+gsea_requested <- !is.null(gsea_path) && nzchar(gsea_path) &&
+  basename(gsea_path) != "NO_GSEA_TABLE"
+
+gsea <- if (!is.null(gsea_path) && nzchar(gsea_path) &&
+              file.exists(gsea_path) && file.size(gsea_path) > 0) {
+  read.delim(gsea_path, header = TRUE, sep = "\t")
+} else {
+  gsea_empty
+}
+
+has_gsea <- nrow(gsea) > 0
+
+gsea_top_terms <- suppressWarnings(as.integer(params$gsea_top_terms))
+if (!isTRUE(is.finite(gsea_top_terms)) || !isTRUE(gsea_top_terms >= 1)) {
+  gsea_top_terms <- 20L
+}
+
+gsea_sig <- gsea %>%
+  filter(!is.na(padj), padj < 0.05) %>%
+  arrange(target, cell_type, pval)
+
+has_gsea_sig      <- nrow(gsea_sig) > 0
+n_gsea_sets       <- nrow(gsea_sig)
+n_gsea_targets    <- n_distinct(gsea_sig$target)
+n_gsea_cell_types <- n_distinct(gsea_sig$cell_type)
+
+# Set names come out of the GMT in MSigDB's shape -- GOBP_REGULATION_OF_... --
+# which is unreadable at axis size. Underscores become spaces for the label
+# only; the hover and the table keep the name as it was given, since that is
+# what anyone would search the collection for.
+pretty_set <- function(x) {
+  label <- gsub("_", " ", x)
+  ifelse(nchar(label) > 52, paste0(substr(label, 1, 51), "\u2026"), label)
+}
+
+# Figure rows: the strongest sets per combination. Capped for the same reason
+# the knockout ring is -- every view is embedded in the HTML up front -- while
+# the table below stays uncapped.
+gsea_fig <- if (has_gsea_sig) {
+  gsea_sig %>%
+    filter(is.finite(NES)) %>%
+    group_by(target, cell_type) %>%
+    slice_max(NES, n = gsea_top_terms, with_ties = FALSE) %>%
+    ungroup()
+} else {
+  gsea_sig
+}
+
+has_gsea_fig <- nrow(gsea_fig) > 0
+
+n_gsea_views <- if (has_gsea_fig) {
+  nrow(distinct(gsea_fig, target, cell_type))
 } else {
   0
 }
@@ -610,6 +686,216 @@ if (!has_sctknk) {
 } else {
   cat("scTenifoldKnk ran, but no gene cleared FDR < 0.05 in any cell type x",
       "target combination, so the table is empty.")
+}
+```
+
+
+## Knockout gene set enrichment
+
+What the knockout moved, read as processes rather than genes. Every gene is
+ranked by the distance it travelled between the wild-type and knocked-out
+networks -- the ranking scTenifoldKnk's own paper feeds to GSEA -- and each gene
+set is scored on how concentrated it is at the top of that ranking. Use the menu
+to switch between the `r n_gsea_views` target and cell type combinations.
+
+`NES` is the enrichment score normalised for set size. It has no up or down
+here: the ranking is by how far a gene moved, not by which way it moved, so a
+high `NES` says a set is crowded into the genes the knockout disturbed most, and
+there is no depleted end to the list for a negative score to describe. Sets are
+drawn only if they clear FDR < 0.05, the strongest `r gsea_top_terms` per
+combination, longest bar first.
+
+One thing to keep in mind reading any of it: the genes ranked here are
+`gene4use`, the highly-variable, transcription-factor and drug-target set the
+pipeline builds up front, not the whole transcriptome. Enrichment is relative to
+that universe, which is already weighted toward regulators.
+
+```{r gsea-figure, eval=has_gsea_fig && has_plotly}
+# One series, so nothing here needs a second hue and there is no legend to
+# carry: the bar length is the value and the title names what it is.
+bar_fill  <- "#2a78d6"
+ink       <- "#0b0b0b"
+ink_muted <- "#52514e"
+surface   <- "#fcfcfb"
+
+views <- gsea_fig %>%
+  distinct(target, cell_type) %>%
+  arrange(target, cell_type)
+
+# Bars sit at numeric y positions with the labels supplied per view through the
+# menu, rather than on a categorical axis. A categorical axis is shared by every
+# trace on the figure, so switching views would leave the sets of all the other
+# combinations on it as empty rows.
+view_rows <- vector("list", nrow(views))
+fig <- plotly::plot_ly()
+
+for (i in seq_len(nrow(views))) {
+  d <- gsea_fig %>%
+    filter(target == views$target[i], cell_type == views$cell_type[i]) %>%
+    arrange(NES)
+
+  view_rows[[i]] <- d
+
+  hover <- paste0(
+    d$pathway,
+    "<br>NES ", signif(d$NES, 3),
+    "<br>ES ", signif(d$ES, 3),
+    "<br>set size ", d$size,
+    "<br>leading edge ", lengths(strsplit(d$leadingEdge, ";", fixed = TRUE)),
+    " gene(s)",
+    "<br>p.adj ", signif(d$padj, 3)
+  )
+
+  fig <- fig %>%
+    plotly::add_trace(
+      x = d$NES, y = seq_len(nrow(d)),
+      type = "bar", orientation = "h",
+      # In data units on a numeric axis, so the pixel thickness is this times
+      # the height of one slot. view_layout() below fixes a slot at 30px, which
+      # puts a bar just under the 24px a bar should ever be.
+      width = 0.55,
+      marker = list(color = bar_fill, cornerradius = 4),
+      text = signif(d$NES, 3), textposition = "outside",
+      textfont = list(size = 12, color = ink),
+      cliponaxis = FALSE,
+      hovertext = hover, hoverinfo = "text",
+      showlegend = FALSE, visible = i == 1
+    )
+}
+
+# The axis is rebuilt on every switch, so its whole state has to be restated in
+# each button -- the same reason the title is restated in the knockout figure.
+view_layout <- function(i) {
+  d <- view_rows[[i]]
+  n <- nrow(d)
+  span <- max(d$NES, na.rm = TRUE)
+
+  list(
+    title = list(
+      text = paste0(d$target[1], " knocked out in ", d$cell_type[1]),
+      x = 0, xanchor = "left",
+      font = list(size = 15, color = ink)
+    ),
+    # Height travels with the view rather than being fixed once for the
+    # figure. One slot per set at a constant 30px means a combination with two
+    # sets gets a short figure with normal-width bars, instead of two bars
+    # stretched to fill the height a twenty-set view needs.
+    height = 30 * n + 150,
+    yaxis = list(
+      tickvals = seq_len(n),
+      ticktext = pretty_set(d$pathway),
+      range = c(0.4, n + 0.6),
+      tickfont = list(size = 11, color = ink_muted),
+      showgrid = FALSE, zeroline = FALSE, showline = FALSE, title = ""
+    ),
+    # Room at the right for the value riding on the end of the longest bar.
+    xaxis = list(
+      range = c(0, span * 1.18),
+      title = list(text = "NES", font = list(size = 12, color = ink_muted)),
+      tickfont = list(size = 11, color = ink_muted),
+      gridcolor = "#ebeae6", zeroline = FALSE, showline = FALSE
+    )
+  )
+}
+
+buttons <- lapply(seq_len(nrow(views)), function(i) {
+  visible <- rep(FALSE, nrow(views))
+  visible[i] <- TRUE
+
+  list(
+    method = "update",
+    args = list(list(visible = visible), view_layout(i)),
+    label = paste0(views$target[i], " - ", views$cell_type[i])
+  )
+})
+
+first <- view_layout(1)
+
+fig %>%
+  plotly::layout(
+    title  = first$title,
+    xaxis  = first$xaxis,
+    yaxis  = first$yaxis,
+    height = first$height,
+    margin = list(l = 330, r = 70, t = 70, b = 50),
+    bargap = 0.35,
+    paper_bgcolor = surface,
+    plot_bgcolor  = surface,
+    updatemenus = list(list(
+      active = 0, buttons = buttons,
+      x = 1, xanchor = "right", y = 1.16, yanchor = "top",
+      direction = "down", showactive = TRUE,
+      bgcolor = surface, bordercolor = "#d9d8d3"
+    ))
+  ) %>%
+  plotly::config(displayModeBar = FALSE)
+```
+
+```{r gsea-figure-missing, eval=!(has_gsea_fig && has_plotly), results="asis"}
+if (!gsea_requested) {
+  cat("No gene set file was supplied, so no enrichment was run. Pass",
+      "`--gsea_gmt` with a GMT for this run's species alongside `--sctknk`.")
+} else if (!has_gsea) {
+  cat("The enrichment ran and returned nothing. The commonest cause is a gene",
+      "set file whose symbols do not match the data's own -- a human GMT",
+      "against mouse symbols matches nothing. The run log names the symbols on",
+      "each side and counts the overlap.")
+} else if (!has_gsea_sig) {
+  cat("The enrichment ran, but no gene set cleared FDR < 0.05 in any cell type",
+      "x target combination, so there is nothing to draw.")
+} else if (!has_gsea_fig) {
+  cat("Every significant gene set came back without a usable NES, so there is",
+      "nothing to draw. The table below still lists them.")
+} else {
+  cat("plotly is not installed in this container, so the enrichment figure",
+      "could not be drawn. The table below still lists every gene set.")
+}
+```
+
+Every gene set clearing FDR < 0.05, uncapped, with the leading edge -- the genes
+at the top of the ranking that carry the set's score. Hover a truncated leading
+edge to see it in full.
+
+```{r gsea-table, eval=has_gsea_sig}
+gsea_sig %>%
+  mutate(leading_edge_n = lengths(strsplit(leadingEdge, ";", fixed = TRUE))) %>%
+  select(cell_type, target, pathway, NES, ES, size, leading_edge_n,
+         pval, padj, leadingEdge) %>%
+  datatable(
+    filter = "top",
+    rownames = FALSE,
+    escape = FALSE,
+    options = list(
+      pageLength = 15,
+      # 0-based: column 7 is pval
+      order = list(list(7, "asc")),
+      columnDefs = list(list(
+        targets = 9,
+        render = DT::JS(
+          "function(data, type, row) {",
+          "  if (type !== 'display' || data === null) return data;",
+          "  var text = String(data);",
+          "  if (text.length <= 70) return text;",
+          "  return '<span title=\"' + text + '\">' +",
+          "         text.substr(0, 69) + '\u2026</span>';",
+          "}"
+        )
+      ))
+    ),
+    caption = "Gene sets enriched among the genes each knockout moved furthest, FDR < 0.05."
+  ) %>%
+  formatSignif(columns = c("NES", "ES", "pval", "padj"), digits = 4)
+```
+
+```{r gsea-table-empty, eval=!has_gsea_sig, results="asis"}
+if (!gsea_requested) {
+  cat("No gene set file was supplied, so no enrichment was run and there is no",
+      "table to show. Pass `--gsea_gmt` alongside `--sctknk`.")
+} else if (!has_gsea) {
+  cat("The enrichment ran and returned nothing; see the note above the figure.")
+} else {
+  cat("The enrichment ran, but no gene set cleared FDR < 0.05 in any cell type",
+      "x target combination, so the table is empty.")
 }
 ```
 

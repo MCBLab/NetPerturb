@@ -16,6 +16,8 @@ process REPORT {
     val score_quantile
     path sctknk_table
     val sctknk_top_genes
+    path gsea_table
+    val gsea_top_terms
 
   output:
     path "netperturb_report.html", emit: report
@@ -45,6 +47,8 @@ process REPORT {
       -P score_quantile:${score_quantile} \
       -P sctknk_file:${sctknk_table} \
       -P sctknk_top_genes:${sctknk_top_genes} \
+      -P gsea_file:${gsea_table} \
+      -P gsea_top_terms:${gsea_top_terms} \
       --output netperturb_report.html
     """
 
