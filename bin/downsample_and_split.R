@@ -12,6 +12,17 @@ column <- args[3]
 species <- args[4]
 n_cells <- as.integer(args[5])
 
+# 0 disables the filter and keeps every identity; anything unparseable falls
+# back to the default rather than propagating an NA into the comparison below.
+min_cells <- suppressWarnings(as.integer(args[6]))
+if (is.na(min_cells) || min_cells < 0) {
+  min_cells <- 150L
+}
+
+if (is.na(n_cells) || n_cells < 1) {
+  stop("--n_cells must be a positive whole number, got: ", args[5])
+}
+
 targets <- readLines(targets)
 target <- strsplit(targets[1], split = ";")[[1]]
 
@@ -56,8 +67,52 @@ if (seuratObj == 'AML_object.rda') {
 
 seuratObj <- as_v3_assay(seuratObj)
 
+if (!column %in% colnames(seuratObj@meta.data)) {
+  stop("--column '", column, "' is not a metadata column of this object. ",
+       "Available: ", paste(colnames(seuratObj@meta.data), collapse = ", "))
+}
+
+# Identities too small to build a network from are dropped here, before the
+# split, so nothing downstream ever receives one: no network is inferred from
+# it, and it appears in no score, no table and no figure.
+#
+# The count compared against --min_cells is the one every downstream method
+# actually sees, which is what is left *after* downsampling -- min(identity
+# size, --n_cells) -- and not the identity's size in the input object. That is
+# the same number --hdwgcna_min_cells is measured against, one step further
+# down, so the two thresholds mean the same thing.
+identity_sizes <- table(as.character(seuratObj@meta.data[[column]]))
+retained <- pmin(as.integer(identity_sizes), n_cells)
+names(retained) <- names(identity_sizes)
+
+keep_identities <- names(retained)[retained >= min_cells]
+dropped_identities <- setdiff(names(retained), keep_identities)
+
+if (length(dropped_identities) > 0) {
+  message("Below --min_cells (", min_cells, "), dropped: ",
+          paste0(dropped_identities, " (", retained[dropped_identities],
+                 " cell(s))", collapse = ", "), ".")
+}
+
+if (length(keep_identities) == 0) {
+  stop("No identity in '", column, "' reaches --min_cells (", min_cells,
+       "); the largest has ", max(retained), " cell(s) after downsampling",
+       if (n_cells < min_cells) {
+         paste0(", and --n_cells (", n_cells,
+                ") is itself below --min_cells, so nothing could pass")
+       } else {
+         ""
+       },
+       ".")
+}
+
+message("Keeping ", length(keep_identities), " identity/identities: ",
+        paste0(keep_identities, " (", retained[keep_identities],
+               " cell(s))", collapse = ", "), ".")
+
 # Downsample cells by celltype
 downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") %>%
+  filter(!!sym(column) %in% keep_identities) %>%
   group_by(!!sym(column)) %>%
   slice_sample(n = n_cells) %>%
   pull(id_cell)

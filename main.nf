@@ -68,7 +68,7 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells )
 
     DOWNSAMPLE.out.scrank_obj
     .flatten()
