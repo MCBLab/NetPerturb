@@ -1,3 +1,13 @@
+# Image carrying fgsea for the knockout track's GSEA step (GSEA_SCTENIFOLDKNK).
+# The tag here is what params.gsea_container defaults to, so build and push
+# before the first non-stub run:
+#
+#   docker build -t diegomscoelho/netperturb-gsea:1.0 container/gsea
+#   docker push diegomscoelho/netperturb-gsea:1.0
+#
+# Singularity pulls it from the same tag; point --gsea_container at a local
+# .sif instead if the image cannot be pulled on your cluster.
+#
 # Same base as the report image: rocker/r-ver comes with Posit Package Manager
 # configured, which serves precompiled Linux binaries for CRAN and Bioconductor
 # alike, so nothing here compiles from source.

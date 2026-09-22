@@ -64,7 +64,7 @@ if (!file.exists(dr_file) || file.size(dr_file) == 0) {
 
 dr <- read.delim(dr_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
-needed <- c("cell_type", "target", "gene", "distance")
+needed <- c("cell_type", "target", "gene", "FC")
 missing <- setdiff(needed, names(dr))
 if (length(missing) > 0) {
   bail("Table is missing column(s): ", paste(missing, collapse = ", "), ".")
@@ -73,6 +73,22 @@ if (length(missing) > 0) {
 if (nrow(dr) == 0) {
   bail("The differentially-regulated gene table is empty; nothing to enrich.")
 }
+
+# The ranking statistic. dRegulation() reports FC as a gene's squared
+# manifold-alignment distance over the mean squared distance of the run, so
+# log2(FC) is signed around that mean: positive for a gene the knockout moved
+# further than the average gene, negative for one it moved less. Ranking on it
+# rather than on the distance is what gives fgsea a two-tailed list and lets
+# NES come back negative -- a set can now be concentrated at either end.
+#
+# Read the sign for what it is: this is distance from the wild-type network,
+# not expression, so a negative NES means "this set sat still while the rest of
+# the network moved", not "this set went down". There is no direction of
+# regulation anywhere in the scTenifoldKnk output to recover.
+#
+# FC is a ratio of squares, so it is never negative; zero distance gives
+# log2(0) = -Inf, which is dropped with the other non-finite values below.
+dr$log2FC <- ifelse(is.finite(dr$FC) & dr$FC > 0, log2(dr$FC), NA_real_)
 
 pathways <- tryCatch(
   fgsea::gmtPathways(gmt_file),
@@ -142,16 +158,17 @@ for (i in seq_len(nrow(combos))) {
   sub <- dr[dr$cell_type == this_cell & dr$target == this_target, ]
 
   # fgsea stops with "Not all stats values are finite numbers", so non-finite
-  # distances are dropped here rather than taken to it.
-  sub <- sub[!is.na(sub$gene) & nzchar(sub$gene) & is.finite(sub$distance), ]
+  # values are dropped here rather than taken to it.
+  sub <- sub[!is.na(sub$gene) & nzchar(sub$gene) & is.finite(sub$log2FC), ]
 
-  # The ranking the paper uses: genes sorted on the manifold-alignment
-  # distance, furthest-moved first. Ranking on FC would give the same order --
-  # FC is a gene's squared distance over the run's mean squared distance, a
-  # monotone transform of it -- so the distance is used directly. A gene
-  # appearing twice keeps its largest distance, since a duplicated name in the
-  # stats vector would make the ranking ambiguous.
-  sub <- sub[order(sub$distance, decreasing = TRUE), ]
+  # Genes sorted on log2FC, furthest-moved first. The order is the paper's --
+  # log2FC is a monotone transform of the manifold-alignment distance, so
+  # sorting on either puts the same genes in the same sequence -- but the
+  # values handed to fgsea straddle zero rather than piling up above it, which
+  # is what makes the score two-tailed. A gene appearing twice keeps its
+  # largest value, since a duplicated name in the stats vector would make the
+  # ranking ambiguous.
+  sub <- sub[order(sub$log2FC, decreasing = TRUE), ]
   sub <- sub[!duplicated(sub$gene), ]
 
   # The knocked-out gene is dropped from its own ranking. It is first by
@@ -169,13 +186,13 @@ for (i in seq_len(nrow(combos))) {
     next
   }
 
-  stats <- stats::setNames(sub$distance, sub$gene)
+  stats <- stats::setNames(sub$log2FC, sub$gene)
 
-  # scoreType = "pos" is required rather than cosmetic. A distance is never
-  # negative, so under the default "std" fgsea warns ("All values in the stats
-  # vector are greater than zero...") and then scores a negative tail that
-  # cannot exist. "pos" asks the question actually being asked: is this gene
-  # set concentrated among the genes the knockout moved furthest?
+  # scoreType = "std", fgsea's default, because log2FC has a real negative tail
+  # -- genes the knockout moved less than the run's average gene. Both ends of
+  # the ranking are therefore meaningful and both get scored, which is where a
+  # negative NES comes from. ("pos", which this used while the ranking was the
+  # raw distance, would now throw that tail away.)
   #
   # BPPARAM rather than nproc: fgsea's own progress bar is drawn once per call
   # and this loop runs once per cell type x gene pair, which buries the
@@ -184,14 +201,15 @@ for (i in seq_len(nrow(combos))) {
   #
   # p-values floor at fgsea's default eps of 1e-50, where log2err comes back
   # NA. That is a strong hit reported conservatively, not a failure; the report
-  # only ever asks whether p.adj clears 0.05.
+  # only ever asks whether p.adj clears 0.25, GSEA's own significance
+  # convention.
   res <- tryCatch(
     fgsea::fgsea(
       pathways  = pathways,
       stats     = stats,
       minSize   = min_size,
       maxSize   = max_size,
-      scoreType = "pos",
+      scoreType = "std",
       BPPARAM   = bp_param
     ),
     # error only, never warning: ties in the distances are routine (a
@@ -238,6 +256,6 @@ gsea <- gsea[order(gsea$target, gsea$cell_type, gsea$pval), names(empty_gsea)]
 
 message("Wrote ", nrow(gsea), " row(s) for ", length(results),
         " target x cell type combination(s); ",
-        sum(gsea$padj < 0.05, na.rm = TRUE), " at FDR < 0.05.")
+        sum(gsea$padj < 0.25, na.rm = TRUE), " at FDR < 0.25.")
 
 write_gsea(gsea)

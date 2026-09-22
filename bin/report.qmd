@@ -239,9 +239,29 @@ if (!isTRUE(is.finite(gsea_top_terms)) || !isTRUE(gsea_top_terms >= 1)) {
   gsea_top_terms <- 20L
 }
 
+# 0.25, not the 0.05 the DR table above is cut at. That is GSEA's own
+# convention -- the Broad's guidance for the method sets significance at FDR
+# q < 0.25 -- and it exists because a gene set test is not a gene test: the
+# sets in a collection overlap heavily, so the BH correction over them is
+# conservative, and the question here is which processes to follow up rather
+# than which single genes to believe.
+gsea_fdr <- 0.25
+
 gsea_sig <- gsea %>%
-  filter(!is.na(padj), padj < 0.05) %>%
-  arrange(target, cell_type, pval)
+  filter(!is.na(padj), padj < gsea_fdr) %>%
+  mutate(
+    # The leading edge is stored ';'-joined; its length is what the figure
+    # sizes dots by and the only part of it the table keeps. as.character()
+    # rather than the column as read: read.delim types a column of a
+    # header-only table -- which is exactly what assets/NO_GSEA_TABLE is --
+    # as logical, and strsplit() refuses a non-character argument, so without
+    # it a run whose enrichment found nothing fails to render at all.
+    leading_edge_n = lengths(strsplit(as.character(leadingEdge), ";", fixed = TRUE)),
+    # fgsea floors p at its eps, so padj never reaches 0 and this stays finite;
+    # the guard is for a table that came from somewhere else.
+    neg_log10_padj = ifelse(as.numeric(padj) > 0, -log10(as.numeric(padj)), NA_real_)
+  ) %>%
+  arrange(target, cell_type, padj)
 
 has_gsea_sig      <- nrow(gsea_sig) > 0
 n_gsea_sets       <- nrow(gsea_sig)
@@ -259,12 +279,15 @@ pretty_set <- function(x) {
 
 # Figure rows: the strongest sets per combination. Capped for the same reason
 # the knockout ring is -- every view is embedded in the HTML up front -- while
-# the table below stays uncapped.
+# the table below stays uncapped. Ranked on |NES| rather than NES: the ranking
+# behind these scores is two-tailed, so a set at the quiet end of it is as much
+# a result as one at the moved end, and slicing on NES alone would keep only
+# the moved end and silently drop the other half of the figure.
 gsea_fig <- if (has_gsea_sig) {
   gsea_sig %>%
-    filter(is.finite(NES)) %>%
+    filter(is.finite(NES), is.finite(neg_log10_padj)) %>%
     group_by(target, cell_type) %>%
-    slice_max(NES, n = gsea_top_terms, with_ties = FALSE) %>%
+    slice_max(abs(NES), n = gsea_top_terms, with_ties = FALSE) %>%
     ungroup()
 } else {
   gsea_sig
@@ -693,17 +716,26 @@ if (!has_sctknk) {
 ## Knockout gene set enrichment
 
 What the knockout moved, read as processes rather than genes. Every gene is
-ranked by the distance it travelled between the wild-type and knocked-out
-networks -- the ranking scTenifoldKnk's own paper feeds to GSEA -- and each gene
-set is scored on how concentrated it is at the top of that ranking. Use the menu
-to switch between the `r n_gsea_views` target and cell type combinations.
+ranked by `log2FC` -- the log2 of its squared manifold-alignment distance over
+the run's mean squared distance, so the ranking is the one scTenifoldKnk's own
+paper feeds to GSEA, centred on the average gene rather than on zero -- and each
+gene set is scored on how concentrated it is at either end of that ranking. Use
+the menu to switch between the `r n_gsea_views` target and cell type
+combinations.
 
-`NES` is the enrichment score normalised for set size. It has no up or down
-here: the ranking is by how far a gene moved, not by which way it moved, so a
-high `NES` says a set is crowded into the genes the knockout disturbed most, and
-there is no depleted end to the list for a negative score to describe. Sets are
-drawn only if they clear FDR < 0.05, the strongest `r gsea_top_terms` per
-combination, longest bar first.
+`NES` is the enrichment score normalised for set size, and it is signed here.
+Read the sign carefully: the ranking is by how far a gene moved, not by which
+way it moved, so a **positive** `NES` says a set is crowded into the genes the
+knockout disturbed most, and a **negative** one says the set sat still while the
+rest of the network moved. Neither is up- or down-regulation -- there is no
+direction of expression anywhere in the scTenifoldKnk output to recover.
+
+Each dot is one gene set: position on the x-axis is its `NES`, size is how many
+genes of it sit in the leading edge, and colour is `-log10(p.adj)`, so the
+darkest dots are the most significant. Sets are drawn only if they clear
+FDR < `r gsea_fdr`, the `r gsea_top_terms` strongest per combination by absolute
+`NES`. Hover any dot for its exact values; the table below carries all of them,
+uncapped.
 
 One thing to keep in mind reading any of it: the genes ranked here are
 `gene4use`, the highly-variable, transcription-factor and drug-target set the
@@ -711,18 +743,62 @@ pipeline builds up front, not the whole transcriptome. Enrichment is relative to
 that universe, which is already weighted toward regulators.
 
 ```{r gsea-figure, eval=has_gsea_fig && has_plotly}
-# One series, so nothing here needs a second hue and there is no legend to
-# carry: the bar length is the value and the title names what it is.
-bar_fill  <- "#2a78d6"
 ink       <- "#0b0b0b"
 ink_muted <- "#52514e"
 surface   <- "#fcfcfb"
+gridline  <- "#e1e0d9"
+baseline  <- "#c3c2b7"
+
+# Significance is a magnitude, so it takes a sequential ramp: one hue, light to
+# dark, never a rainbow. These are steps 250-700 of the blue ramp. It starts at
+# 250 rather than at the ramp's lightest step because these are discrete marks
+# on a light surface -- step 100 on #fcfcfb is a dot you cannot see, which the
+# lightest step of a heatmap can get away with and a scatter cannot.
+dot_scale <- list(
+  list(0.00, "#86b6ef"),
+  list(0.25, "#3987e5"),
+  list(0.50, "#256abf"),
+  list(0.75, "#184f95"),
+  list(1.00, "#0d366b")
+)
 
 views <- gsea_fig %>%
   distinct(target, cell_type) %>%
   arrange(target, cell_type)
 
-# Bars sit at numeric y positions with the labels supplied per view through the
+# Size, colour and the x-axis are all scaled once over every view rather than
+# per view. The menu swaps traces in place, so a scale that moved with it would
+# make two dots of the same size, shade or position mean different things one
+# click apart -- the axis would rescale under a reader who is holding the
+# previous view in their head.
+size_max_px <- 26
+size_ref    <- 2 * max(gsea_fig$leading_edge_n, na.rm = TRUE) / size_max_px^2
+
+# p-values floor at fgsea's eps of 1e-50, where -log10(p.adj) is about 50. One
+# such hit stretched over the whole ramp would leave every other dot
+# indistinguishably pale, so the scale tops out near the 95th percentile of the
+# values actually plotted, rounded to a tick, and never below 2 so a run of
+# weak hits still gets a usable ramp. Dots above the cap take the darkest step
+# and the top tick says so; the exact p.adj is in the hover and in the table.
+colour_cap <- max(2, stats::quantile(gsea_fig$neg_log10_padj, 0.95, na.rm = TRUE))
+colour_ticks <- pretty(c(0, colour_cap), n = 4)
+colour_ticks <- colour_ticks[colour_ticks >= 0]
+colour_max   <- max(colour_ticks)
+
+colour_labels <- format(colour_ticks, trim = TRUE)
+if (any(gsea_fig$neg_log10_padj > colour_max, na.rm = TRUE)) {
+  colour_labels[length(colour_labels)] <-
+    paste0("≥ ", colour_labels[length(colour_labels)])
+}
+
+# Always includes zero: the sign of NES is the whole point of the axis, so the
+# baseline it is signed against has to be on screen even when every set in a
+# view happens to land on one side of it.
+x_span <- range(c(0, gsea_fig$NES), na.rm = TRUE)
+x_pad  <- max(diff(x_span) * 0.08, 0.1)
+x_lim  <- c(x_span[1] - x_pad, x_span[2] + x_pad)
+
+# Dots sit at numeric y positions with the labels supplied per view through the
 # menu, rather than on a categorical axis. A categorical axis is shared by every
 # trace on the figure, so switching views would leave the sets of all the other
 # combinations on it as empty rows.
@@ -739,25 +815,42 @@ for (i in seq_len(nrow(views))) {
   hover <- paste0(
     d$pathway,
     "<br>NES ", signif(d$NES, 3),
-    "<br>ES ", signif(d$ES, 3),
-    "<br>set size ", d$size,
-    "<br>leading edge ", lengths(strsplit(d$leadingEdge, ";", fixed = TRUE)),
-    " gene(s)",
-    "<br>p.adj ", signif(d$padj, 3)
+    "<br>p.adj ", signif(d$padj, 3),
+    "<br>leading edge ", d$leading_edge_n, " of ", d$size, " gene(s)"
   )
 
   fig <- fig %>%
     plotly::add_trace(
       x = d$NES, y = seq_len(nrow(d)),
-      type = "bar", orientation = "h",
-      # In data units on a numeric axis, so the pixel thickness is this times
-      # the height of one slot. view_layout() below fixes a slot at 30px, which
-      # puts a bar just under the 24px a bar should ever be.
-      width = 0.55,
-      marker = list(color = bar_fill, cornerradius = 4),
-      text = signif(d$NES, 3), textposition = "outside",
-      textfont = list(size = 12, color = ink),
-      cliponaxis = FALSE,
+      type = "scatter", mode = "markers",
+      marker = list(
+        size     = d$leading_edge_n,
+        sizemode = "area",
+        sizeref  = size_ref,
+        # A set can carry a single leading-edge gene, which at this sizeref is
+        # a dot too small to hover, let alone see.
+        sizemin  = 8,
+        color      = d$neg_log10_padj,
+        colorscale = dot_scale,
+        cmin = 0, cmax = colour_max,
+        # The ring is surface-coloured rather than a border: it keeps two dots
+        # that land on the same NES legible without adding ink that isn't data.
+        line = list(color = surface, width = 2),
+        # Every trace carries the scale; plotly draws the bar only for the one
+        # that is visible, so it survives a view switch unchanged.
+        showscale = TRUE,
+        colorbar = list(
+          title = list(text = "-log10 p.adj", side = "top",
+                       font = list(size = 11, color = ink_muted)),
+          tickvals = colour_ticks, ticktext = colour_labels,
+          tickfont = list(size = 11, color = ink_muted),
+          # Pixels, not a fraction of the plot: the views are different
+          # heights, and a fractional bar would be a squashed stub with its
+          # ticks on top of each other on a combination that found three sets.
+          thickness = 10, lenmode = "pixels", len = 160, outlinewidth = 0,
+          x = 1.02, xanchor = "left", y = 1, yanchor = "top"
+        )
+      ),
       hovertext = hover, hoverinfo = "text",
       showlegend = FALSE, visible = i == 1
     )
@@ -768,7 +861,6 @@ for (i in seq_len(nrow(views))) {
 view_layout <- function(i) {
   d <- view_rows[[i]]
   n <- nrow(d)
-  span <- max(d$NES, na.rm = TRUE)
 
   list(
     title = list(
@@ -777,23 +869,33 @@ view_layout <- function(i) {
       font = list(size = 15, color = ink)
     ),
     # Height travels with the view rather than being fixed once for the
-    # figure. One slot per set at a constant 30px means a combination with two
-    # sets gets a short figure with normal-width bars, instead of two bars
-    # stretched to fill the height a twenty-set view needs.
-    height = 30 * n + 150,
+    # figure. One slot per set at a constant 34px means a combination with two
+    # sets gets a short figure with normal-sized dots, instead of two dots
+    # marooned in the height a twenty-set view needs.
+    height = 34 * n + 150,
     yaxis = list(
       tickvals = seq_len(n),
       ticktext = pretty_set(d$pathway),
-      range = c(0.4, n + 0.6),
+      # Half a slot of air top and bottom, which is 17px against the 34px
+      # slot below -- more than the radius of the largest dot, so a big dot on
+      # the first or last row is not clipped by the plot edge.
+      range = c(0.45, n + 0.55),
       tickfont = list(size = 11, color = ink_muted),
-      showgrid = FALSE, zeroline = FALSE, showline = FALSE, title = ""
+      # One hairline per row, so a dot 300px from its label stays on the right
+      # one. Solid, a single step off the surface: it has to be followable
+      # without competing with the dots.
+      showgrid = TRUE, gridcolor = gridline, gridwidth = 1,
+      zeroline = FALSE, showline = FALSE, title = ""
     ),
-    # Room at the right for the value riding on the end of the longest bar.
     xaxis = list(
-      range = c(0, span * 1.18),
+      range = x_lim,
       title = list(text = "NES", font = list(size = 12, color = ink_muted)),
       tickfont = list(size = 11, color = ink_muted),
-      gridcolor = "#ebeae6", zeroline = FALSE, showline = FALSE
+      gridcolor = gridline,
+      # The one rule on the plot drawn heavier than a gridline: it is what the
+      # sign of every dot is read against.
+      zeroline = TRUE, zerolinecolor = baseline, zerolinewidth = 2,
+      showline = FALSE
     )
   )
 }
@@ -817,13 +919,15 @@ fig %>%
     xaxis  = first$xaxis,
     yaxis  = first$yaxis,
     height = first$height,
-    margin = list(l = 330, r = 70, t = 70, b = 50),
-    bargap = 0.35,
+    margin = list(l = 330, r = 180, t = 90, b = 55),
     paper_bgcolor = surface,
     plot_bgcolor  = surface,
     updatemenus = list(list(
       active = 0, buttons = buttons,
-      x = 1, xanchor = "right", y = 1.16, yanchor = "top",
+      # Anchored by its bottom edge, so the menu grows up into the top
+      # margin instead of down over the first row of dots on a combination
+      # that only found two or three sets.
+      x = 1, xanchor = "right", y = 1.16, yanchor = "bottom",
       direction = "down", showactive = TRUE,
       bgcolor = surface, bordercolor = "#d9d8d3"
     ))
@@ -841,50 +945,41 @@ if (!gsea_requested) {
       "against mouse symbols matches nothing. The run log names the symbols on",
       "each side and counts the overlap.")
 } else if (!has_gsea_sig) {
-  cat("The enrichment ran, but no gene set cleared FDR < 0.05 in any cell type",
-      "x target combination, so there is nothing to draw.")
+  cat("The enrichment ran, but no gene set cleared FDR <", gsea_fdr, "in any",
+      "cell type x target combination, so there is nothing to draw.")
 } else if (!has_gsea_fig) {
-  cat("Every significant gene set came back without a usable NES, so there is",
-      "nothing to draw. The table below still lists them.")
+  cat("Every significant gene set came back without a usable NES or p.adj, so",
+      "there is nothing to plot. The table below still lists them.")
 } else {
   cat("plotly is not installed in this container, so the enrichment figure",
       "could not be drawn. The table below still lists every gene set.")
 }
 ```
 
-Every gene set clearing FDR < 0.05, uncapped, with the leading edge -- the genes
-at the top of the ranking that carry the set's score. Hover a truncated leading
-edge to see it in full.
+Every gene set clearing FDR < `r gsea_fdr`, uncapped -- the figure above shows
+only the strongest `r gsea_top_terms` of each combination. `leading_edge_n` is
+how many of the set's genes sit in the leading edge, the stretch of the ranking
+that carries the set's score, and it is what the figure sizes each dot by. The
+leading edge's gene names are not repeated here; they are in
+`sctknk/gsea_all_targets.txt` alongside `ES` and the unadjusted `pval`.
 
 ```{r gsea-table, eval=has_gsea_sig}
 gsea_sig %>%
-  mutate(leading_edge_n = lengths(strsplit(leadingEdge, ";", fixed = TRUE))) %>%
-  select(cell_type, target, pathway, NES, ES, size, leading_edge_n,
-         pval, padj, leadingEdge) %>%
+  select(cell_type, target, pathway, NES, size, leading_edge_n, padj) %>%
   datatable(
     filter = "top",
     rownames = FALSE,
-    escape = FALSE,
     options = list(
       pageLength = 15,
-      # 0-based: column 7 is pval
-      order = list(list(7, "asc")),
-      columnDefs = list(list(
-        targets = 9,
-        render = DT::JS(
-          "function(data, type, row) {",
-          "  if (type !== 'display' || data === null) return data;",
-          "  var text = String(data);",
-          "  if (text.length <= 70) return text;",
-          "  return '<span title=\"' + text + '\">' +",
-          "         text.substr(0, 69) + '\u2026</span>';",
-          "}"
-        )
-      ))
+      # 0-based: column 6 is padj. pval used to carry this sort; it is a
+      # monotone function of padj within a combination, so the order the reader
+      # sees is unchanged by dropping the column.
+      order = list(list(6, "asc"))
     ),
-    caption = "Gene sets enriched among the genes each knockout moved furthest, FDR < 0.05."
+    caption = paste0("Gene sets enriched at either end of each knockout's ",
+                     "ranking, FDR < ", gsea_fdr, ".")
   ) %>%
-  formatSignif(columns = c("NES", "ES", "pval", "padj"), digits = 4)
+  formatSignif(columns = c("NES", "padj"), digits = 4)
 ```
 
 ```{r gsea-table-empty, eval=!has_gsea_sig, results="asis"}
@@ -894,8 +989,8 @@ if (!gsea_requested) {
 } else if (!has_gsea) {
   cat("The enrichment ran and returned nothing; see the note above the figure.")
 } else {
-  cat("The enrichment ran, but no gene set cleared FDR < 0.05 in any cell type",
-      "x target combination, so the table is empty.")
+  cat("The enrichment ran, but no gene set cleared FDR <", gsea_fdr, "in any",
+      "cell type x target combination, so the table is empty.")
 }
 ```
 
