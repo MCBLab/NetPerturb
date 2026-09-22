@@ -20,6 +20,40 @@ cell_types <- sub("_weight.*", "", basename(rds_files))
 target_rank <- strsplit(target[1], split = ";")[[1]]
 target_id <- gsub("[^A-Za-z0-9_.-]+", "_", paste(target_rank, collapse = "_"))
 
+# Both output tables, empty but named, for the paths that have nothing to write.
+# Explicit columns for the reason the all_ranks initialiser below gives: a bare
+# data.frame() writes no header, and MERGE builds its header from whichever
+# table it reads first.
+empty_ranks <- data.frame(
+  cell_type = character(), target = character(), binding = character(),
+  perb_score = numeric(), stringsAsFactors = FALSE
+)
+
+empty_connections <- data.frame(
+  cell_type = character(), target = character(), binding = character(),
+  target_gene = character(), partner = character(), weight = numeric(),
+  rank = integer(), stringsAsFactors = FALSE
+)
+
+write_table <- function(x, prefix) {
+  write.table(x, paste0(prefix, ".", target_id, ".txt"), quote = FALSE,
+              row.names = FALSE, col.names = TRUE, sep = "\t")
+}
+
+# Leaves both tables headered and empty and exits clean. Unlike the
+# rank_celltype failures at the bottom of this script -- a worker dying in
+# scRank's own parallel backend, which is worth failing loudly so Nextflow
+# retries rather than caches -- everything that calls this is deterministic:
+# the gene is not in the object and will not be there on a retry either. So
+# the target is skipped, MERGE concatenates two header-only tables into
+# nothing, and the rest of the run carries on without it.
+skip_target <- function(...) {
+  message(...)
+  write_table(empty_connections, "top_connections")
+  write_table(empty_ranks, "perbscore_all_targets")
+  quit(save = "no", status = 0)
+}
+
 #add a print statement to check the target variable before processing the targets
 print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
 
@@ -48,17 +82,91 @@ as_v3_assay <- function(obj) {
 
 if (seuratObj == 'AML_object.rda') {
   load(seuratObj)
-  seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target_rank[1]),]
+  # Every target gene the object actually carries, not just the first: the
+  # profile check below reads rownames(), so a gene dropped here would look
+  # unexpressed rather than un-subsetted. intersect() also keeps a target that
+  # is missing outright from erroring the subset itself.
+  seuratObj <- seuratObj[unique(c(VariableFeatures(seuratObj)[1:200],
+                                  intersect(target_rank, rownames(seuratObj)))), ]
 } else {
   seuratObj <- readRDS(seuratObj)
 }
 
 seuratObj <- as_v3_assay(seuratObj)
 
-obj <- CreateScRank(input = seuratObj,
-                    species = species, 
-                    cell_type = column,
-                    target = target_rank[1])
+# CreateScRank() validates the target it is handed against the expression
+# profile and stops with "Please check if the target gene is in the gene
+# expression profile." when it is not there, which takes the whole task down
+# before either table is written. A gene the object does not carry cannot be
+# in a network built from that same object either, so it has no edges to
+# remove and contributes nothing to a perturbation score: dropping it and
+# scoring the rest of the target gives the same answer as scoring all of it
+# would have. That is already how the top-connections loop below treats a gene
+# missing from a network, and it is why the target keeps its original name --
+# "A;B" with B unexpressed is the same knockout as "A".
+usable <- target_rank[target_rank %in% rownames(seuratObj)]
+
+if (length(usable) < length(target_rank)) {
+  message("Not in the expression profile, dropped from this target: ",
+          paste(setdiff(target_rank, usable), collapse = ", "), ".")
+}
+
+if (length(usable) == 0) {
+  skip_target("No gene of '", target[1], "' is in the expression profile; ",
+              "skipping this target.")
+}
+
+# The gene handed to CreateScRank is only the one it validates: obj@para$target
+# is reset below, before anything is ranked. It still has to be a gene the
+# function accepts, though, and rownames() is not quite the same test -- a gene
+# can sit in the matrix with no counts anywhere in it -- so the candidates are
+# tried in turn and the ones it refuses are dropped alongside the ones that
+# were never there.
+#
+# Only that one error is caught. Anything else out of CreateScRank -- a version
+# skew between Seurat and SeuratObject in the image, a malformed object -- is
+# re-raised to kill the task, because it is not a fact about this target, and
+# swallowing it would hand Nextflow an empty table to cache as a success. That
+# is the failure the exit status at the bottom of this script exists to avoid,
+# and a blanket tryCatch here would reintroduce it through the back door.
+is_absent_target <- function(e) {
+  msg <- conditionMessage(e)
+  grepl("target gene", msg, fixed = TRUE) &&
+    grepl("expression profile", msg, fixed = TRUE)
+}
+
+obj <- NULL
+refused <- character()
+
+for (candidate in usable) {
+  obj <- tryCatch(
+    CreateScRank(input = seuratObj,
+                 species = species,
+                 cell_type = column,
+                 target = candidate),
+    error = function(e) {
+      if (!is_absent_target(e)) {
+        stop(e)
+      }
+      message("CreateScRank does not find ", candidate,
+              " in the expression profile.")
+      NULL
+    }
+  )
+
+  if (!is.null(obj)) {
+    break
+  }
+
+  refused <- c(refused, candidate)
+}
+
+usable <- setdiff(usable, refused)
+
+if (is.null(obj)) {
+  skip_target("CreateScRank accepted no gene of '", target[1], "'; ",
+              "skipping this target.")
+}
 
 obj@net <- sc_objs
 names(obj@net) <- cell_types
@@ -89,7 +197,7 @@ for (ct in cell_types) {
     next
   }
 
-  for (gene in target_rank) {
+  for (gene in usable) {
     if (!(gene %in% rownames(net))) {
       message("Target ", gene, " is absent from the ", ct, " network.")
       next
@@ -129,36 +237,26 @@ for (ct in cell_types) {
 top_connections <- if (length(connections) > 0) {
   do.call(rbind, connections)
 } else {
-  data.frame(
-    cell_type = character(), target = character(), binding = character(),
-    target_gene = character(), partner = character(), weight = numeric(),
-    rank = integer(), stringsAsFactors = FALSE
-  )
+  empty_connections
 }
 
-write.table(
-  top_connections,
-  paste0("top_connections.", target_id, ".txt"),
-  quote = FALSE,
-  row.names = FALSE,
-  col.names = TRUE,
-  sep = "\t"
-)
+write_table(top_connections, "top_connections")
 
-# Explicit, empty-but-named columns so a target that fails for every cell
-# type still leaves a properly headered (if empty) table, rather than the
-# zero-column data.frame() a bare initializer would write out.
-all_ranks <- data.frame(
-  cell_type = character(), target = character(), binding = character(),
-  perb_score = numeric(), stringsAsFactors = FALSE
-)
+# Empty but named for the same reason empty_ranks is: a target that fails for
+# every cell type still has to leave a properly headered table behind.
+all_ranks <- empty_ranks
 
 n_failed <- 0
 
 for (target_sc in target) {
-  message("Target ", target_sc, " found. Proceeding with rank_celltype.")
+  # usable rather than the label split on ';': a gene the expression profile
+  # does not carry was dropped above, and handing it to rank_celltype anyway
+  # is the failure this guard exists to avoid. The label is unchanged, since
+  # an unexpressed gene has no edges and so no effect on the score.
+  message("Target ", target_sc, " found. Proceeding with rank_celltype on: ",
+          paste(usable, collapse = ", "))
   # Set the target
-  obj@para$target <- strsplit(target_sc, split = ";")[[1]]
+  obj@para$target <- usable
 
   # Try running rank_celltype
   tryCatch({
@@ -185,14 +283,7 @@ for (target_sc in target) {
 }
 
 # Save results (even if partial)
-write.table(
-  all_ranks,
-  paste0("perbscore_all_targets.", target_id, ".txt"),
-  quote = FALSE,
-  row.names = FALSE,
-  col.names = TRUE,
-  sep = "\t"
-)
+write_table(all_ranks, "perbscore_all_targets")
 
 # rank_celltype's failures are usually a worker in its own parallel backend
 # (mclapply) getting killed rather than a real absence of signal for that
