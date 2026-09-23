@@ -90,7 +90,7 @@ workflow {
 
         SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot )
 
-        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK.out.dr_table.collect() )
+        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect() )
 
         // Ranks each pair's genes by how far the knockout moved them and asks
         // which gene sets sit at the top of that ranking -- the analysis the
