@@ -14,7 +14,7 @@ process GSEA_SCTENIFOLDKNK {
   label "r_gsea"
 
   // Built from container/gsea/Dockerfile. The tag is a param so a locally
-  // built .sif can be substituted without editing this file -- SCTENIFOLDKNK
+  // built .sif can be substituted without editing this file -- SCTENIFOLDKNK_KO
   // hardcodes one and that is precisely why its track only runs on the machine
   // that path belongs to.
   // A registry tag gets the docker:// prefix under singularity; a path to a

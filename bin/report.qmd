@@ -138,7 +138,7 @@ if (has_umap) umap_path <- normalizePath(umap_path)
 # The named-but-empty frame matters: everything below filters on p.adj, so a
 # bare data.frame() with no columns would fail with "object 'p.adj' not found"
 # rather than fall through to the "not run" message. Same reasoning, and the
-# same 8 columns, as empty_dr in bin/sctenifoldknk.R. The size check is for
+# same 8 columns, as empty_dr in bin/sctenifoldknk_ko.R. The size check is for
 # MERGE_SCTENIFOLDKNK's stub, which touches a zero-byte file that read.delim
 # refuses with "no lines available in input".
 sctknk_empty <- data.frame(
@@ -197,11 +197,16 @@ n_sctknk_cell_types <- n_distinct(sctknk_sig$cell_type)
 # Ring nodes for the figure. The knocked-out gene is always in its own DR table
 # and always moves furthest, so it would be drawn as a spoke back to itself;
 # it is dropped here and kept in the table, where it reads as confirmation the
-# knockout took. The ring is then capped, since a target can clear FDR on
+# knockout took. A ';'-joined target is a joint knockout, so all of its genes
+# are dropped. The ring is then capped, since a target can clear FDR on
 # hundreds of genes and every view is embedded in the HTML up front.
+is_ko_gene <- function(gene, target) {
+  mapply(function(g, t) g %in% strsplit(t, ";", fixed = TRUE)[[1]], gene, target)
+}
+
 sctknk_net <- if (has_sctknk_sig) {
   sctknk_sig %>%
-    filter(gene != target, is.finite(log2FC)) %>%
+    filter(!is_ko_gene(gene, target), is.finite(log2FC)) %>%
     group_by(target, cell_type) %>%
     slice_max(log2FC, n = sctknk_top_genes, with_ties = FALSE) %>%
     ungroup()
@@ -494,14 +499,16 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
 
 ## Knockout networks
 
-Each knocked-out gene and the genes its knockout moved. scTenifoldKnk zeroes the
-target's outgoing edges, realigns the knocked-out network against the wild-type
+Each knockout and the genes it moved. scTenifoldKnk zeroes the target's
+outgoing edges, realigns the knocked-out network against the wild-type
 one, and scores every gene on how far it travelled between the two; the genes
 drawn here are the ones clearing FDR < 0.05. Use the menu to switch between the
 `r n_sctknk_views` target and cell type combinations.
 
 The knocked-out gene sits at the centre and the genes it moved sit around it. A
-node's size follows its `log2FC`, scaled within the combination on display, so
+combined target such as `A;B` is a single joint knockout, with both genes' edges
+zeroed together, so all of its genes sit at the centre, each linked to every gene
+the knockout moved. A node's size follows its `log2FC`, scaled within the combination on display, so
 sizes rank genes against each other rather than across cell types. The ring is
 capped at the `r sctknk_top_genes` strongest genes per combination; the table in
 the next section is not capped. Hover any node for its exact values.
@@ -574,9 +581,13 @@ marker_size <- function(w, lo = 16, hi = 34) {
 }
 
 # star_positions() and edge_path() read target_gene and partner, so the DR
-# table is renamed into that shape rather than the helpers being rewritten.
+# table is renamed into that shape rather than the helpers being rewritten. A
+# joint knockout puts every one of its genes at the centre, each spoked to
+# every gene the knockout moved: a gene's movement belongs to the knockout as
+# a whole, not to any one of its genes.
 sctknk_edges <- sctknk_net %>%
-  mutate(target_gene = target, partner = gene)
+  mutate(target_gene = target, partner = gene) %>%
+  tidyr::separate_rows(target_gene, sep = ";")
 
 views <- sctknk_edges %>%
   distinct(target, cell_type) %>%
@@ -610,9 +621,11 @@ for (i in seq_len(nrow(views))) {
     y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
   )
 
-  # One row per gene already: sctknk_sig holds a single row per cell type x
-  # target x gene, so no grouping is needed to draw each node once.
+  # sctknk_sig holds a single row per cell type x target x gene, but a joint
+  # knockout repeats each of them once per gene at the centre, so each node
+  # is drawn from its first row.
   moved <- edges %>%
+    distinct(partner, .keep_all = TRUE) %>%
     transmute(
       partner, log2FC,
       text = paste0(

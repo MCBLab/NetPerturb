@@ -28,7 +28,7 @@ min_size <- as_int(min_size, 10)
 max_size <- as_int(max_size, 500)
 
 # The 8 columns fgsea::fgsea() returns, with cell_type/target up front, the
-# same way sctenifoldknk.R fronts dRegulation()'s columns. Explicit and
+# same way sctenifoldknk_ko.R fronts dRegulation()'s columns. Explicit and
 # empty-but-named for the reason empty_dr gives there: a bare data.frame()
 # writes no header, and every reader downstream -- MERGE-style concatenation,
 # report.qmd's filters -- needs the columns to exist even when there are no
@@ -140,7 +140,7 @@ if (length(overlap) < min_size) {
 # Serial on purpose, on two counts. fgsea's default (nproc = 0) hands the work
 # to BiocParallel::bpparam(), which is MulticoreParam over every core on the
 # machine -- in an allocation of 2 cpus that is exactly the oversubscription
-# conf/modules.config documents for SCTENIFOLDKNK. And forked workers would
+# conf/modules.config documents for SCTENIFOLDKNK_KO. And forked workers would
 # undo the set.seed() above. A few hundred ranked genes against a few hundred
 # sets is sub-second work, so there is nothing to win here anyway.
 #
@@ -177,8 +177,9 @@ for (i in seq_len(nrow(combos))) {
   # annotates it, which is exactly the set a reader would most want to believe.
   # This is the one place the ranking departs from the paper's "sort all
   # genes", and report.qmd already makes the same call for the same reason when
-  # it drops the gene from its own network ring and keeps it in the table.
-  sub <- sub[sub$gene != this_target, ]
+  # it drops the gene from its own network ring and keeps it in the table. A
+  # ';'-joined target is a joint knockout, so every one of its genes goes.
+  sub <- sub[!sub$gene %in% strsplit(this_target, ";", fixed = TRUE)[[1]], ]
 
   if (nrow(sub) < min_size) {
     message("Only ", nrow(sub), " ranked gene(s) for ", this_target, " in ",

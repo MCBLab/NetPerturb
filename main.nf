@@ -6,7 +6,8 @@
 
 
 include { GENIE3 } from "./modules/local/genie3/main.nf"
-include { SCTENIFOLDKNK } from "./modules/local/sctenifoldknk/main.nf"
+include { SCTENIFOLDKNK_KO } from "./modules/local/sctenifoldknk_ko/main.nf"
+include { SCTENIFOLDKNK_BUILD } from "./modules/local/sctenifoldknk_build/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { HDWGCNA } from "./modules/local/hdwgcna/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
@@ -65,33 +66,29 @@ workflow {
         .map { it.trim() }
         .filter { it }
 
-    // scTenifoldKnk knocks out exactly one gene per run, so it cannot take a
-    // ';'-joined combined target the way RANK_SCORE does. Rather than skip
-    // those lines, the file is flattened to the individual genes it names and
-    // each is knocked out on its own, so "Stfa1;Mpo" yields a separate Stfa1
-    // result and Mpo result. Deduplicated across the whole file, so a gene
-    // that appears both alone and inside a combination is knocked out once.
-    // This is the same split downsample_and_split.R does to build gene4use.
-    sctknk_target_ch = target_ch
-        .flatMap { line -> line.split(';').collect { gene -> gene.trim() } }
-        .filter { it }
-        .unique()
+    // The knockout track takes the same targets RANK_SCORE does, line for
+    // line: a ';'-joined target is one joint knockout of all its genes, not
+    // one knockout per gene.
+    sctknk_target_ch = target_ch.unique()
 
     DOWNSAMPLE.out.scrank_obj
     .flatten()
     .set { sc_obj }
 
-    // scTenifoldKnk knocks out the target gene as part of building its
-    // network, so unlike the rank-score methods it is target-specific by
-    // construction and runs once per (cell type, gene) pair rather than
-    // once per cell type. Its table never enters RANK_SCORE -- it goes to its
-    // own merge, and from there into REPORT when --network is running too.
+    // scTenifoldKnk in two steps. The wild-type network does not depend on
+    // the target, so SCTENIFOLDKNK_BUILD makes it once per cell type; the
+    // knockout on it is target-specific, so SCTENIFOLDKNK_KO runs once per
+    // (cell type, target) pair, in parallel. Its table never enters
+    // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
+    // --network is running too.
     if( sctknk ) {
-        sc_obj
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores )
+
+        SCTENIFOLDKNK_BUILD.out.wt
         .combine( sctknk_target_ch )
         .set { sctknk_input }
 
-        SCTENIFOLDKNK( sctknk_input, n_cores )
+        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot )
 
         MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK.out.dr_table.collect() )
 
