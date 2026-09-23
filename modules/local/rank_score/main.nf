@@ -16,6 +16,7 @@ process RANK_SCORE {
     val column
     val binding
     val top_n
+    val assay
     path(rank_obj)
 
   output:
@@ -28,7 +29,7 @@ process RANK_SCORE {
   script:
     """
    #!/bin/bash
-    rank_score.R ${obj} "${target}" ${species} ${column} ${binding} ${top_n} ${rank_obj}
+    rank_score.R ${obj} "${target}" ${species} ${column} ${binding} ${top_n} ${assay} ${rank_obj}
     """
 
   stub:

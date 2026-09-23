@@ -17,7 +17,8 @@ nextflow_process {
                 input[3] = "labels"
                 input[4] = "antagonist"
                 input[5] = 15
-                input[6] = [
+                input[6] = "RNA"
+                input[7] = [
                     file("\${projectDir}/tests/fixtures/sensitive.RDS"),
                     file("\${projectDir}/tests/fixtures/resistant.RDS")
                 ]
@@ -51,7 +52,8 @@ nextflow_process {
                 input[3] = "labels"
                 input[4] = "agonist"
                 input[5] = 15
-                input[6] = [ file("\${projectDir}/tests/fixtures/sensitive.RDS") ]
+                input[6] = "RNA"
+                input[7] = [ file("\${projectDir}/tests/fixtures/sensitive.RDS") ]
                 """
             }
         }

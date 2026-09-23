@@ -74,6 +74,8 @@ The workflow executes the following core modules:
 ### 1. Object Parsing and Downsampling (`DOWNSAMPLE`)
 This is the initial step of the process. It ingests a fully processed Seurat object (`.rds`) and identifies the user-defined metadata column containing the cell identities (e.g., cell types or clones). To ensure statistical robustness and equitable GRN inference, it randomly downsamples the cells from each identity to a specified maximum number (`--n_cells`), balancing the computational load. Identities left with fewer than `--min_cells` cells after that are dropped here, before the split, so no network is ever inferred from one and it reaches no score, table or figure. It also writes a UMAP of the retained cells coloured by `--column` to `downsample/umap_<column>.png`, so the identities entering the analysis, and their relative sizes after downsampling, can be checked at a glance. An embedding already present on the object is reused; one is computed only if the object carries none. Drawing this figure is guarded, so a plotting failure leaves a placeholder image rather than stopping the run.
 
+It also checks every gene named in `--target` against the retained cells. A gene absent from the object, or with zero counts in every retained cell, can have no edges in any network, so it is removed from the rest of the analysis here rather than failing a later step. A combined target loses only its failing gene (`Stfa1;Mpo` with `Mpo` absent is analysed as `Stfa1`) and is dropped only when none of it is left; the run aborts if no target passes. The passing targets go to `downsample/targets_qc.txt`, which every later step reads in place of `--target`. The excluded genes, with the reason and what happened to their target, go to `downsample/target_qc.tsv` and are listed in the report's Overview as "These genes were not analyzed due to QC checking".
+
 ### 2. Network Inference (`GENIE3`, `SCRANK`, `HDWGCNA`) and Knockout (`SCTENIFOLDKNK`)
 This is the heavy-lifting computational core. For each downsampled cellular identity, the pipeline infers a gene regulatory network using the method selected with `--network`: `genie3` runs [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html), `scrank` uses the scRank network strategy, and `hdwgcna` runs [hdWGCNA](https://smorabit.github.io/hdWGCNA/) on metacells. Each of these three returns regulatory interaction weights between genes for each cell state, which `RANK_SCORE` (below) turns into a `perb_score` for the requested target(s).
 
@@ -175,6 +177,8 @@ Cstdc5
 Stfa1;Mpo
 ```
 
+`--assay`: Seurat assay holding the raw counts. Defaults to `RNA`. scRank, GENIE3, hdWGCNA and scTenifoldKnk all read an assay named `RNA`, so any other assay given here is renamed to `RNA` when the object is loaded, replacing an existing `RNA` assay if there is one. Use it for objects whose counts sit under another name, e.g. `--assay originalexp` for an object converted from a `SingleCellExperiment`.
+
 `--network`: Network inference method driving the perturbation-scoring track. Supported values are `genie3`, `scrank` and `hdwgcna`. Optional only if `--sctknk` is given; otherwise the run has nothing to do and aborts.
 
 `--sctknk`: Switches on the scTenifoldKnk track, which runs in parallel with whichever method `--network` selects and adds its differentially-regulated gene table as a section in that run's report. Defaults to `false`. With `--sctknk` and no `--network` it runs on its own, producing the table only — no `RANK_SCORE` or `REPORT`.
@@ -221,6 +225,15 @@ sensitive	Brd4	antagonist	1.5395821350262e-06
 resistant	Brd4	antagonist	1.61320913209275e-06
 sensitive	Cstdc5	antagonist	1.30868421341405e-06
 resistant	Cstdc5	antagonist	2.91128461301128e-06
+```
+
+downsample/target_qc.tsv: Target genes removed by `DOWNSAMPLE`'s QC check, one row per gene, with the requested target it came from, the reason (`absent from the expression profile` or `zero counts in every retained cell`) and the action taken. Header only when every gene passed. `downsample/targets_qc.txt` holds the targets that were actually analysed.
+
+```sh
+# Example
+target	gene	reason	action
+Hhip	Hhip	zero counts in every retained cell	target not analysed
+Stfa1;Mpo	Mpo	absent from the expression profile	dropped from the target; analysed as Stfa1
 ```
 
 rank_scores/top_connections_all_targets.txt: The strongest edges each target holds in each cell identity's network, up to `--top_connections` per target gene per identity, ranked on absolute weight. Published for downstream use; the report does not render it.

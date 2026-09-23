@@ -30,22 +30,6 @@ workflow {
     n_cells = params.n_cells
     n_cores = params.n_cores
     target = file(params.target)
-    //create a list of targets from the input file, assuming one target per line
-    target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
-    target_ch = Channel.fromList(target_list)
-
-    // scTenifoldKnk knocks out exactly one gene per run, so it cannot take a
-    // ';'-joined combined target the way RANK_SCORE does. Rather than skip
-    // those lines, the file is flattened to the individual genes it names and
-    // each is knocked out on its own, so "Stfa1;Mpo" yields a separate Stfa1
-    // result and Mpo result. Deduplicated across the whole file, so a gene
-    // that appears both alone and inside a combination is knocked out once.
-    // This is the same split downsample_and_split.R does to build gene4use.
-    sctknk_target_list = target_list
-        .collectMany { line -> line.split(';').collect { gene -> gene.trim() } }
-        .findAll { it }
-        .unique()
-    sctknk_target_ch = Channel.fromList(sctknk_target_list)
     network = params.network
     sctknk = params.sctknk
 
@@ -68,7 +52,30 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay )
+
+    // Everything past DOWNSAMPLE reads the targets that passed its QC check
+    // (present in the object, and with counts in the retained cells) rather
+    // than --target itself; the ones that failed go to the report instead.
+    target_qc_file = DOWNSAMPLE.out.targets
+
+    // one target per line, ';' joining genes perturbed together
+    target_ch = target_qc_file
+        .splitText()
+        .map { it.trim() }
+        .filter { it }
+
+    // scTenifoldKnk knocks out exactly one gene per run, so it cannot take a
+    // ';'-joined combined target the way RANK_SCORE does. Rather than skip
+    // those lines, the file is flattened to the individual genes it names and
+    // each is knocked out on its own, so "Stfa1;Mpo" yields a separate Stfa1
+    // result and Mpo result. Deduplicated across the whole file, so a gene
+    // that appears both alone and inside a combination is knocked out once.
+    // This is the same split downsample_and_split.R does to build gene4use.
+    sctknk_target_ch = target_ch
+        .flatMap { line -> line.split(';').collect { gene -> gene.trim() } }
+        .filter { it }
+        .unique()
 
     DOWNSAMPLE.out.scrank_obj
     .flatten()
@@ -113,7 +120,7 @@ workflow {
             .set { rank_cells  }
         }
         else if( network == 'scrank' ) {
-            SCRANK( sc_obj, species, target, column, n_cores )
+            SCRANK( sc_obj, species, target_qc_file, column, n_cores )
 
             SCRANK.out.rank_obj
             .collect()
@@ -127,7 +134,7 @@ workflow {
             .set { rank_cells  }
         }
 
-        RANK_SCORE( obj, target_ch, species, column, params.binding, params.top_connections, rank_cells )
+        RANK_SCORE( obj, target_ch, species, column, params.binding, params.top_connections, params.assay, rank_cells )
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
@@ -154,7 +161,8 @@ workflow {
             sctknk_table,
             params.sctknk_top_genes,
             gsea_table,
-            params.gsea_top_terms
+            params.gsea_top_terms,
+            DOWNSAMPLE.out.target_qc
         )
     }
 }

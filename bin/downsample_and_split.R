@@ -19,14 +19,21 @@ if (is.na(min_cells) || min_cells < 0) {
   min_cells <- 150L
 }
 
+# Assay holding the counts; see select_assay() below.
+assay <- if (length(args) >= 7 && nzchar(args[7])) args[7] else "RNA"
+
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
 }
 
-targets <- readLines(targets)
-target <- strsplit(targets[1], split = ";")[[1]]
-
-targets <- unlist(strsplit(targets, split = ";"))
+# One target per line, ';' joining genes perturbed together. Blank lines and
+# stray whitespace are dropped, as main.nf used to do before reading the
+# targets DOWNSAMPLE writes instead. warn = FALSE: a missing final newline is
+# not worth a warning.
+target_lines <- trimws(readLines(targets, warn = FALSE))
+target_lines <- target_lines[nzchar(target_lines)]
+target_genes <- lapply(strsplit(target_lines, split = ";"),
+                       function(g) unique(trimws(g[nzchar(trimws(g))])))
 
 # The container pairs Seurat v4 with SeuratObject v5, so an object saved with a
 # v5 assay is invisible to every Seurat v4 entry point: they resolve assays with
@@ -58,14 +65,54 @@ as_v3_assay <- function(obj) {
   obj
 }
 
+# scRank, GENIE3, hdWGCNA and scTenifoldKnk all read the assay named "RNA"
+# (scRank hardcodes GetAssayData(assay = "RNA")), so an object whose counts sit
+# under another name -- e.g. "originalexp" from a SingleCellExperiment
+# conversion -- fails in all of them. The --assay chosen is made the default,
+# converted like any other, and renamed to "RNA", replacing whatever assay
+# already went by that name, so everything downstream reads the right counts.
+select_assay <- function(obj, assay) {
+  if (!assay %in% Assays(obj)) {
+    stop("--assay '", assay, "' is not an assay of this object. ",
+         "Available: ", paste(Assays(obj), collapse = ", "))
+  }
+  DefaultAssay(obj) <- assay
+  obj <- as_v3_assay(obj)
+  if (assay != "RNA") {
+    message("Using assay '", assay, "' as 'RNA'.")
+    if ("RNA" %in% Assays(obj)) {
+      obj[["RNA"]] <- NULL
+    }
+    obj <- do.call(RenameAssays, c(list(object = obj), setNames(list("RNA"), assay)))
+  }
+  # An object converted from AnnData often carries X alone, which lands in
+  # `data` and leaves `counts` empty -- and scRank and scTenifoldKnk read
+  # counts. Integer values there are raw counts filed in the wrong slot, so
+  # they are moved over and normalised; anything else is already transformed
+  # and no counts can be recovered from it.
+  if (length(obj[["RNA"]]@counts) == 0) {
+    x <- obj[["RNA"]]@data
+    if (length(x) == 0 || !all(x@x == round(x@x))) {
+      stop("Assay '", assay, "' has no counts, and its data layer is not raw ",
+           "counts either; pass --assay pointing at an assay with raw counts.")
+    }
+    message("Assay '", assay, "' has no counts; using its integer data layer ",
+            "as counts and log-normalising it.")
+    obj[["RNA"]] <- CreateAssayObject(counts = x)
+    obj <- NormalizeData(obj, assay = "RNA", verbose = FALSE)
+  }
+  obj
+}
+
 if (seuratObj == 'AML_object.rda') {
     load(seuratObj)
-    seuratObj <- seuratObj[c(VariableFeatures(seuratObj)[1:200], target),]
+    seuratObj <- seuratObj[unique(c(VariableFeatures(seuratObj)[1:200],
+                                  intersect(unlist(target_genes), rownames(seuratObj)))),]
 } else {
     seuratObj <- readRDS(seuratObj)
 }
 
-seuratObj <- as_v3_assay(seuratObj)
+seuratObj <- select_assay(seuratObj, assay)
 
 if (!column %in% colnames(seuratObj@meta.data)) {
   stop("--column '", column, "' is not a metadata column of this object. ",
@@ -119,6 +166,84 @@ downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") 
 
 ncells <- length(downsampled_cells)
 seurat_downsample <- seuratObj[, downsampled_cells]
+
+# Target QC ----------------------------------------------------------------
+# A gene the object does not carry, or one with no counts in any cell kept
+# above, has no edges in any network and nothing for a knockout to move, and
+# every method downstream fails on it in its own way (CreateScRank refuses it,
+# rank_celltype finds it missing from the network, scTenifoldKnk divides by
+# zero). So it is taken out here, once, for the whole run: the targets that
+# pass are written to targets_qc.txt, which every later step reads instead of
+# --target, and the ones that do not are listed in target_qc.tsv for the
+# report. A combined target loses only its failing gene -- "A;B" with B absent
+# is the same knockout as "A" -- and is dropped only when none of it is left.
+gene_counts <- Matrix::rowSums(seurat_downsample[["RNA"]]@counts)
+
+qc_reason <- function(gene) {
+  if (!gene %in% names(gene_counts)) {
+    "absent from the expression profile"
+  } else if (gene_counts[[gene]] == 0) {
+    "zero counts in every retained cell"
+  } else {
+    NA_character_
+  }
+}
+
+qc_rows <- list()
+passing <- character()
+
+for (i in seq_along(target_lines)) {
+  genes   <- target_genes[[i]]
+  reasons <- vapply(genes, qc_reason, character(1))
+  kept    <- genes[is.na(reasons)]
+  failed  <- genes[!is.na(reasons)]
+
+  if (length(kept) > 0) {
+    passing <- c(passing, paste(kept, collapse = ";"))
+  }
+
+  if (length(failed) > 0) {
+    qc_rows[[length(qc_rows) + 1]] <- data.frame(
+      target = target_lines[i],
+      gene   = failed,
+      reason = unname(reasons[failed]),
+      action = if (length(kept) > 0) {
+        paste0("dropped from the target; analysed as ", paste(kept, collapse = ";"))
+      } else {
+        "target not analysed"
+      },
+      stringsAsFactors = FALSE
+    )
+  }
+}
+
+target_qc <- if (length(qc_rows) > 0) {
+  do.call(rbind, qc_rows)
+} else {
+  data.frame(target = character(), gene = character(), reason = character(),
+             action = character(), stringsAsFactors = FALSE)
+}
+
+if (nrow(target_qc) > 0) {
+  message("Not analysed due to QC checking: ",
+          paste(unique(paste0(target_qc$gene, " (", target_qc$reason, ")")), collapse = ", "), ".")
+}
+
+write.table(target_qc, "target_qc.tsv", quote = FALSE, sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+passing <- unique(passing)
+
+if (length(passing) == 0) {
+  stop("No target passed QC checking (see target_qc.tsv); nothing to analyse.")
+}
+
+writeLines(passing, "targets_qc.txt")
+
+# The first passing target is what CreateScRank is handed downstream; all of
+# them go into gene4use.
+target  <- strsplit(passing[1], split = ";")[[1]]
+targets <- unique(unlist(strsplit(passing, split = ";")))
 
 # Gene set carried downstream. This reproduces the feature selection that
 # scRank::CreateScRank does internally (R/method.R), so no scRank object has to

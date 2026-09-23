@@ -13,7 +13,8 @@ species <- args[3]
 column <- args[4]
 binding <- args[5]
 top_n <- args[6]
-rds_files <- args[7:length(args)]
+assay <- args[7]
+rds_files <- args[8:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
@@ -80,6 +81,45 @@ as_v3_assay <- function(obj) {
   obj
 }
 
+# scRank, GENIE3, hdWGCNA and scTenifoldKnk all read the assay named "RNA"
+# (scRank hardcodes GetAssayData(assay = "RNA")), so an object whose counts sit
+# under another name -- e.g. "originalexp" from a SingleCellExperiment
+# conversion -- fails in all of them. The --assay chosen is made the default,
+# converted like any other, and renamed to "RNA", replacing whatever assay
+# already went by that name, so everything downstream reads the right counts.
+select_assay <- function(obj, assay) {
+  if (!assay %in% Assays(obj)) {
+    stop("--assay '", assay, "' is not an assay of this object. ",
+         "Available: ", paste(Assays(obj), collapse = ", "))
+  }
+  DefaultAssay(obj) <- assay
+  obj <- as_v3_assay(obj)
+  if (assay != "RNA") {
+    message("Using assay '", assay, "' as 'RNA'.")
+    if ("RNA" %in% Assays(obj)) {
+      obj[["RNA"]] <- NULL
+    }
+    obj <- do.call(RenameAssays, c(list(object = obj), setNames(list("RNA"), assay)))
+  }
+  # An object converted from AnnData often carries X alone, which lands in
+  # `data` and leaves `counts` empty -- and scRank and scTenifoldKnk read
+  # counts. Integer values there are raw counts filed in the wrong slot, so
+  # they are moved over and normalised; anything else is already transformed
+  # and no counts can be recovered from it.
+  if (length(obj[["RNA"]]@counts) == 0) {
+    x <- obj[["RNA"]]@data
+    if (length(x) == 0 || !all(x@x == round(x@x))) {
+      stop("Assay '", assay, "' has no counts, and its data layer is not raw ",
+           "counts either; pass --assay pointing at an assay with raw counts.")
+    }
+    message("Assay '", assay, "' has no counts; using its integer data layer ",
+            "as counts and log-normalising it.")
+    obj[["RNA"]] <- CreateAssayObject(counts = x)
+    obj <- NormalizeData(obj, assay = "RNA", verbose = FALSE)
+  }
+  obj
+}
+
 if (seuratObj == 'AML_object.rda') {
   load(seuratObj)
   # Every target gene the object actually carries, not just the first: the
@@ -92,7 +132,7 @@ if (seuratObj == 'AML_object.rda') {
   seuratObj <- readRDS(seuratObj)
 }
 
-seuratObj <- as_v3_assay(seuratObj)
+seuratObj <- select_assay(seuratObj, assay)
 
 # CreateScRank() validates the target it is handed against the expression
 # profile and stops with "Please check if the target gene is in the gene
@@ -241,6 +281,30 @@ top_connections <- if (length(connections) > 0) {
 }
 
 write_table(top_connections, "top_connections")
+
+# rank_celltype zeroes the target's row in every cell type network
+# (dpGRN[target, ] <- 0), so a gene missing from any one of them stops it with
+# "Drug target gene is not in the network". That is as deterministic as a gene
+# missing from the expression profile -- a retry rebuilds nothing -- so it is
+# dropped the same way rather than failing the task. The connections above are
+# already written and keep whatever the gene has in the networks it is in.
+in_all_nets <- vapply(usable, function(gene) {
+  all(vapply(obj@net, function(net) gene %in% rownames(net), logical(1)))
+}, logical(1))
+
+if (!all(in_all_nets)) {
+  message("Not in every cell type network, dropped from ranking: ",
+          paste(usable[!in_all_nets], collapse = ", "), ".")
+}
+
+usable <- usable[in_all_nets]
+
+if (length(usable) == 0) {
+  message("No gene of '", target[1], "' is in every cell type network; ",
+          "skipping ranking for this target.")
+  write_table(empty_ranks, "perbscore_all_targets")
+  quit(save = "no", status = 0)
+}
 
 # Empty but named for the same reason empty_ranks is: a target that fails for
 # every cell type still has to leave a properly headered table behind.

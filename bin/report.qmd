@@ -19,6 +19,7 @@ params:
   sctknk_top_genes: 25
   gsea_file: ""
   gsea_top_terms: 20
+  target_qc_file: ""
 ---
 
 ```{r setup, include=FALSE}
@@ -108,6 +109,21 @@ if (!nzchar(network_key)) {
   network_label <- network_key
 }
 network_value <- if (nzchar(network_key)) network_key else "not supplied"
+
+# Target genes DOWNSAMPLE took out of the run before any network was built:
+# absent from the object, or with no counts in the cells it kept. Missing or
+# empty when the qmd is rendered by hand, or by a run from before that check,
+# which reads the same as a run where every gene passed.
+target_qc_path <- params$target_qc_file
+target_qc <- if (!is.null(target_qc_path) && nzchar(target_qc_path) &&
+                 file.exists(target_qc_path) && file.size(target_qc_path) > 0) {
+  read.delim(target_qc_path, header = TRUE, sep = "\t",
+             colClasses = "character", check.names = FALSE)
+} else {
+  data.frame(target = character(), gene = character(), reason = character(),
+             action = character())
+}
+has_target_qc <- nrow(target_qc) > 0
 
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
@@ -326,6 +342,30 @@ The gene regulatory networks these scores were computed from were inferred with
 **`r network_label`** (`--network`: `r network_value`). Every score below is
 relative to that network type, so scores from a run using a different inference
 method are not directly comparable.
+
+### Target QC
+
+```{r target-qc-note, results="asis"}
+if (has_target_qc) {
+  cat("These genes were not analyzed due to QC checking: ",
+      paste0("**", unique(target_qc$gene), "**", collapse = ", "),
+      ". A gene is excluded when it is absent from the expression profile or ",
+      "has zero counts in every cell retained after downsampling, since it can ",
+      "have no edges in any network. A combined target loses only the failing ",
+      "gene and is analysed with the rest.\n", sep = "")
+} else {
+  cat("Every requested target gene passed QC checking.\n")
+}
+```
+
+```{r target-qc-table, eval=has_target_qc}
+datatable(
+  target_qc,
+  rownames = FALSE,
+  colnames = c("Requested target", "Gene", "Reason", "Action"),
+  options = list(dom = "t", pageLength = nrow(target_qc))
+)
+```
 
 ## Perturbation score table
 

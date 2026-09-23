@@ -16,10 +16,13 @@ process DOWNSAMPLE {
     val species
     val n_cells
     val min_cells
+    val assay
 
   output:
     path "*.RDS", emit: scrank_obj
     path "*.png", emit: umap
+    path "targets_qc.txt", emit: targets
+    path "target_qc.tsv", emit: target_qc
 
   when:
   task.ext.when == null || task.ext.when  
@@ -28,7 +31,7 @@ process DOWNSAMPLE {
     """
     #!/bin/bash
 
-    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells}
+    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells} ${assay}
     """
 
   stub:
@@ -36,6 +39,8 @@ process DOWNSAMPLE {
     touch sensitive.RDS
     touch resistant.RDS
     touch umap.png
+    grep -v '^[[:space:]]*\$' ${target} > targets_qc.txt
+    printf 'target\\tgene\\treason\\taction\\n' > target_qc.tsv
     """
 }
 

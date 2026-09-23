@@ -25,6 +25,19 @@ obj <- CreateScRank(input = sc_obj,
                     cell_type = column,
                     target = target)
 
+# CreateScRank only forces the one gene it is handed into gene4use; every other
+# target reaches the network only if it happens to be an HVG, TF or drug gene,
+# and RANK_SCORE then fails with "Drug target gene is not in the network". Use
+# the set DOWNSAMPLE built instead -- the same one GENIE3 and hdWGCNA use, which
+# already carries every requested target. Constr_net keeps a row for each of
+# these genes, so a target is in the network even with no edges in this type.
+gene4use <- sc_obj@misc$gene4use
+if (is.null(gene4use)) {
+  gene4use <- unique(c(obj@para$gene4use,
+                       unlist(strsplit(targets, split = ";"))))
+}
+obj@para$gene4use <- gene4use[gene4use %in% rownames(sc_obj)]
+
 obj <- Constr_net(obj, n.core = n_cores)
 
 # obj@net is keyed by the raw, unsanitized value of the identity column

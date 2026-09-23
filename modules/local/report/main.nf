@@ -18,6 +18,7 @@ process REPORT {
     val sctknk_top_genes
     path gsea_table
     val gsea_top_terms
+    path target_qc
 
   output:
     path "netperturb_report.html", emit: report
@@ -49,6 +50,7 @@ process REPORT {
       -P sctknk_top_genes:${sctknk_top_genes} \
       -P gsea_file:${gsea_table} \
       -P gsea_top_terms:${gsea_top_terms} \
+      -P target_qc_file:${target_qc} \
       --output netperturb_report.html
     """
 

@@ -27,6 +27,7 @@ nextflow_process {
                 input[6] = 25
                 input[7] = file("\${projectDir}/tests/fixtures/gsea_all_targets.txt")
                 input[8] = 20
+                input[9] = file("\${projectDir}/tests/fixtures/target_qc.tsv")
                 """
             }
         }
@@ -54,6 +55,7 @@ nextflow_process {
                 input[6] = 25
                 input[7] = file("\${projectDir}/tests/fixtures/gsea_all_targets.txt")
                 input[8] = 20
+                input[9] = file("\${projectDir}/tests/fixtures/target_qc.tsv")
                 """
             }
         }
@@ -80,6 +82,7 @@ nextflow_process {
                 input[6] = 25
                 input[7] = file("\${projectDir}/assets/NO_GSEA_TABLE")
                 input[8] = 20
+                input[9] = file("\${projectDir}/tests/fixtures/target_qc.tsv")
                 """
             }
         }

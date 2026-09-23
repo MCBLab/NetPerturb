@@ -17,6 +17,7 @@ nextflow_process {
                 input[3] = "mouse"
                 input[4] = 100
                 input[5] = 150
+                input[6] = "RNA"
                 """
             }
         }
