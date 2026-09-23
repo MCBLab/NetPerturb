@@ -22,6 +22,13 @@ if (is.na(min_cells) || min_cells < 0) {
 # Assay holding the counts; see select_assay() below.
 assay <- if (length(args) >= 7 && nzchar(args[7])) args[7] else "RNA"
 
+# Number of highly variable genes carried into gene4use; see the HVG block
+# below. Unparseable or below 1 falls back to the default.
+n_hvg <- suppressWarnings(as.integer(if (length(args) >= 8) args[8] else NA))
+if (is.na(n_hvg) || n_hvg < 1) {
+  n_hvg <- 2000L
+}
+
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
 }
@@ -253,17 +260,21 @@ if (!species %in% c("human", "mouse")) {
   stop("species must be 'human' or 'mouse', got: ", species)
 }
 
-# Variable features the object already carries are reused; they are computed
-# only when it has none. nfeatures cannot exceed the number of genes present.
-hvg <- if (length(VariableFeatures(seurat_downsample)) > 0) {
-  VariableFeatures(seurat_downsample)
+# --n_hvg variable features. Those the object already carries are reused when
+# there are at least that many -- the first n_hvg of them -- and computed
+# otherwise, since reusing a shorter list would quietly hand back fewer genes
+# than were asked for. nfeatures cannot exceed the number of genes present.
+stored_hvg <- VariableFeatures(seurat_downsample)
+hvg <- if (length(stored_hvg) >= n_hvg) {
+  stored_hvg
 } else {
   VariableFeatures(FindVariableFeatures(seurat_downsample,
                                         selection.method = "vst",
-                                        nfeatures = min(2000, nrow(seurat_downsample)),
+                                        nfeatures = min(n_hvg, nrow(seurat_downsample)),
                                         verbose = FALSE))
 }
-hvg <- head(hvg, 2000)
+hvg <- head(hvg, n_hvg)
+message("Using ", length(hvg), " highly variable gene(s) (--n_hvg ", n_hvg, ").")
 
 utile_database <- scRank::utile_database
 tf_gene <- utile_database$Gene_TF[[species]]$Symbol

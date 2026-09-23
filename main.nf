@@ -53,7 +53,7 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg )
 
     // Everything past DOWNSAMPLE reads the targets that passed its QC check
     // (present in the object, and with counts in the retained cells) rather

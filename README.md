@@ -207,6 +207,8 @@ Stfa1;Mpo
 
 `--min_cells`: Fewest cells a cellular identity must contribute for `DOWNSAMPLE` to keep it. Defaults to `150`; `0` keeps every identity. The count it is compared against is what survives downsampling — `min(identity size, --n_cells)` — rather than the identity's size in the input object, since that is what every network method downstream actually receives, and it is the same number `--hdwgcna_min_cells` is measured against one step further down. An identity below it is dropped before the object is split, with a line in the log naming it and its size. Setting `--n_cells` below `--min_cells` drops every identity and aborts the run, which the error says explicitly.
 
+`--n_hvg`: Number of highly variable genes `DOWNSAMPLE` puts into `gene4use`, the gene set every network method is built on, together with the species' transcription factors and drug targets and the requested targets. Defaults to `2000`. Variable features already stored on the object are reused when there are at least this many; otherwise they are computed with Seurat's `vst` on the downsampled cells. More genes mean larger networks and longer runs, most of all for scTenifoldKnk and GENIE3.
+
 `--binding`: Perturbation mode passed to the scoring step, for example `antagonist` or `agonist`.
 
 `--n_cores`: Number of CPU cores requested for parallelizable network inference and scoring steps.
