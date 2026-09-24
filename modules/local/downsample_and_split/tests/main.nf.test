@@ -36,8 +36,12 @@ nextflow_process {
 
             // one row per identity, for the report's cell count figure
             def counts = file(process.out.cell_counts[0]).readLines()
-            assert counts[0] == "identity\tn_input\tn_used\tstatus"
+            assert counts[0] == "identity\tn_input\tn_used\tstatus\tgenes_total\tgenes_gene4use\tgenes_expressed\tgenes_filtered"
             assert counts.size() == 3
+
+            // one row per identity x single target gene, for the expression heatmap
+            def expr = file(process.out.target_expression[0]).readLines()
+            assert expr[0] == "identity\tgene\tavg_expression\tpct_expressing"
         }
     }
 }

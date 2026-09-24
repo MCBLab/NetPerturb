@@ -1,4 +1,4 @@
-identity	n_input	n_used	status
-sensitive	812	500	kept
-resistant	2304	500	kept
-stroma	97	0	dropped (below --min_cells)
+identity	n_input	n_used	status	genes_total	genes_gene4use	genes_expressed	genes_filtered
+sensitive	812	500	kept	18000	3120	2874	246
+resistant	2304	500	kept	18000	3120	2951	169
+stroma	97	0	dropped (below --min_cells)	18000	NA	NA	NA

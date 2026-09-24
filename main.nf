@@ -229,6 +229,7 @@ workflow {
             params.gsea_top_terms,
             DOWNSAMPLE.out.target_qc,
             DOWNSAMPLE.out.cell_counts,
+            DOWNSAMPLE.out.target_expression,
             run_info_file,
             trace_snapshot
         )

@@ -21,6 +21,7 @@ params:
   gsea_top_terms: 20
   target_qc_file: ""
   cell_counts_file: ""
+  target_expression_file: ""
   run_info_file: ""
   trace_file: ""
 ---
@@ -352,6 +353,23 @@ cell_counts <- if (!is.null(cell_counts_path) && nzchar(cell_counts_path) &&
              status = character())
 }
 has_cell_counts <- nrow(cell_counts) > 0
+
+# Mean log-normalised expression of each single target gene in each kept
+# identity, from DOWNSAMPLE; a ';'-joined target arrives split into its genes.
+# Missing when the qmd is rendered by hand, or by a run from before DOWNSAMPLE
+# wrote it.
+target_expr_path <- params$target_expression_file
+target_expr <- if (!is.null(target_expr_path) && nzchar(target_expr_path) &&
+                   file.exists(target_expr_path) && file.size(target_expr_path) > 0) {
+  read.delim(target_expr_path, header = TRUE, sep = "\t", check.names = FALSE,
+             stringsAsFactors = FALSE)
+} else {
+  data.frame(identity = character(), gene = character(),
+             avg_expression = numeric(), pct_expressing = numeric())
+}
+has_target_expr <- nrow(target_expr) > 0
+n_expr_genes <- length(unique(target_expr$gene))
+n_expr_ids   <- length(unique(target_expr$identity))
 
 # The run itself, as main.nf wrote it: a key/value table with the start time,
 # the command line and the settings behind the result. Read into a named
@@ -1234,13 +1252,40 @@ cat("No UMAP figure was supplied with this report.")
 ### Cells per identity
 
 ```{r cell-counts-note, results="asis"}
+# Gene columns arrive with DOWNSAMPLE's newer cell_counts.tsv; an older one
+# has cells only, and the section falls back to that.
+has_gene_counts <- has_cell_counts &&
+  all(c("genes_total", "genes_gene4use", "genes_expressed") %in% names(cell_counts))
+
 if (has_cell_counts) {
   n_dropped_ids <- sum(cell_counts$status != "kept")
-  cat("Cells each identity contributed: **", format(sum(cell_counts$n_used), big.mark = ","),
-      "** cells were used in total, across ", sum(cell_counts$status == "kept"),
-      " identities (`--n_cells` ", run_value("n_cells"), " per identity, `--min_cells` ",
-      run_value("min_cells"), "). The grey bar behind each is the identity's size in the ",
+  kept_cc <- cell_counts[cell_counts$status == "kept", ]
+  genes_note <- if (has_gene_counts) {
+    expr_range <- range(kept_cc$genes_expressed, na.rm = TRUE)
+    paste0(
+      "; genes: every network is offered the same **",
+      comma(kept_cc$genes_gene4use[1]), "** of the object's ",
+      comma(kept_cc$genes_total[1]), " genes (`gene4use`: `--n_hvg` ",
+      run_value("n_hvg"), " variable genes plus the species' transcription factors, ",
+      "drug targets and the requested targets), and each identity keeps those with ",
+      "counts in its own cells, **",
+      if (expr_range[1] == expr_range[2]) comma(expr_range[1])
+      else paste0(comma(expr_range[1]), "–", comma(expr_range[2])),
+      "** genes per network")
+  } else ""
+  cat(if (has_gene_counts) "Cells and genes" else "Cells", " each identity's network was built from. **",
+      comma(sum(cell_counts$n_used)), "** cells were used in total, across ",
+      nrow(kept_cc), " identities (`--n_cells` ", run_value("n_cells"),
+      " per identity, `--min_cells` ", run_value("min_cells"), genes_note, "). ",
+      if (has_gene_counts) "In the cells panel the" else "The",
+      " grey bar behind each is the identity's size in the ",
       "input object; an identity dropped for `--min_cells` has only that bar, in orange.",
+      if (has_gene_counts) {
+        paste0(" In the genes panel the pale green part is `gene4use` genes with zero ",
+               "counts in that identity, which can have no edges in its network: ",
+               "scTenifoldKnk drops them, hdWGCNA pads them with zeros, and GENIE3 and ",
+               "scRank have nothing to fit them on.")
+      } else "",
       if (n_dropped_ids > 0) {
         paste0(" ", n_dropped_ids, " identit", ifelse(n_dropped_ids == 1, "y was", "ies were"),
                " dropped for having fewer than `--min_cells` cells after downsampling, ",
@@ -1252,32 +1297,104 @@ if (has_cell_counts) {
 }
 ```
 
-```{r cell-counts, eval=has_cell_counts, fig.width=9, fig.height=max(3, 0.35 * nrow(cell_counts) + 1.5)}
-# A dropped identity has no used cells to colour, so it is its input bar that
-# carries the flag.
+```{r cell-counts, eval=has_cell_counts, fig.width=if (has_gene_counts) 12 else 9, fig.height=max(3, 0.35 * nrow(cell_counts) + 1.5)}
+# Cells and genes side by side, one facet each, sharing the identity axis.
+# Each panel is a back bar (what was available) with a front bar (what the
+# network got) drawn over it. A dropped identity has no used cells to colour,
+# so it is its input bar that carries the flag, and it has no genes panel bar.
 cc <- cell_counts %>%
-  mutate(identity = factor(identity, levels = identity[order(n_used, n_input)]),
-         kept     = status == "kept",
-         input_as = ifelse(kept, "In input object", "Dropped (below --min_cells)"))
+  mutate(kept     = status == "kept",
+         identity = factor(identity, levels = identity[order(kept, n_used, n_input)]))
 
-ggplot(cc, aes(y = identity)) +
-  geom_col(aes(x = n_input, fill = input_as), width = 0.8) +
-  geom_col(aes(x = n_used, fill = "Used for networks"), width = 0.8) +
-  geom_text(aes(x = n_input,
-                label = ifelse(kept,
-                               paste0(comma(n_used), " / ", comma(n_input)),
-                               paste0("0 / ", comma(n_input), " (dropped)"))),
-            hjust = -0.1, size = 3.3) +
-  scale_fill_manual(values = c("Used for networks"           = "#2C7FB8",
-                               "In input object"             = "grey88",
-                               "Dropped (below --min_cells)" = "#F4A582"),
-                    breaks = c("Used for networks", "In input object",
-                               "Dropped (below --min_cells)"),
+panels <- cc %>%
+  transmute(identity, kept, panel = "Cells",
+            back  = n_input, front = n_used,
+            back_fill  = ifelse(kept, "In input object", "Dropped (below --min_cells)"),
+            front_fill = "Used for networks",
+            label = ifelse(kept, paste0(comma(n_used), " / ", comma(n_input)),
+                           paste0("0 / ", comma(n_input), " (dropped)")))
+
+if (has_gene_counts) {
+  panels <- bind_rows(panels, cc %>%
+    filter(kept) %>%
+    transmute(identity, kept, panel = "Genes",
+              back  = genes_gene4use, front = genes_expressed,
+              back_fill  = "Zero counts in identity (filtered)",
+              front_fill = "In network (expressed)",
+              label = paste0(comma(genes_expressed), " / ", comma(genes_gene4use))))
+}
+panels$panel <- factor(panels$panel, levels = c("Cells", "Genes"))
+
+fills <- c("Used for networks"                  = "#2C7FB8",
+           "In input object"                    = "grey88",
+           "Dropped (below --min_cells)"        = "#F4A582",
+           "In network (expressed)"             = "#41AB5D",
+           "Zero counts in identity (filtered)" = "#C7E9C0")
+
+ggplot(panels, aes(y = identity)) +
+  geom_col(aes(x = back, fill = back_fill), width = 0.8) +
+  geom_col(aes(x = front, fill = front_fill), width = 0.8) +
+  geom_text(aes(x = back, label = label), hjust = -0.1, size = 3.3) +
+  facet_wrap(~ panel, scales = "free_x") +
+  scale_fill_manual(values = fills, breaks = intersect(names(fills), unique(c(panels$back_fill, panels$front_fill))),
                     name = NULL) +
-  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.25))) +
-  labs(x = "Cells (used / in input object)", y = NULL) +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.3))) +
+  labs(x = "used / available", y = NULL) +
+  guides(fill = guide_legend(nrow = 2)) +
   theme_minimal(base_size = 12) +
-  theme(legend.position = "top", panel.grid.major.y = element_blank())
+  theme(legend.position = "top", panel.grid.major.y = element_blank(),
+        strip.text = element_text(face = "bold", size = 12))
+```
+
+```{r cell-counts-table, eval=has_gene_counts}
+cell_counts %>%
+  transmute(Identity = identity, Status = status,
+            `Cells in input` = n_input, `Cells used` = n_used,
+            `Genes in object` = genes_total, `gene4use` = genes_gene4use,
+            `Genes in network` = genes_expressed, `Genes filtered` = genes_filtered) %>%
+  datatable(rownames = FALSE,
+            options = list(dom = "t", pageLength = nrow(cell_counts)),
+            caption = paste("Cells and genes per identity. Genes filtered are gene4use",
+                            "genes with zero counts in that identity's retained cells."))
+```
+
+### Target expression per identity
+
+```{r target-expr-note, results="asis"}
+if (has_target_expr) {
+  cat("Mean expression of each target gene in each identity, over the cells ",
+      "retained after downsampling -- the cells its network was built from. ",
+      "A combined target (`A;B`) is shown as its single genes, each on its own. ",
+      "Expression is log-normalised (counts per 10,000, then log1p), and the ",
+      "number under each value is the percentage of the identity's cells with ",
+      "at least one count of the gene. A target that is barely expressed in an ",
+      "identity has little for that identity's network to connect it to, which ",
+      "is worth keeping in mind when reading its scores above.\n", sep = "")
+} else {
+  cat("No target expression table was supplied with this report.\n")
+}
+```
+
+```{r target-expr, eval=has_target_expr, fig.width=max(5, 1.1 * n_expr_genes + 3), fig.height=max(3, 0.45 * n_expr_ids + 1.5)}
+# Genes keep the order the targets were given in; identities are sorted as in
+# the perturbation score heatmap.
+te <- target_expr %>%
+  mutate(gene     = factor(gene, levels = unique(gene)),
+         identity = factor(identity, levels = sort(unique(identity))),
+         label    = sprintf("%.2f\n%.0f%%", avg_expression, pct_expressing))
+
+ggplot(te, aes(x = gene, y = identity, fill = avg_expression)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  geom_text(aes(label = label,
+                colour = avg_expression > 0.6 * max(avg_expression, na.rm = TRUE)),
+            size = 3.2, lineheight = 0.9, show.legend = FALSE) +
+  scale_colour_manual(values = c(`TRUE` = "white", `FALSE` = "#0b0b0b")) +
+  scale_fill_distiller(palette = "YlOrRd", direction = 1,
+                       name = "Mean\nlog-normalised\nexpression") +
+  labs(x = "Target gene", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
 ```
 
 ## Pipeline run

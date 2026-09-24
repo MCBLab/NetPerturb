@@ -186,7 +186,8 @@ seurat_downsample <- seuratObj[, downsampled_cells]
 # Cells per identity, for the report's cell count figure: how many the input
 # object had, and how many of them every network was built from. An identity
 # dropped for --min_cells is listed with 0 used, so the figure shows what was
-# left out as well as what was kept.
+# left out as well as what was kept. The gene columns are added, and the table
+# written, once gene4use is known further down.
 used_sizes <- table(as.character(seurat_downsample@meta.data[[column]]))
 cell_counts <- data.frame(
   identity = names(identity_sizes),
@@ -197,8 +198,6 @@ cell_counts <- data.frame(
                     "kept", "dropped (below --min_cells)"),
   stringsAsFactors = FALSE
 )
-write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
-            row.names = FALSE, col.names = TRUE)
 
 # Target QC ----------------------------------------------------------------
 # A gene the object does not carry, or one with no counts in any cell kept
@@ -323,6 +322,53 @@ if (length(mt_rb) > 0) {
 # looking ribosomal, and anything missing from the object is then dropped.
 genes_4_use <- unique(c(genes_4_use, targets))
 genes_4_use <- genes_4_use[genes_4_use %in% rownames(seurat_downsample)]
+
+# Genes per identity, next to its cells in the report. Every network is
+# offered the same gene4use, but a gene with no counts in an identity's
+# retained cells can have no edges in that identity's network: scTenifoldKnk
+# drops it outright, hdWGCNA pads it with zeros, and GENIE3 and scRank give it
+# nothing to regress on. So genes_expressed is what each network is really
+# built on, and gene4use minus it is what that identity filters out. Dropped
+# identities have no network and are left NA.
+retained_ident <- as.character(seurat_downsample@meta.data[[column]])
+g4u_counts <- seurat_downsample[["RNA"]]@counts[genes_4_use, , drop = FALSE]
+genes_expressed <- vapply(cell_counts$identity, function(id) {
+  cells <- retained_ident == id
+  if (!any(cells)) return(NA_integer_)
+  sum(Matrix::rowSums(g4u_counts[, cells, drop = FALSE]) > 0)
+}, integer(1))
+
+cell_counts$genes_total     <- nrow(seurat_downsample)
+cell_counts$genes_gene4use  <- ifelse(is.na(genes_expressed), NA_integer_, length(genes_4_use))
+cell_counts$genes_expressed <- unname(genes_expressed)
+cell_counts$genes_filtered  <- cell_counts$genes_gene4use - cell_counts$genes_expressed
+
+write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+# Expression of every target gene in every kept identity, for the report's
+# heatmap. One row per single gene: a ';'-joined target is split into its
+# genes, each shown on its own. Only the retained cells count, since those are
+# what the networks were built from. Log-normalised here from the counts
+# (per 10,000, then log1p) rather than read from the data layer, which holds
+# raw counts in an object that was never normalised; the library size is the
+# cell's total over every gene, as NormalizeData() would take it.
+target_counts <- seurat_downsample[["RNA"]]@counts[targets, , drop = FALSE]
+lib_size <- Matrix::colSums(seurat_downsample[["RNA"]]@counts)
+target_lognorm <- log1p(t(t(as.matrix(target_counts)) / pmax(lib_size, 1)) * 1e4)
+
+target_expression <- do.call(rbind, lapply(keep_identities, function(id) {
+  cells <- retained_ident == id
+  data.frame(
+    identity       = id,
+    gene           = targets,
+    avg_expression = unname(rowMeans(target_lognorm[, cells, drop = FALSE])),
+    pct_expressing = unname(100 * rowMeans(as.matrix(target_counts[, cells, drop = FALSE]) > 0)),
+    stringsAsFactors = FALSE
+  )
+}))
+write.table(target_expression, "target_expression.tsv", quote = FALSE, sep = "\t",
+            row.names = FALSE, col.names = TRUE)
 
 split_obj <- SplitObject(seurat_downsample, split.by = column)
 
