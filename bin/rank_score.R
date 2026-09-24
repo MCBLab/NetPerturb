@@ -312,6 +312,43 @@ all_ranks <- empty_ranks
 
 n_failed <- 0
 
+# rank_celltype forks one worker per cell type (foreach/doParallel, i.e.
+# mclapply), and each worker builds dense 2n x 2n Laplacians for its networks.
+# When the kernel kills workers for memory, mclapply only warns ("scheduled
+# cores ... did not deliver results") and hands back NULL for their cell types,
+# and rank_celltype then dies further on with the unhelpful
+# "seq_len(n): argument must be coercible to non-negative integer". A dead
+# worker says nothing about the target, so the ranking is rerun one cell type
+# at a time, which keeps a single Laplacian in memory at once. Any other error
+# is left alone: it would fail the same way sequentially.
+rank_celltype_safe <- function(obj, n.core = 4) {
+  workers_died <- FALSE
+  res <- tryCatch(
+    withCallingHandlers(
+      rank_celltype(obj, n.core = n.core),
+      warning = function(w) {
+        if (grepl("did not deliver", conditionMessage(w), fixed = TRUE)) {
+          workers_died <<- TRUE
+        }
+      }
+    ),
+    error = function(e) {
+      if (!workers_died) {
+        stop(e)
+      }
+      NULL
+    }
+  )
+  if (!is.null(res)) {
+    return(res)
+  }
+  message("rank_celltype workers were killed (likely out of memory); ",
+          "retrying with n.core = 1.")
+  doParallel::stopImplicitCluster()
+  foreach::registerDoSEQ()
+  rank_celltype(obj, n.core = 1)
+}
+
 for (target_sc in target) {
   # usable rather than the label split on ';': a gene the expression profile
   # does not carry was dropped above, and handing it to rank_celltype anyway
@@ -324,7 +361,7 @@ for (target_sc in target) {
 
   # Try running rank_celltype
   tryCatch({
-    obj <- rank_celltype(obj, n.core = 4)
+    obj <- rank_celltype_safe(obj)
 
     # Extract data and convert to long format
     perb_scores <- obj@cell_type_rank$perb_score

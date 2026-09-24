@@ -175,10 +175,9 @@ for (i in seq_len(nrow(combos))) {
   # construction -- zeroing its edges is what the distance measures -- so
   # leaving it in hands a guaranteed top-of-list hit to every gene set that
   # annotates it, which is exactly the set a reader would most want to believe.
-  # This is the one place the ranking departs from the paper's "sort all
-  # genes", and report.qmd already makes the same call for the same reason when
-  # it drops the gene from its own network ring and keeps it in the table. A
-  # ';'-joined target is a joint knockout, so every one of its genes goes.
+  # SCTENIFOLDKNK_KO already drops it from the DR table for the same reason, so
+  # this only matters for a table from a run before that. A ';'-joined target
+  # is a joint knockout, so every one of its genes goes.
   sub <- sub[!sub$gene %in% strsplit(this_target, ";", fixed = TRUE)[[1]], ]
 
   if (nrow(sub) < min_size) {

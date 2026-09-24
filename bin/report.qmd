@@ -194,11 +194,11 @@ n_sctknk_sig   <- nrow(sctknk_sig)
 n_sctknk_targets    <- n_distinct(sctknk_sig$target)
 n_sctknk_cell_types <- n_distinct(sctknk_sig$cell_type)
 
-# Ring nodes for the figure. The knocked-out gene is always in its own DR table
-# and always moves furthest, so it would be drawn as a spoke back to itself;
-# it is dropped here and kept in the table, where it reads as confirmation the
-# knockout took. A ';'-joined target is a joint knockout, so all of its genes
-# are dropped. The ring is then capped, since a target can clear FDR on
+# Ring nodes for the figure. SCTENIFOLDKNK_KO already drops the knocked-out
+# gene(s) from the DR table -- they always move furthest by construction -- so
+# this filter only matters for a table from a run before that; it would draw
+# them as spokes back to themselves. A ';'-joined target is a joint knockout,
+# so all of its genes are dropped. The ring is then capped, since a target can clear FDR on
 # hundreds of genes and every view is embedded in the HTML up front.
 is_ko_gene <- function(gene, target) {
   mapply(function(g, t) g %in% strsplit(t, ";", fixed = TRUE)[[1]], gene, target)
@@ -217,7 +217,8 @@ sctknk_net <- if (has_sctknk_sig) {
 has_sctknk_net <- nrow(sctknk_net) > 0
 
 # Counted off sctknk_net rather than sctknk_sig, because that is the frame the
-# dropdown is built from: a combination whose only significant gene was the
+# dropdown is built from: in a table from before the knocked-out genes were
+# dropped upstream, a combination whose only significant gene was the
 # knocked-out gene itself has a row in the table but no menu entry.
 n_sctknk_views <- if (has_sctknk_net) {
   nrow(distinct(sctknk_net, target, cell_type))
@@ -748,9 +749,9 @@ distance squared over the run's mean, logged; `p.value` tests it against the
 chi-square null and `p.adj` is the Benjamini-Hochberg adjustment within the run.
 
 `p.value` is a direct function of `log2FC`, so the two rank genes identically and
-the FDR cut above is the same thing as a `log2FC` threshold. Each knocked-out
-gene appears in its own rows, normally at the top, which is the simplest check
-that the knockout took.
+the FDR cut above is the same thing as a `log2FC` threshold. The knocked-out
+genes themselves are left out: they always move furthest by construction, so
+their rows say nothing about the knockout's effect.
 
 Currently `r n_sctknk_sig` gene(s) clear FDR < 0.05, across
 `r n_sctknk_targets` target(s) and `r n_sctknk_cell_types` cell type(s).

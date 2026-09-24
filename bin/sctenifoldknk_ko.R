@@ -107,6 +107,18 @@ if (is.null(dr) || nrow(dr) == 0) {
        cell_type, "; writing an empty table for this pair.")
 }
 
+# The knocked-out gene(s) are dropped from the table. Zeroing a gene's edges is
+# what the distance measures, so it always sits at the top by construction and
+# says nothing about the knockout's effect on the rest of the network. The
+# other rows are unaffected: dRegulation() has already computed their p.adj,
+# over every gene, before this.
+dr <- dr[!dr$gene %in% present, , drop = FALSE]
+
+if (nrow(dr) == 0) {
+  skip("Only the knocked-out gene(s) came back for ", target, " in ",
+       cell_type, "; writing an empty table for this pair.")
+}
+
 # dRegulation() already returns dr sorted by p.value.
 dr$cell_type <- cell_type
 dr$target    <- target
