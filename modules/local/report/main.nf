@@ -19,6 +19,9 @@ process REPORT {
     path gsea_table
     val gsea_top_terms
     path target_qc
+    path cell_counts
+    path run_info
+    path trace_snapshot, stageAs: "trace_snapshot.tsv"
 
   output:
     path "netperturb_report.html", emit: report
@@ -51,6 +54,9 @@ process REPORT {
       -P gsea_file:${gsea_table} \
       -P gsea_top_terms:${gsea_top_terms} \
       -P target_qc_file:${target_qc} \
+      -P cell_counts_file:${cell_counts} \
+      -P run_info_file:${run_info} \
+      -P trace_file:trace_snapshot.tsv \
       --output netperturb_report.html
     """
 

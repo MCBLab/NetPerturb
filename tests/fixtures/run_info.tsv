@@ -1,0 +1,25 @@
+run_name	fixture_run
+session_id	00000000-0000-0000-0000-000000000000
+started	2026-07-27 00:11:50 -0300
+started_epoch_ms	1785121910000
+command_line	nextflow run main.nf --network genie3 -profile docker
+resume	false
+profile	docker
+container_engine	docker
+nextflow_version	24.10.6
+pipeline_version	0.1.0dev
+revision	local
+user	tester
+launch_dir	/tmp/launch
+work_dir	/tmp/launch/work
+obj	dummy_obj.rds
+target	test_input.txt
+column	labels
+species	mouse
+assay	RNA
+network	genie3
+sctknk	false
+n_cells	500
+min_cells	150
+n_hvg	2000
+n_cores	4

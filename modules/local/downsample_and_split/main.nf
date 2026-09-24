@@ -24,6 +24,7 @@ process DOWNSAMPLE {
     path "*.png", emit: umap
     path "targets_qc.txt", emit: targets
     path "target_qc.tsv", emit: target_qc
+    path "cell_counts.tsv", emit: cell_counts
 
   when:
   task.ext.when == null || task.ext.when  
@@ -42,6 +43,9 @@ process DOWNSAMPLE {
     touch umap.png
     grep -v '^[[:space:]]*\$' ${target} > targets_qc.txt
     printf 'target\\tgene\\treason\\taction\\n' > target_qc.tsv
+    printf 'identity\\tn_input\\tn_used\\tstatus\\n' > cell_counts.tsv
+    printf 'sensitive\\t100\\t100\\tkept\\n' >> cell_counts.tsv
+    printf 'resistant\\t100\\t100\\tkept\\n' >> cell_counts.tsv
     """
 }
 

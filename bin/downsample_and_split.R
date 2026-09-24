@@ -174,6 +174,23 @@ downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") 
 ncells <- length(downsampled_cells)
 seurat_downsample <- seuratObj[, downsampled_cells]
 
+# Cells per identity, for the report's cell count figure: how many the input
+# object had, and how many of them every network was built from. An identity
+# dropped for --min_cells is listed with 0 used, so the figure shows what was
+# left out as well as what was kept.
+used_sizes <- table(as.character(seurat_downsample@meta.data[[column]]))
+cell_counts <- data.frame(
+  identity = names(identity_sizes),
+  n_input  = as.integer(identity_sizes),
+  n_used   = as.integer(ifelse(names(identity_sizes) %in% names(used_sizes),
+                               used_sizes[names(identity_sizes)], 0L)),
+  status   = ifelse(names(identity_sizes) %in% keep_identities,
+                    "kept", "dropped (below --min_cells)"),
+  stringsAsFactors = FALSE
+)
+write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
 # Target QC ----------------------------------------------------------------
 # A gene the object does not carry, or one with no counts in any cell kept
 # above, has no edges in any network and nothing for a knockout to move, and

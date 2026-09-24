@@ -32,6 +32,11 @@ nextflow_process {
 
             def names = process.out.scrank_obj[0].collect { file(it).name }.sort()
             assert names == ["resistant.RDS", "sensitive.RDS"]
+
+            // one row per identity, for the report's cell count figure
+            def counts = file(process.out.cell_counts[0]).readLines()
+            assert counts[0] == "identity\tn_input\tn_used\tstatus"
+            assert counts.size() == 3
         }
     }
 }

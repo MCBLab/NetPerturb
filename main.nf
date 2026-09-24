@@ -149,6 +149,72 @@ workflow {
             ? GSEA_SCTENIFOLDKNK.out.gsea_table
             : file("${projectDir}/assets/NO_GSEA_TABLE")
 
+        // What the report says about the run itself: when it started, the
+        // command line, and the settings that shape the result. Written as a
+        // key/value table since REPORT's container cannot see the workflow
+        // object. The epoch lets the report measure elapsed time without
+        // caring which time zone the container runs in.
+        def start = workflow.start.toInstant()
+        def run_info = [
+            "run_name"        : workflow.runName,
+            "session_id"      : workflow.sessionId,
+            "started"         : java.time.ZonedDateTime.ofInstant(start, java.time.ZoneId.systemDefault())
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z")),
+            "started_epoch_ms": start.toEpochMilli(),
+            "command_line"    : workflow.commandLine,
+            "resume"          : workflow.resume,
+            "profile"         : workflow.profile,
+            "container_engine": workflow.containerEngine ?: "none",
+            "nextflow_version": workflow.nextflow.version,
+            "pipeline_version": workflow.manifest.version,
+            "revision"        : workflow.revision ?: workflow.commitId ?: "local",
+            "user"            : workflow.userName,
+            "launch_dir"      : workflow.launchDir,
+            "work_dir"        : workflow.workDir,
+            "obj"             : params.obj,
+            "target"          : params.target,
+            "column"          : params.column,
+            "species"         : params.species,
+            "assay"           : params.assay,
+            "network"         : params.network,
+            "sctknk"          : params.sctknk,
+            "n_cells"         : params.n_cells,
+            "min_cells"       : params.min_cells,
+            "n_hvg"           : params.n_hvg,
+            "n_cores"         : params.n_cores
+        ]
+        run_info_file = Channel
+            .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )
+            .collectFile( name: "run_info.tsv" )
+
+        // Per-step running times come from the execution trace, which
+        // Nextflow appends to one row per task as each one finishes. It is
+        // read once everything REPORT depends on has finished -- which is
+        // every task of the run bar REPORT itself -- and copied into the work
+        // dir, since the container cannot reach the published one. Rows are
+        // written asynchronously right after a task ends, hence the short
+        // wait before reading. The path is the one Nextflow is actually
+        // writing to, so a -with-trace <file> or a trace.file from -c is
+        // followed; the nextflow.config default is only the fallback. A
+        // missing trace (trace disabled) becomes a one-line note the report
+        // says it lacks -- not an empty string, which collectFile would emit
+        // no file for, leaving REPORT waiting forever.
+        def trace_cfg = workflow.session.config.navigate('trace.file')
+        def trace_path = file( trace_cfg instanceof CharSequence && trace_cfg
+            ? trace_cfg.toString()
+            : "${params.tracedir}/execution_trace_${params.trace_report_suffix}.txt" )
+        report_upstream = MERGE.out.merged_rank_scores
+        if( sctknk ) {
+            report_upstream = report_upstream.mix( MERGE_SCTENIFOLDKNK.out.merged_dr_table )
+        }
+        if( sctknk && params.gsea_gmt ) {
+            report_upstream = report_upstream.mix( GSEA_SCTENIFOLDKNK.out.gsea_table )
+        }
+        trace_snapshot = report_upstream
+            .collect()
+            .map { sleep(3000); trace_path.exists() ? trace_path.text : "# no trace file at ${trace_path}\n" }
+            .collectFile( name: "trace_snapshot.tsv" )
+
         REPORT(
             MERGE.out.merged_rank_scores,
             DOWNSAMPLE.out.umap,
@@ -159,7 +225,10 @@ workflow {
             params.sctknk_top_genes,
             gsea_table,
             params.gsea_top_terms,
-            DOWNSAMPLE.out.target_qc
+            DOWNSAMPLE.out.target_qc,
+            DOWNSAMPLE.out.cell_counts,
+            run_info_file,
+            trace_snapshot
         )
     }
 }
