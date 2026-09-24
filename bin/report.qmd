@@ -1324,7 +1324,8 @@ run_fields <- c(
   "--n_cells"         = "n_cells",
   "--min_cells"       = "min_cells",
   "--n_hvg"           = "n_hvg",
-  "--n_cores"         = "n_cores"
+  "--n_cores"         = "n_cores",
+  "--seed"            = "seed"
 )
 datatable(
   data.frame(Field = names(run_fields), Value = vapply(run_fields, run_value, character(1))),

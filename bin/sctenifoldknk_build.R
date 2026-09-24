@@ -14,13 +14,17 @@ suppressPackageStartupMessages({
 # regulation on it, once per (cell type, target), in parallel.
 #
 # The steps and their arguments are scTenifoldKnk()'s own for qc = FALSE with
-# its defaults, in the same order and under the same seeds, so a knockout run
-# on this network gives the same table scTenifoldKnk() would have.
+# its defaults, in the same order and seeded the same way, so a knockout run
+# on this network gives the same table scTenifoldKnk() would have -- exactly
+# so with --seed 1, the seed scTenifoldKnk() hardcodes and the pipeline default.
 
 args <- commandArgs(trailingOnly = TRUE)
 
 seuratObj <- args[1]
 n_cores   <- as.integer(args[2])
+# --seed; missing or unparseable falls back to 1, the pipeline default
+seed      <- suppressWarnings(as.integer(if (length(args) >= 3) args[3] else NA))
+if (is.na(seed)) seed <- 1L
 
 cell_type <- sub("\\.RDS$", "", basename(seuratObj))
 out_file  <- paste0(cell_type, "_sctknk_wt.rds")
@@ -87,12 +91,12 @@ strict_direction <- function(X, lambda = 1) {
 wt <- tryCatch({
   X <- cpmNormalization(mat)
 
-  set.seed(1)
+  set.seed(seed)
   nets <- makeNetworks(X = X, q = 0.9, priorNetwork = NULL, nNet = 10,
                        nCells = min(500, ncol(X)), scaleScores = TRUE,
                        symmetric = FALSE, nComp = n_comp, nCores = n_cores)
 
-  set.seed(1)
+  set.seed(seed)
   td <- tensorDecomposition(xList = nets, K = 3, maxError = 1e-05,
                             maxIter = 1000, nDecimal = 3)
 

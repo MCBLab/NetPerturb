@@ -29,6 +29,14 @@ if (is.na(n_hvg) || n_hvg < 1) {
   n_hvg <- 2000L
 }
 
+# --seed: which cells slice_sample() keeps below, and the UMAP computed when
+# the object has none. Missing or unparseable falls back to 1, the pipeline
+# default.
+seed <- suppressWarnings(as.integer(if (length(args) >= 9) args[9] else NA))
+if (is.na(seed)) {
+  seed <- 1L
+}
+
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
 }
@@ -165,6 +173,7 @@ message("Keeping ", length(keep_identities), " identity/identities: ",
                " cell(s))", collapse = ", "), ".")
 
 # Downsample cells by celltype
+set.seed(seed)
 downsampled_cells <- seuratObj@meta.data %>% tibble::rowid_to_column("id_cell") %>%
   filter(!!sym(column) %in% keep_identities) %>%
   group_by(!!sym(column)) %>%
@@ -349,8 +358,8 @@ build_umap <- function(obj) {
     # npcs cannot exceed either dimension of the matrix being decomposed, and
     # the downsampled object can be small on both.
     npcs <- max(2, min(30, ncol(obj) - 1, nrow(obj) - 1))
-    obj <- RunPCA(obj, npcs = npcs, verbose = FALSE)
-    obj <- RunUMAP(obj, dims = seq_len(npcs), verbose = FALSE)
+    obj <- RunPCA(obj, npcs = npcs, seed.use = seed, verbose = FALSE)
+    obj <- RunUMAP(obj, dims = seq_len(npcs), seed.use = seed, verbose = FALSE)
     embedding <- "umap"
   }
 

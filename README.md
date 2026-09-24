@@ -209,6 +209,8 @@ Stfa1;Mpo
 
 `--n_hvg`: Number of highly variable genes `DOWNSAMPLE` puts into `gene4use`, the gene set every network method is built on, together with the species' transcription factors and drug targets and the requested targets. Defaults to `2000`. Variable features already stored on the object are reused when there are at least this many; otherwise they are computed with Seurat's `vst` on the downsampled cells. More genes mean larger networks and longer runs, most of all for scTenifoldKnk and GENIE3.
 
+`--seed`: Seed for every step that draws random numbers. Defaults to `1`. It fixes which cells `DOWNSAMPLE` keeps (and the UMAP it draws when the object has none), GENIE3's random forests (on any `--n_cores`, since GENIE3 seeds its workers through doRNG), hdWGCNA's metacell sampling and WGCNA's own `randomSeed`, scTenifoldKnk's bootstrap networks, tensor decomposition and manifold alignment, and fgsea's adaptive sampler. The default is the seed scTenifoldKnk hardcodes, so the knockout track gives the same table as `scTenifoldKnk()` run by hand. scRank's `Constr_net` also seeds itself with `1` internally and does not see `--seed`, so `--network scrank` networks do not change with it. Two runs with the same seed and inputs give the same results. Changing it changes which cells are kept, so every step reruns, even under `-resume`.
+
 `--binding`: Perturbation mode passed to the scoring step, for example `antagonist` or `agonist`.
 
 `--n_cores`: Number of CPU cores requested for parallelizable network inference and scoring steps.

@@ -18,6 +18,7 @@ process DOWNSAMPLE {
     val min_cells
     val assay
     val n_hvg
+    val seed
 
   output:
     path "*.RDS", emit: scrank_obj
@@ -33,7 +34,7 @@ process DOWNSAMPLE {
     """
     #!/bin/bash
 
-    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells} ${assay} ${n_hvg}
+    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells} ${assay} ${n_hvg} ${seed}
     """
 
   stub:

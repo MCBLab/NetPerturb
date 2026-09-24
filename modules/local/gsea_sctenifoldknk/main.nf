@@ -29,6 +29,7 @@ process GSEA_SCTENIFOLDKNK {
     path gmt
     val min_size
     val max_size
+    val seed
 
   output:
     path "gsea_all_targets.txt", emit: gsea_table
@@ -39,7 +40,7 @@ process GSEA_SCTENIFOLDKNK {
   script:
     """
     #!/bin/bash
-    gsea_sctenifoldknk.R "${dr_table}" "${gmt}" ${min_size} ${max_size}
+    gsea_sctenifoldknk.R "${dr_table}" "${gmt}" ${min_size} ${max_size} ${seed}
     """
 
   stub:

@@ -7,6 +7,9 @@ dr_file  <- args[1]
 gmt_file <- args[2]
 min_size <- args[3]
 max_size <- args[4]
+# --seed; missing or unparseable falls back to 1, the pipeline default
+seed     <- suppressWarnings(as.integer(if (length(args) >= 5) args[5] else NA))
+if (is.na(seed)) seed <- 1L
 
 out_file <- "gsea_all_targets.txt"
 
@@ -15,7 +18,7 @@ out_file <- "gsea_all_targets.txt"
 # that on -resume, which makes pinning it more important rather than less --
 # without a seed, nobody re-running this by hand can reproduce the numbers in
 # the published table.
-set.seed(20260921)
+set.seed(seed)
 
 # Same defaulting rank_score.R applies to its own numeric args: a missing or
 # unparseable value falls back rather than propagating an NA into fgsea.

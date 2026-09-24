@@ -19,6 +19,7 @@ nextflow_process {
                 input[5] = 150
                 input[6] = "RNA"
                 input[7] = 2000
+                input[8] = 1
                 """
             }
         }

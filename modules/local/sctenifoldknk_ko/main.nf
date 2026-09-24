@@ -26,6 +26,7 @@ process SCTENIFOLDKNK_KO {
     tuple path(wt), val(target)
     val n_cores
     val plot
+    val seed
 
   output:
     path "*.txt", emit: dr_table
@@ -38,7 +39,7 @@ process SCTENIFOLDKNK_KO {
   script:
     """
     #!/bin/bash
-    sctenifoldknk_ko.R ${wt} "${target}" ${n_cores} ${plot}
+    sctenifoldknk_ko.R ${wt} "${target}" ${n_cores} ${plot} ${seed}
     """
 
   stub:

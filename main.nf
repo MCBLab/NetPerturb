@@ -53,7 +53,7 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed )
 
     // Everything past DOWNSAMPLE reads the targets that passed its QC check
     // (present in the object, and with counts in the retained cells) rather
@@ -82,13 +82,13 @@ workflow {
     // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
     // --network is running too.
     if( sctknk ) {
-        SCTENIFOLDKNK_BUILD( sc_obj, n_cores )
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.seed )
 
         SCTENIFOLDKNK_BUILD.out.wt
         .combine( sctknk_target_ch )
         .set { sctknk_input }
 
-        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot )
+        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed )
 
         MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect() )
 
@@ -102,7 +102,8 @@ workflow {
                 MERGE_SCTENIFOLDKNK.out.merged_dr_table,
                 file(params.gsea_gmt),
                 params.gsea_min_size,
-                params.gsea_max_size
+                params.gsea_max_size,
+                params.seed
             )
         }
     }
@@ -110,7 +111,7 @@ workflow {
     if( network ) {
 
         if( network == 'genie3' ) {
-           GENIE3( sc_obj, n_cores )
+           GENIE3( sc_obj, n_cores, params.seed )
 
             GENIE3.out.rank_obj
             .collect()
@@ -124,7 +125,7 @@ workflow {
             .set { rank_cells  }
         }
         else if( network == 'hdwgcna' ) {
-            HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells )
+            HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells, params.seed )
 
             HDWGCNA.out.rank_obj
             .collect()
@@ -181,7 +182,8 @@ workflow {
             "n_cells"         : params.n_cells,
             "min_cells"       : params.min_cells,
             "n_hvg"           : params.n_hvg,
-            "n_cores"         : params.n_cores
+            "n_cores"         : params.n_cores,
+            "seed"            : params.seed
         ]
         run_info_file = Channel
             .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )

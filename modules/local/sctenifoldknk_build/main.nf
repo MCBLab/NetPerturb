@@ -16,6 +16,7 @@ process SCTENIFOLDKNK_BUILD {
   input:
     path scobj
     val n_cores
+    val seed
 
   output:
     path "*_sctknk_wt.rds", emit: wt
@@ -26,7 +27,7 @@ process SCTENIFOLDKNK_BUILD {
   script:
     """
     #!/bin/bash
-    sctenifoldknk_build.R ${scobj} ${n_cores}
+    sctenifoldknk_build.R ${scobj} ${n_cores} ${seed}
     """
 
   stub:

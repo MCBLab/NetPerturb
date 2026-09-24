@@ -15,8 +15,9 @@ suppressPackageStartupMessages({
 # *is* the result, so this script's output goes straight to MERGE.
 #
 # The knockout, alignment and dRegulation() call are scTenifoldKnk()'s own
-# with its defaults, under the same seed, so a single-gene target gives the
-# same table scTenifoldKnk() would have.
+# with its defaults, seeded the same way, so a single-gene target gives the
+# same table scTenifoldKnk() would have -- exactly so with --seed 1, the seed
+# scTenifoldKnk() hardcodes and the pipeline default.
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -27,6 +28,9 @@ n_cores <- as.integer(args[3])
 # Anything but "true" leaves it off, so the script run by hand without the
 # argument behaves as it always did.
 make_plot <- length(args) >= 4 && tolower(args[4]) == "true"
+# --seed; missing or unparseable falls back to 1, the pipeline default
+seed <- suppressWarnings(as.integer(if (length(args) >= 5) args[5] else NA))
+if (is.na(seed)) seed <- 1L
 
 cell_type <- sub("_sctknk_wt\\.rds$", "", basename(wt_file))
 
@@ -93,7 +97,7 @@ ko <- wt
 ko[present, ] <- 0
 
 dr <- tryCatch({
-  set.seed(1)
+  set.seed(seed)
   ma <- manifoldAlignment(wt, ko, d = 2, nCores = n_cores)
   dRegulation(ma, empiricalNull = FALSE)
 }, error = function(e) {
