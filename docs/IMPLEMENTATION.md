@@ -4,10 +4,11 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
-| 25 | The report describes the run | Sep 2026 | branch `edge_cases` |
-| 24 | One seed for the whole run | Sep 2026 | branch `edge_cases` |
-| 23 | The knockout split in two | Sep 2026 | branch `edge_cases` |
-| 22 | Targets and identities checked up front | Sep 2026 | branch `edge_cases` |
+| 26 | A documentation website | Sep 2026 | branch `mkdocs` |
+| 25 | The report describes the run | Sep 2026 | #21 |
+| 24 | One seed for the whole run | Sep 2026 | #21 |
+| 23 | The knockout split in two | Sep 2026 | #21 |
+| 22 | Targets and identities checked up front | Sep 2026 | #21 |
 | 21 | Gene set enrichment on the knockout table | Sep 2026 | #20 |
 | 20 | The knockout track running in parallel | Sep 2026 | #20 |
 | 19 | scTenifoldKnk replaces scTenifoldNet | Sep 2026 | #20 |
@@ -32,9 +33,30 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 ---
 
+## Wave 26 — A documentation website
+
+**Sep 2026** · branch `mkdocs`, not yet on `main`
+
+The README had grown into the only manual: one long page mixing a pipeline description, every parameter, every output file and the development notes. The pipeline now also has a website at `https://mcblab.github.io/NetPerturb/`, laid out like the one [Causeway](https://juliaapolonio.github.io/Causeway/) uses: MkDocs with the readthedocs theme and four pages, **Home**, **Usage**, **Output** and **FAQ**, built from `docs/` by `mkdocs.yml` at the repository root.
+
+**Content.** The site is a reorganisation of the README for someone running the pipeline, not a copy of it:
+
+- *Home* has the overview, the metro map and a quick start.
+- *Usage* turns the parameter prose into grouped tables (required, downsampling, scoring, knockout, enrichment, general) and adds profiles, per-process resources and a custom `-c` config example.
+- *Output* walks the `--outdir` tree folder by folder, including the report's sections.
+- *FAQ* is new. Its questions are the failure modes the pipeline already handles and explains in its code: missing targets and identities, an empty GSEA from a species mismatch, what a signed `NES` or a directionless `FC` means, the unpublished scTenifoldKnk image and how to point the processes at a local `.sif`, and the uutils `date` bug.
+
+The reasoning behind design decisions stays here in `IMPLEMENTATION.md`, which is kept out of the site with `exclude_docs`, along with the metro source, the poster exports and the logo script.
+
+**Theme.** The site follows the MCB Lab site (`mcblab.github.io`), which is Quarto with Bootswatch Sandstone. Sandstone's palette is mapped onto the readthedocs theme in `docs/css/docs.css`: a dark sidebar (`#3e3f3a`), a blue header (`#325d88`), a sand frame (`#dfd7ca`) around cream content (`#f8f5f0`), and the lab's font, Atkinson Hyperlegible, self-hosted in `docs/fonts/`. The home page borrows the lab site's card grid for the two tracks and the report. Readthedocs has no dark mode, so the metro map is shown in its light rendering only. Inline code does not wrap on desktop, so a flag like `--network` is never split at its hyphens; on phones it may wrap, so a long path cannot push the page sideways. Wide tab-separated examples scroll inside their own box instead of being clipped.
+
+**Logo.** A hexagon sticker in the same palette: a small network whose red node reaches its neighbours through dashed edges (the perturbed gene and the edges a knockout removes), solid edges among the rest, and a cell beside it. `docs/img/make_logo.py` generates it. The title is drawn from Atkinson Hyperlegible's glyph outlines rather than as SVG `<text>`, so it renders the same in a browser, in cairosvg and on GitHub, where the font is not installed. The script also writes a text-free mark for the favicons, since the title cannot be read at 16–32 px. The README now shows the logo and links to the site.
+
+**Deployment.** `.github/workflows/docs.yml` runs `mkdocs gh-deploy --strict` on pushes to `main` that touch `docs/` or `mkdocs.yml`, publishing to the `gh-pages` branch. Strict mode fails the build on a broken internal link or anchor, which matters because the FAQ and Usage link into each other's sections. GitHub Pages has to be set to serve that branch once, in the repository settings.
+
 ## Wave 25 — The report describes the run
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 Until this wave the report showed results and nothing about what produced them. A reader could not tell which targets had been quietly left out, how many cells and genes each network had actually been built on, whether a target was even expressed in a given identity, or how the run had been launched. Four sections close that gap, and each reads a small table the pipeline already had the facts for.
 
@@ -50,13 +72,13 @@ Every new input is optional in `report.qmd`. A report rendered by hand, or again
 
 ## Wave 24 — One seed for the whole run
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 `--seed` (default `1`) now reaches every step that draws random numbers: which cells `DOWNSAMPLE` keeps and the UMAP it computes when the object has none, GENIE3's random forests (through doRNG, so any `--n_cores` gives the same result), hdWGCNA's metacell sampling and WGCNA's `randomSeed`, scTenifoldKnk's bootstrap networks, tensor decomposition and manifold alignment, and fgsea's sampler (seeded since wave 21, now from the same parameter). The default is `1` because scTenifoldKnk hardcodes that seed, so with defaults the knockout track matches `scTenifoldKnk()` run by hand. The exception is scRank's `Constr_net`, which seeds itself with `1` internally and ignores `--seed`, so `--network scrank` networks do not change with it. This is documented, not worked around. Changing the seed changes which cells are kept, so every step reruns, even under `-resume`.
 
 ## Wave 23 — The knockout split in two
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 **Build once, knock out many times.** `scTenifoldKnk()` builds the wild-type network and knocks one gene out of it in a single call. With one call per (cell type, gene), a run with *n* targets rebuilt the same network *n* times. The network does not depend on the target and is seeded, so every rebuild came out identical, and the build (bootstrap networks plus tensor decomposition) is the expensive half. `SCTENIFOLDKNK` became two processes. `SCTENIFOLDKNK_BUILD` runs once per cell type and saves the wild-type network as `<cell type>_sctknk_wt.rds`. `SCTENIFOLDKNK_KO` combines each network with each target and runs only the knockout, manifold alignment and differential regulation, in parallel. Both steps call scTenifoldKnk's own functions in its own order, with its defaults and seeding.
 
@@ -72,7 +94,7 @@ Every new input is optional in `report.qmd`. A report rendered by hand, or again
 
 ## Wave 22 — Targets and identities checked up front
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 Runs on new datasets kept dying deep inside a network or scoring step, over a fact that was knowable at the start: a target the object did not have, an identity too small to model, or counts under an assay other than `RNA`. This wave moves those checks into `DOWNSAMPLE`, so later steps only receive inputs they can use, and makes `RANK_SCORE` tolerate the cases that can only be discovered once a network exists.
 
