@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="MCB Lab" /><link rel="canonical" href="https://mcblab.github.io/NetPerturb/usage/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Usage - NetPerturb</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../css/docs.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Usage";
+        var mkdocs_page_input_path = "usage.md";
+        var mkdocs_page_url = "/NetPerturb/usage/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="..">
+          <img src="../img/logo.svg" class="logo" alt="Logo"/>
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="..#overview">Overview</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="..#how-much-does-it-matter">How much does it matter?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="..#what-does-it-move">What does it move?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="..#one-report">One report</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#pipeline-summary">Pipeline summary</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#quick-start">Quick start</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#credits">Credits</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#citation">Citation</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Usage</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#requirements">Requirements</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#running-the-pipeline">Running the pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#choosing-what-runs">Choosing what runs</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#inputs">Inputs</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#seurat-object-obj">Seurat object (--obj)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#target-file-target">Target file (--target)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#parameters">Parameters</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#required">Required</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#downsampling-and-gene-selection">Downsampling and gene selection</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#scoring-track">Scoring track</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#knockout-track">Knockout track</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#gene-set-enrichment">Gene set enrichment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#general">General</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#profiles">Profiles</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#resources">Resources</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#reproducibility">Reproducibility</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#testing">Testing</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../output/">Output</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#report">Report</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#downsample">downsample/</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#genie3-scrank-hdwgcna">genie3/, scrank/, hdwgcna/</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#rank_scores">rank_scores/</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#perbscore_all_targetstxt">perbscore_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#top_connections_all_targetstxt">top_connections_all_targets.txt</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#sctknk">sctknk/</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#sctenifoldknk_all_targetstxt">sctenifoldknk_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#gsea_all_targetstxt">gsea_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#plots">plots/</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#pipeline_info">pipeline_info/</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../faq/">FAQ</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="../faq/#choosing-an-analysis">Choosing an analysis</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#what-is-the-difference-between-the-perturbation-score-and-the-knockout">What is the difference between the perturbation score and the knockout?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#which-network-method-should-i-use">Which --network method should I use?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#can-i-perturb-several-genes-at-once">Can I perturb several genes at once?</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../faq/#missing-results">Missing results</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#why-is-one-of-my-targets-missing-from-the-results">Why is one of my targets missing from the results?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#why-is-one-of-my-cell-identities-missing">Why is one of my cell identities missing?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#why-did-sctknk-alone-not-produce-a-report">Why did --sctknk alone not produce a report?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#my-knockout-found-very-few-significant-genes-is-something-wrong">My knockout found very few significant genes. Is something wrong?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#gsea-returned-no-gene-sets">GSEA returned no gene sets.</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../faq/#interpreting-results">Interpreting results</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#does-a-high-fc-in-the-knockout-table-mean-the-gene-went-up">Does a high FC in the knockout table mean the gene went up?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#what-does-a-negative-nes-mean">What does a negative NES mean?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#the-reports-heatmap-shows-only-a-few-scores">The report's heatmap shows only a few scores.</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../faq/#running-the-pipeline">Running the pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#how-do-i-provide-the-sctenifoldknk-container">How do I provide the scTenifoldKnk container?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#my-counts-are-not-in-the-rna-assay">My counts are not in the RNA assay.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#a-task-ran-out-of-memory">A task ran out of memory.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#can-i-run-on-compute-nodes-without-internet">Can I run on compute nodes without internet?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#why-did-changing-seed-re-run-everything-under-resume">Why did changing --seed re-run everything under -resume?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#every-task-fails-with-unexpected-unbound-variable">Every task fails with Unexpected: unbound variable.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../faq/#where-can-i-report-a-problem-or-ask-a-question">Where can I report a problem or ask a question?</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">NetPerturb</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Usage</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/MCBLab/NetPerturb/blob/main/docs/usage.md">Edit on MCBLab/NetPerturb</a>
+    </li>
+  </ul>
+    <div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Breadcrumb Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left" aria-hidden="true"></span> Previous</a>
+        <a href="../output/" class="btn btn-neutral float-right" title="Output">Next <span class="icon icon-circle-arrow-right" aria-hidden="true"></span></a>
+    </div>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h1>
+<h2 id="requirements">Requirements<a class="headerlink" href="#requirements" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a href="https://www.nextflow.io/docs/latest/getstarted.html">Nextflow</a> <code>&gt;=22.10.1</code>.</li>
+<li>A container engine: <a href="https://docs.sylabs.io/">Singularity/Apptainer</a> (recommended on HPC) or <a href="https://docs.docker.com/engine/installation/">Docker</a>. Select it with <code>-profile singularity</code> or <code>-profile docker</code>.</li>
+<li>Enough memory for the network steps. See <a href="#resources">Resources</a> below.</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">scTenifoldKnk image</p>
+<p>The knockout track's image is not published to a registry yet. Build it from <code>container/sctenifoldknk/Dockerfile</code> and point the two knockout processes at it before using <code>--sctknk</code>. The <a href="../faq/#how-do-i-provide-the-sctenifoldknk-container">FAQ</a> shows how.</p>
+</div>
+<h2 id="running-the-pipeline">Running the pipeline<a class="headerlink" href="#running-the-pipeline" title="Permanent link">&para;</a></h2>
+<pre><code class="language-bash">nextflow run MCBLab/NetPerturb \
+  -profile singularity \
+  --obj seurat_object.rds \
+  --column cell_type \
+  --species mouse \
+  --target targets.txt \
+  --network genie3 \
+  --outdir results
+</code></pre>
+<p>Nextflow writes its working files to <code>work/</code> in the launch directory and the published results to <code>--outdir</code>. Add <code>-resume</code> to a relaunched command to reuse every task that already finished. Only steps whose inputs or parameters changed are run again.</p>
+<h3 id="choosing-what-runs">Choosing what runs<a class="headerlink" href="#choosing-what-runs" title="Permanent link">&para;</a></h3>
+<p>The pipeline has two independent tracks. <code>--network</code> selects the <strong>scoring track</strong> and <code>--sctknk</code> switches on the <strong>knockout track</strong>. At least one of them is required:</p>
+<pre><code class="language-bash"># scoring track only: networks, perturbation scores, report
+nextflow run MCBLab/NetPerturb --network genie3 ...
+
+# both tracks in parallel, sharing DOWNSAMPLE; knockout sections added to the report
+nextflow run MCBLab/NetPerturb --network scrank --sctknk ...
+
+# knockout track only: differentially-regulated gene table (and GSEA), no report
+nextflow run MCBLab/NetPerturb --sctknk ...
+</code></pre>
+<table>
+<thead>
+<tr>
+<th><code>--network</code></th>
+<th>Method</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>genie3</code></td>
+<td><a href="https://bioconductor.org/packages/release/bioc/html/GENIE3.html">GENIE3</a> random-forest regression</td>
+<td>Scales with <code>--n_hvg</code>; the slowest for large gene sets.</td>
+</tr>
+<tr>
+<td><code>scrank</code></td>
+<td>scRank's own <code>Constr_net</code></td>
+<td>Seeds itself internally; does not follow <code>--seed</code>.</td>
+</tr>
+<tr>
+<td><code>hdwgcna</code></td>
+<td><a href="https://smorabit.github.io/hdWGCNA/">hdWGCNA</a> on metacells</td>
+<td>The TOM is signed from correlations, sparsified at <code>--cut_ratio</code> and rescaled to <code>[-1, 1]</code>. Identities below <code>--hdwgcna_min_cells</code> are skipped.</td>
+</tr>
+</tbody>
+</table>
+<p>Scores are only comparable between runs that used the same <code>--network</code> method.</p>
+<h2 id="inputs">Inputs<a class="headerlink" href="#inputs" title="Permanent link">&para;</a></h2>
+<h3 id="seurat-object-obj">Seurat object (<code>--obj</code>)<a class="headerlink" href="#seurat-object-obj" title="Permanent link">&para;</a></h3>
+<p>A processed Seurat object saved with <code>saveRDS()</code>. The pipeline needs:</p>
+<ul>
+<li><strong>raw counts</strong> in an assay. It reads <code>RNA</code> by default; set <code>--assay</code> if yours is named differently, e.g. <code>originalexp</code> for an object converted from a <code>SingleCellExperiment</code>.</li>
+<li>a <strong>metadata column</strong> with the identities to compare, passed as <code>--column</code>.</li>
+<li>optionally, a UMAP embedding and variable features. Both are reused if present and computed otherwise.</li>
+</ul>
+<h3 id="target-file-target">Target file (<code>--target</code>)<a class="headerlink" href="#target-file-target" title="Permanent link">&para;</a></h3>
+<p>A plain text file with one target per line. Genes joined by <code>;</code> form a single combined target: scored as one joint perturbation, and knocked out together as one joint knockout. The largest combination supported is two genes.</p>
+<pre><code class="language-text">Brd4
+Cstdc5
+Stfa1;Mpo
+</code></pre>
+<p>The file above produces three <code>RANK_SCORE</code> tasks and three knockouts per identity. To also get <code>Stfa1</code> and <code>Mpo</code> individually, list them on their own lines.</p>
+<p>Every gene is checked against the retained cells before any network is built. A gene absent from the object, or with no counts in any retained cell, is removed: a combined target loses only that gene, and a target left with no genes is dropped. The run stops only if no target survives. What was removed, and why, is listed in <code>downsample/target_qc.tsv</code> and in the report.</p>
+<p>Symbols must match the object (MGI for mouse, HGNC for human), and <code>--species</code> must match both.</p>
+<h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
+<h3 id="required">Required<a class="headerlink" href="#required" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--obj</code></td>
+<td>Path or URL to the Seurat object (<code>.rds</code>).</td>
+</tr>
+<tr>
+<td><code>--column</code></td>
+<td>Metadata column defining the cell identities to compare.</td>
+</tr>
+<tr>
+<td><code>--species</code></td>
+<td><code>human</code> or <code>mouse</code>. Selects the transcription factor and drug target lists and the scRank annotation.</td>
+</tr>
+<tr>
+<td><code>--target</code></td>
+<td>Target file, as described above.</td>
+</tr>
+<tr>
+<td><code>--network</code> and/or <code>--sctknk</code></td>
+<td>At least one track.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="downsampling-and-gene-selection">Downsampling and gene selection<a class="headerlink" href="#downsampling-and-gene-selection" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--assay</code></td>
+<td><code>RNA</code></td>
+<td>Assay holding raw counts. Any other assay is renamed to <code>RNA</code> on load.</td>
+</tr>
+<tr>
+<td><code>--n_cells</code></td>
+<td>—</td>
+<td>Maximum cells kept per identity. Smaller identities keep every cell.</td>
+</tr>
+<tr>
+<td><code>--min_cells</code></td>
+<td><code>150</code></td>
+<td>Identities with fewer cells after downsampling are dropped before any network is built. <code>0</code> keeps all.</td>
+</tr>
+<tr>
+<td><code>--n_hvg</code></td>
+<td><code>2000</code></td>
+<td>Highly variable genes added to <code>gene4use</code>, the gene set of the scoring-track networks.</td>
+</tr>
+<tr>
+<td><code>--seed</code></td>
+<td><code>1</code></td>
+<td>Seed for every random step: cell sampling, GENIE3, hdWGCNA/WGCNA, scTenifoldKnk and fgsea.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="scoring-track">Scoring track<a class="headerlink" href="#scoring-track" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--network</code></td>
+<td>—</td>
+<td><code>genie3</code>, <code>scrank</code> or <code>hdwgcna</code>.</td>
+</tr>
+<tr>
+<td><code>--binding</code></td>
+<td><code>antagonist</code></td>
+<td>Perturbation mode for scRank scoring: <code>antagonist</code> or <code>agonist</code>.</td>
+</tr>
+<tr>
+<td><code>--top_connections</code></td>
+<td><code>15</code></td>
+<td>Strongest edges recorded per target gene per identity.</td>
+</tr>
+<tr>
+<td><code>--cut_ratio</code></td>
+<td><code>0.95</code></td>
+<td>hdWGCNA only: quantile of absolute edge weight below which edges are cut.</td>
+</tr>
+<tr>
+<td><code>--hdwgcna_min_cells</code></td>
+<td><code>150</code></td>
+<td>hdWGCNA only: identities below this are not aggregated into metacells.</td>
+</tr>
+<tr>
+<td><code>--score_quantile</code></td>
+<td><code>0.75</code></td>
+<td>Report only: pooled log10 scores below this quantile are left out of the figures. Tables are never cut.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="knockout-track">Knockout track<a class="headerlink" href="#knockout-track" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--sctknk</code></td>
+<td><code>false</code></td>
+<td>Switch on the scTenifoldKnk knockout track.</td>
+</tr>
+<tr>
+<td><code>--sctknk_min_pct</code></td>
+<td><code>0.05</code></td>
+<td>A gene must be detected in more than this fraction of an identity's cells to enter its knockout network. Targets are always kept. Build cost grows with the square of the gene count.</td>
+</tr>
+<tr>
+<td><code>--sctknk_plot</code></td>
+<td><code>false</code></td>
+<td>Also draw scTenifoldKnk's <code>plotKO()</code> network per identity × target, as PDFs under <code>sctknk/plots/</code>.</td>
+</tr>
+<tr>
+<td><code>--sctknk_top_genes</code></td>
+<td><code>25</code></td>
+<td>Report only: genes drawn around each knocked-out target in the knockout network figure.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="gene-set-enrichment">Gene set enrichment<a class="headerlink" href="#gene-set-enrichment" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--gsea_gmt</code></td>
+<td>—</td>
+<td>GMT file of gene sets. Without it no enrichment runs. Requires <code>--sctknk</code>.</td>
+</tr>
+<tr>
+<td><code>--gsea_min_size</code></td>
+<td><code>10</code></td>
+<td>Smallest gene set tested, counted after intersecting with the ranked genes.</td>
+</tr>
+<tr>
+<td><code>--gsea_max_size</code></td>
+<td><code>500</code></td>
+<td>Largest gene set tested.</td>
+</tr>
+<tr>
+<td><code>--gsea_top_terms</code></td>
+<td><code>20</code></td>
+<td>Report only: gene sets drawn per combination in the enrichment dot plot.</td>
+</tr>
+<tr>
+<td><code>--gsea_container</code></td>
+<td><code>diegomscoelho/netperturb-gsea:1.0</code></td>
+<td>Image carrying fgsea. May be a local <code>.sif</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Use gene sets in the same symbols as your data. MSigDB publishes mouse collections as <code>*.Mm.symbols.gmt</code> (e.g. <code>m5.go.bp</code>, or <code>m5.mpt</code>, the phenotype sets the scTenifoldKnk paper uses) and human ones as <code>*.Hs.symbols.gmt</code> (e.g. <code>c5.go.bp</code>, <code>c2.cp.reactome</code>). The file is read from disk, so compute nodes need no internet access.</p>
+<h3 id="general">General<a class="headerlink" href="#general" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--n_cores</code></td>
+<td>—</td>
+<td>CPUs per network and scoring task. Network tasks request exactly this many.</td>
+</tr>
+<tr>
+<td><code>--outdir</code></td>
+<td><code>results</code></td>
+<td>Where results are published.</td>
+</tr>
+<tr>
+<td><code>--tracedir</code></td>
+<td><code>&lt;outdir&gt;/pipeline_info</code></td>
+<td>Nextflow's execution report, timeline, trace and DAG.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="profiles">Profiles<a class="headerlink" href="#profiles" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Profile</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>singularity</code>, <code>docker</code>, <code>podman</code>, <code>shifter</code>, <code>charliecloud</code></td>
+<td>Container engine.</td>
+</tr>
+<tr>
+<td><code>arm</code></td>
+<td>Docker on ARM machines (runs the amd64 images under emulation).</td>
+</tr>
+<tr>
+<td><code>test</code></td>
+<td>Small mouse AML object with <code>--network genie3</code>, 500 cells per identity, 2 cores.</td>
+</tr>
+<tr>
+<td><code>test_ocasio</code>, <code>test_vangalen</code></td>
+<td>Larger public datasets (human AML bone marrow for van Galen, scored with hdWGCNA). They need more memory.</td>
+</tr>
+</tbody>
+</table>
+<p>Combine a data profile with an engine profile: <code>-profile test,singularity</code>.</p>
+<h2 id="resources">Resources<a class="headerlink" href="#resources" title="Permanent link">&para;</a></h2>
+<p>Requests per task, from <code>conf/modules.config</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Process</th>
+<th>Memory</th>
+<th>CPUs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DOWNSAMPLE</code></td>
+<td>16 GB</td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>GENIE3</code></td>
+<td>16 GB</td>
+<td><code>--n_cores</code></td>
+</tr>
+<tr>
+<td><code>SCRANK</code></td>
+<td>64 GB</td>
+<td><code>--n_cores</code></td>
+</tr>
+<tr>
+<td><code>HDWGCNA</code></td>
+<td>24 GB</td>
+<td><code>--n_cores</code></td>
+</tr>
+<tr>
+<td><code>RANK_SCORE</code></td>
+<td>64 GB</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SCTENIFOLDKNK_BUILD</code></td>
+<td>24 GB</td>
+<td><code>--n_cores</code></td>
+</tr>
+<tr>
+<td><code>SCTENIFOLDKNK_KO</code></td>
+<td>16 GB</td>
+<td><code>--n_cores</code></td>
+</tr>
+<tr>
+<td><code>GSEA_SCTENIFOLDKNK</code></td>
+<td>8 GB</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>REPORT</code></td>
+<td>4 GB</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+<p>To change them, or to add an executor such as SLURM, pass your own config with <code>-c</code>:</p>
+<pre><code class="language-groovy">// custom.config
+process {
+    executor = 'slurm'
+    queue    = 'long'
+    withName: SCRANK              { memory = 128.GB }
+    withName: SCTENIFOLDKNK_BUILD { memory = 48.GB; time = 24.h }
+}
+</code></pre>
+<pre><code class="language-bash">nextflow run MCBLab/NetPerturb -profile singularity -c custom.config ...
+</code></pre>
+<h2 id="reproducibility">Reproducibility<a class="headerlink" href="#reproducibility" title="Permanent link">&para;</a></h2>
+<p>Two runs with the same inputs, parameters and <code>--seed</code> give the same results. The seed controls which cells are kept, so changing it re-runs every step, even under <code>-resume</code>. The one exception is <code>--network scrank</code>: scRank seeds its own network construction with <code>1</code> and ignores <code>--seed</code>.</p>
+<p>The report records the exact command line, Nextflow and pipeline versions, container engine and every setting that shapes the result.</p>
+<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<p>The pipeline is covered by <a href="https://www.nf-test.com/">nf-test</a>. The default suite runs every process through its stub, so it pulls no containers and runs no R code. It finishes in a few minutes:</p>
+<pre><code class="language-bash">nf-test test
+</code></pre>
+<p>The end-to-end run downloads the test object and pulls every container, so it is opt-in:</p>
+<pre><code class="language-bash">nf-test test -c nf-test.integration.config --tag integration --profile test,singularity
+</code></pre>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../output/" class="btn btn-neutral float-right" title="Output">Next <span class="icon icon-circle-arrow-right"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>© MCB Lab — Marques-Coelho Bioinformatics Lab</p>
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/MCBLab/NetPerturb/" class="fa fa-code-fork" style="color: #fcfcfc"> MCBLab/NetPerturb</a>
+        </span>
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+      <span><a href="../output/" style="color: #fcfcfc">Next &raquo;</a></span>
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>

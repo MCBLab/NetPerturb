@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="MCB Lab" /><link rel="canonical" href="https://mcblab.github.io/NetPerturb/faq/" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>FAQ - NetPerturb</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+        <link href="../css/docs.css" rel="stylesheet" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "FAQ";
+        var mkdocs_page_input_path = "faq.md";
+        var mkdocs_page_url = "/NetPerturb/faq/";
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href="..">
+          <img src="../img/logo.svg" class="logo" alt="Logo"/>
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="..#overview">Overview</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="..#how-much-does-it-matter">How much does it matter?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="..#what-does-it-move">What does it move?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="..#one-report">One report</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#pipeline-summary">Pipeline summary</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#quick-start">Quick start</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#credits">Credits</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="..#citation">Citation</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../usage/">Usage</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#requirements">Requirements</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#running-the-pipeline">Running the pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#choosing-what-runs">Choosing what runs</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#inputs">Inputs</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#seurat-object-obj">Seurat object (--obj)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#target-file-target">Target file (--target)</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#parameters">Parameters</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#required">Required</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#downsampling-and-gene-selection">Downsampling and gene selection</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#scoring-track">Scoring track</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#knockout-track">Knockout track</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#gene-set-enrichment">Gene set enrichment</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../usage/#general">General</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#profiles">Profiles</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#resources">Resources</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#reproducibility">Reproducibility</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../usage/#testing">Testing</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="../output/">Output</a>
+    <ul>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#report">Report</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#downsample">downsample/</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#genie3-scrank-hdwgcna">genie3/, scrank/, hdwgcna/</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#rank_scores">rank_scores/</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#perbscore_all_targetstxt">perbscore_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#top_connections_all_targetstxt">top_connections_all_targets.txt</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#sctknk">sctknk/</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#sctenifoldknk_all_targetstxt">sctenifoldknk_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#gsea_all_targetstxt">gsea_all_targets.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#plots">plots/</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#pipeline_info">pipeline_info/</a>
+    </li>
+    </ul>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">FAQ</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#choosing-an-analysis">Choosing an analysis</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#what-is-the-difference-between-the-perturbation-score-and-the-knockout">What is the difference between the perturbation score and the knockout?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#which-network-method-should-i-use">Which --network method should I use?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#can-i-perturb-several-genes-at-once">Can I perturb several genes at once?</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#missing-results">Missing results</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#why-is-one-of-my-targets-missing-from-the-results">Why is one of my targets missing from the results?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#why-is-one-of-my-cell-identities-missing">Why is one of my cell identities missing?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#why-did-sctknk-alone-not-produce-a-report">Why did --sctknk alone not produce a report?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#my-knockout-found-very-few-significant-genes-is-something-wrong">My knockout found very few significant genes. Is something wrong?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#gsea-returned-no-gene-sets">GSEA returned no gene sets.</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#interpreting-results">Interpreting results</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#does-a-high-fc-in-the-knockout-table-mean-the-gene-went-up">Does a high FC in the knockout table mean the gene went up?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#what-does-a-negative-nes-mean">What does a negative NES mean?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#the-reports-heatmap-shows-only-a-few-scores">The report's heatmap shows only a few scores.</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#running-the-pipeline">Running the pipeline</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#how-do-i-provide-the-sctenifoldknk-container">How do I provide the scTenifoldKnk container?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#my-counts-are-not-in-the-rna-assay">My counts are not in the RNA assay.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#a-task-ran-out-of-memory">A task ran out of memory.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#can-i-run-on-compute-nodes-without-internet">Can I run on compute nodes without internet?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#why-did-changing-seed-re-run-everything-under-resume">Why did changing --seed re-run everything under -resume?</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#every-task-fails-with-unexpected-unbound-variable">Every task fails with Unexpected: unbound variable.</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#where-can-i-report-a-problem-or-ask-a-question">Where can I report a problem or ask a question?</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">NetPerturb</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">FAQ</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/MCBLab/NetPerturb/blob/main/docs/faq.md">Edit on MCBLab/NetPerturb</a>
+    </li>
+  </ul>
+    <div class="rst-breadcrumbs-buttons" role="navigation" aria-label="Breadcrumb Navigation">
+        <a href="../output/" class="btn btn-neutral float-left" title="Output"><span class="icon icon-circle-arrow-left" aria-hidden="true"></span> Previous</a>
+    </div>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="faq">FAQ<a class="headerlink" href="#faq" title="Permanent link">&para;</a></h1>
+<h2 id="choosing-an-analysis">Choosing an analysis<a class="headerlink" href="#choosing-an-analysis" title="Permanent link">&para;</a></h2>
+<h3 id="what-is-the-difference-between-the-perturbation-score-and-the-knockout">What is the difference between the perturbation score and the knockout?<a class="headerlink" href="#what-is-the-difference-between-the-perturbation-score-and-the-knockout" title="Permanent link">&para;</a></h3>
+<p>They answer different questions about the same target.</p>
+<ul>
+<li>The <strong>perturbation score</strong> (<code>--network</code>) is one number per identity × target: how much that identity's regulatory network depends on the target. Use it to rank identities, e.g. which clones are most sensitive to inhibiting a drug target.</li>
+<li>The <strong>knockout</strong> (<code>--sctknk</code>) removes the target's outgoing edges from the network and measures how far every other gene moves. You get a genome-wide table per identity × target. Use it to see <em>which genes and processes</em> depend on the target.</li>
+</ul>
+<p>The two tracks can run in the same command, share downsampling, and end up in the same report.</p>
+<h3 id="which-network-method-should-i-use">Which <code>--network</code> method should I use?<a class="headerlink" href="#which-network-method-should-i-use" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>genie3</code> is the default choice. It is a well-established regression-based method and fully reproducible with <code>--seed</code>. It is the slowest when <code>--n_hvg</code> is large.</li>
+<li><code>scrank</code> uses scRank's own network builder. It is the natural choice if you want to match scRank results, but it ignores <code>--seed</code>.</li>
+<li><code>hdwgcna</code> builds co-expression networks on metacells, which is more robust for sparse data and large identities. Tune <code>--cut_ratio</code> for your data.</li>
+</ul>
+<p>Scores are only comparable between runs that used the same method.</p>
+<h3 id="can-i-perturb-several-genes-at-once">Can I perturb several genes at once?<a class="headerlink" href="#can-i-perturb-several-genes-at-once" title="Permanent link">&para;</a></h3>
+<p>Yes. Join them with <code>;</code> on one line of the target file, e.g. <code>Stfa1;Mpo</code>. The scoring track scores them as one joint perturbation, and the knockout track zeroes all of them in a single knocked-out network. To get the single-gene results as well, list each gene on its own line too.</p>
+<h2 id="missing-results">Missing results<a class="headerlink" href="#missing-results" title="Permanent link">&para;</a></h2>
+<h3 id="why-is-one-of-my-targets-missing-from-the-results">Why is one of my targets missing from the results?<a class="headerlink" href="#why-is-one-of-my-targets-missing-from-the-results" title="Permanent link">&para;</a></h3>
+<p>It did not pass the target QC in <code>DOWNSAMPLE</code>. A gene that is absent from the object, or has no counts in any retained cell, cannot have edges in any network, so it is removed before any network is built. Check <code>downsample/target_qc.tsv</code> or the <em>Target QC</em> part of the report's Overview, which list every removed gene and the reason.</p>
+<p>Common causes are a symbol in the wrong case or species (<code>TP53</code> vs <code>Trp53</code>), an alias instead of the official symbol, or a gene filtered out of the object during preprocessing.</p>
+<h3 id="why-is-one-of-my-cell-identities-missing">Why is one of my cell identities missing?<a class="headerlink" href="#why-is-one-of-my-cell-identities-missing" title="Permanent link">&para;</a></h3>
+<p>It had fewer than <code>--min_cells</code> cells after downsampling (default 150). This is logged and flagged in the report's <em>Cells per identity</em> figure. Lower <code>--min_cells</code> to keep it, but networks inferred from very few cells are unreliable. With <code>--network hdwgcna</code>, identities below <code>--hdwgcna_min_cells</code> are also skipped, because they are too small to aggregate into metacells.</p>
+<h3 id="why-did-sctknk-alone-not-produce-a-report">Why did <code>--sctknk</code> alone not produce a report?<a class="headerlink" href="#why-did-sctknk-alone-not-produce-a-report" title="Permanent link">&para;</a></h3>
+<p>The report is built around the perturbation score table, so it is only rendered when <code>--network</code> runs. With <code>--sctknk</code> alone, the knockout table and the enrichment are still published in <code>sctknk/</code>. Add a <code>--network</code> method to get them in a report.</p>
+<h3 id="my-knockout-found-very-few-significant-genes-is-something-wrong">My knockout found very few significant genes. Is something wrong?<a class="headerlink" href="#my-knockout-found-very-few-significant-genes-is-something-wrong" title="Permanent link">&para;</a></h3>
+<p>Not necessarily. A target with few outgoing edges in an identity's network moves little when knocked out, so few genes clear FDR &lt; 0.05. Check the target's expression in the report's <em>Target expression per identity</em> heatmap. A barely expressed target has little to knock out. Genes below <code>--sctknk_min_pct</code> are also not in the knockout network at all; lowering it adds sparser genes, at a steep memory cost.</p>
+<h3 id="gsea-returned-no-gene-sets">GSEA returned no gene sets.<a class="headerlink" href="#gsea-returned-no-gene-sets" title="Permanent link">&para;</a></h3>
+<p>Nearly always the gene set symbols do not match the data's. MSigDB's mouse collections (<code>*.Mm.symbols.gmt</code>) use MGI symbols and its human ones (<code>*.Hs.symbols.gmt</code>) use HGNC. A human GMT against mouse data matches almost nothing. The task log prints example symbols from both sides and the overlap between them. Also check that <code>--gsea_min_size</code> is not too high, because sets are counted after intersecting with the knockout network's genes.</p>
+<h2 id="interpreting-results">Interpreting results<a class="headerlink" href="#interpreting-results" title="Permanent link">&para;</a></h2>
+<h3 id="does-a-high-fc-in-the-knockout-table-mean-the-gene-went-up">Does a high <code>FC</code> in the knockout table mean the gene went up?<a class="headerlink" href="#does-a-high-fc-in-the-knockout-table-mean-the-gene-went-up" title="Permanent link">&para;</a></h3>
+<p>No. scTenifoldKnk compares network <em>structure</em>, not expression. <code>FC</code> is a gene's squared alignment distance divided by the average gene's, so it only says how far the gene moved, not in which direction.</p>
+<h3 id="what-does-a-negative-nes-mean">What does a negative <code>NES</code> mean?<a class="headerlink" href="#what-does-a-negative-nes-mean" title="Permanent link">&para;</a></h3>
+<p>Genes are ranked by how far the knockout moved them, centred on the average gene. A positive <code>NES</code> means the set is concentrated among the genes that moved most. A negative <code>NES</code> means the set sat still while the rest of the network moved. Neither means up- or down-regulation.</p>
+<h3 id="the-reports-heatmap-shows-only-a-few-scores">The report's heatmap shows only a few scores.<a class="headerlink" href="#the-reports-heatmap-shows-only-a-few-scores" title="Permanent link">&para;</a></h3>
+<p>The figures keep only the high mode of the pooled scores, cut at <code>--score_quantile</code> (default <code>0.75</code>, the top quarter). The distribution figure draws the cut, so you can check it falls between the two modes and adjust it. The score table and <code>rank_scores/perbscore_all_targets.txt</code> are never cut.</p>
+<h2 id="running-the-pipeline">Running the pipeline<a class="headerlink" href="#running-the-pipeline" title="Permanent link">&para;</a></h2>
+<h3 id="how-do-i-provide-the-sctenifoldknk-container">How do I provide the scTenifoldKnk container?<a class="headerlink" href="#how-do-i-provide-the-sctenifoldknk-container" title="Permanent link">&para;</a></h3>
+<p>The knockout image is not on a registry yet. Build it from the repository and point both knockout processes at it:</p>
+<pre><code class="language-bash">docker build -t netperturb-sctenifoldknk:1.0 container/sctenifoldknk
+# for Singularity/Apptainer:
+singularity build sctenifoldknk-v1.0.sif docker-daemon://netperturb-sctenifoldknk:1.0
+</code></pre>
+<pre><code class="language-groovy">// sctknk.config
+process {
+    withName: 'SCTENIFOLDKNK_BUILD|SCTENIFOLDKNK_KO' {
+        container = '/path/to/sctenifoldknk-v1.0.sif'
+    }
+}
+</code></pre>
+<pre><code class="language-bash">nextflow run MCBLab/NetPerturb -c sctknk.config --sctknk ...
+</code></pre>
+<p>The enrichment image is set with <code>--gsea_container</code>, which also accepts a local <code>.sif</code>.</p>
+<h3 id="my-counts-are-not-in-the-rna-assay">My counts are not in the <code>RNA</code> assay.<a class="headerlink" href="#my-counts-are-not-in-the-rna-assay" title="Permanent link">&para;</a></h3>
+<p>Pass the assay name with <code>--assay</code>, e.g. <code>--assay originalexp</code> for objects converted from a <code>SingleCellExperiment</code>. It is renamed to <code>RNA</code> when loaded, because every network method reads that name.</p>
+<h3 id="a-task-ran-out-of-memory">A task ran out of memory.<a class="headerlink" href="#a-task-ran-out-of-memory" title="Permanent link">&para;</a></h3>
+<p>Raise that process's memory with a custom config passed with <code>-c</code> (see <a href="../usage/#resources">Usage → Resources</a>). The largest consumers are:</p>
+<ul>
+<li><code>SCTENIFOLDKNK_BUILD</code>: memory grows with the square of the knockout network's gene count. Raising <code>--sctknk_min_pct</code> shrinks it.</li>
+<li><code>GENIE3</code>, <code>SCRANK</code> and <code>HDWGCNA</code>: these grow with <code>--n_hvg</code> and <code>--n_cells</code>.</li>
+<li><code>RANK_SCORE</code>: if its parallel workers are killed for memory, it retries automatically one identity at a time.</li>
+</ul>
+<h3 id="can-i-run-on-compute-nodes-without-internet">Can I run on compute nodes without internet?<a class="headerlink" href="#can-i-run-on-compute-nodes-without-internet" title="Permanent link">&para;</a></h3>
+<p>Yes, once the inputs and images are local. Pass <code>--obj</code> and <code>--gsea_gmt</code> as local paths and pre-pull the containers, e.g. by setting <code>NXF_SINGULARITY_CACHEDIR</code> and running once on a login node. Nothing else is downloaded during the run. scTenifoldKnk's <code>plotKO()</code> is drawn without its online annotation for this reason.</p>
+<h3 id="why-did-changing-seed-re-run-everything-under-resume">Why did changing <code>--seed</code> re-run everything under <code>-resume</code>?<a class="headerlink" href="#why-did-changing-seed-re-run-everything-under-resume" title="Permanent link">&para;</a></h3>
+<p>The seed decides which cells <code>DOWNSAMPLE</code> keeps, and every later step depends on those cells. The same seed and inputs always give the same results, which is what makes <code>-resume</code> safe.</p>
+<h3 id="every-task-fails-with-unexpected-unbound-variable">Every task fails with <code>Unexpected: unbound variable</code>.<a class="headerlink" href="#every-task-fails-with-unexpected-unbound-variable" title="Permanent link">&para;</a></h3>
+<p>This happens on machines using the uutils reimplementation of coreutils, the default on recent Ubuntu. Nextflow's task wrapper times tasks with <code>date +%s%3N</code>, which uutils does not support. It affects every Nextflow pipeline, not only this one. Installing GNU coreutils fixes it.</p>
+<h3 id="where-can-i-report-a-problem-or-ask-a-question">Where can I report a problem or ask a question?<a class="headerlink" href="#where-can-i-report-a-problem-or-ask-a-question" title="Permanent link">&para;</a></h3>
+<p>Open an issue on <a href="https://github.com/MCBLab/NetPerturb/issues">GitHub</a> with the command you ran, the <code>.nextflow.log</code> and the failing task's <code>.command.err</code> from its <code>work/</code> directory.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href="../output/" class="btn btn-neutral float-left" title="Output"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+      <p>© MCB Lab — Marques-Coelho Bioinformatics Lab</p>
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/MCBLab/NetPerturb/" class="fa fa-code-fork" style="color: #fcfcfc"> MCBLab/NetPerturb</a>
+        </span>
+    
+    
+      <span><a href="../output/" style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
