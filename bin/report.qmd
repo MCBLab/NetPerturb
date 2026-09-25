@@ -168,8 +168,9 @@ if (!isTRUE(is.finite(sctknk_top_genes)) || !isTRUE(sctknk_top_genes >= 1)) {
   sctknk_top_genes <- 25L
 }
 
-# dRegulation() reports FC as a gene's squared manifold-alignment distance over
-# the mean squared distance of the run, so it is a ratio to the average rather
+# FC is a gene's squared manifold-alignment distance over the mean squared
+# distance of the genes that were not knocked out (scTenifoldKnk 1.0.3's
+# statistic; see sctenifoldknk_ko.R), so it is a ratio to the average rather
 # than a differential-expression fold change, and it carries no direction: a
 # gene that moved a long way scores high whichever way it moved. log2 of it is
 # what the figure sizes nodes by and what the table reports.

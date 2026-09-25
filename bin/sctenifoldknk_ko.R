@@ -14,10 +14,11 @@ suppressPackageStartupMessages({
 # edge weight for RANK_SCORE to read a target's score off of; the DR table
 # *is* the result, so this script's output goes straight to MERGE.
 #
-# The knockout, alignment and dRegulation() call are scTenifoldKnk()'s own
-# with its defaults, seeded the same way, so a single-gene target gives the
-# same table scTenifoldKnk() would have -- exactly so with --seed 1, the seed
-# scTenifoldKnk() hardcodes and the pipeline default.
+# The knockout and alignment are scTenifoldKnk()'s own with its defaults,
+# seeded the same way (exactly so with --seed 1, the seed scTenifoldKnk()
+# hardcodes and the pipeline default). The differential regulation is
+# scTenifoldKnk 1.0.3's, computed here rather than by the installed package;
+# see d_regulation() below for why.
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -37,7 +38,7 @@ cell_type <- sub("_sctknk_wt\\.rds$", "", basename(wt_file))
 target_id <- gsub("[^A-Za-z0-9_.-]+", "_", target)
 out_file  <- paste0(cell_type, "_sctenifoldknk_", target_id, ".txt")
 
-# Same 6 columns dRegulation() returns, plus cell_type/target up front.
+# Same 6 columns d_regulation() returns, plus cell_type/target up front.
 # Explicit, empty-but-named columns so a target that gets skipped still
 # leaves a properly headered (if empty) table -- see rank_score.R for why a
 # bare empty data.frame() breaks MERGE's plain `head -n 1`.
@@ -98,34 +99,72 @@ if (length(present) < length(genes)) {
 ko <- wt
 ko[present, ] <- 0
 
+# Differential regulation as scTenifoldKnk 1.0.3 computes it. Each gene's
+# distance between its wild-type and knocked-out positions in the aligned
+# manifold becomes FC = distance^2 / mean(distance^2), tested against a
+# chi-square with 1 df. In 1.0.3 that mean leaves the knocked-out genes out.
+# 1.1, the current CRAN release, dropped its gKO argument and takes the mean
+# over every gene -- and the knocked-out gene, whose distance is enormous by
+# construction, then carries almost all of it: on a 5,600-gene network one
+# knocked-out gene held ~98% of the summed FC, which shrinks every other
+# gene's FC ~50-fold and leaves nothing below p.adj 1. So the statistic is
+# taken from 1.0.3, with the knocked-out genes excluded by name rather than
+# by rank, and they are also left out of the FDR correction, since they are
+# not among the genes being tested. The Box-Cox Z column is 1.0.3's as well.
+d_regulation <- function(manifoldOutput, gKO) {
+  genes   <- gsub("^X_", "", grep("^X_", rownames(manifoldOutput), value = TRUE))
+  y_genes <- gsub("^Y_", "", grep("^Y_", rownames(manifoldOutput), value = TRUE))
+  n <- length(genes)
+  if (n != nrow(manifoldOutput) / 2 || !all(y_genes == genes)) {
+    stop("manifold output does not pair X_ and Y_ genes in the same order")
+  }
+
+  distance <- vapply(seq_len(n), function(i) {
+    as.numeric(stats::dist(rbind(manifoldOutput[i, ], manifoldOutput[i + n, ])))
+  }, numeric(1))
+
+  lambdas <- seq(-2, 2, length.out = 1000)
+  lambdas <- lambdas[lambdas != 0]
+  bc <- try(MASS::boxcox(distance[distance > 0] ~ 1, plot = FALSE, lambda = lambdas),
+            silent = TRUE)
+  nD <- if (inherits(bc, "try-error")) {
+    distance
+  } else {
+    lambda <- bc$x[which.max(bc$y)]
+    if (lambda < 0) 1 / (distance^lambda) else distance^lambda
+  }
+
+  tested <- !genes %in% gKO
+  FC <- distance^2 / mean(distance[tested]^2)
+  p_value <- stats::pchisq(FC, df = 1, lower.tail = FALSE)
+
+  out <- data.frame(gene = genes, distance = distance, Z = as.numeric(scale(nD)),
+                    FC = FC, p.value = p_value, p.adj = NA_real_)[tested, , drop = FALSE]
+  out$p.adj <- stats::p.adjust(out$p.value, method = "fdr")
+  out[order(out$p.value), , drop = FALSE]
+}
+
 dr <- tryCatch({
   set.seed(seed)
   ma <- manifoldAlignment(wt, ko, d = 2, nCores = n_cores)
-  dRegulation(ma, empiricalNull = FALSE)
+  d_regulation(ma, gKO = present)
 }, error = function(e) {
   message("scTenifoldKnk failed for ", target, " in ", cell_type, ": ",
           conditionMessage(e))
   NULL
 })
 
+# d_regulation() has already left the knocked-out gene(s) out: zeroing a
+# gene's edges is what the distance measures, so it would sit at the top by
+# construction and say nothing about the knockout's effect on the rest of the
+# network. A network holding nothing but the knocked-out gene(s) leaves no
+# rows at all.
 if (is.null(dr) || nrow(dr) == 0) {
   skip("No differentially-regulated genes returned for ", target, " in ",
        cell_type, "; writing an empty table for this pair.")
 }
 
-# The knocked-out gene(s) are dropped from the table. Zeroing a gene's edges is
-# what the distance measures, so it always sits at the top by construction and
-# says nothing about the knockout's effect on the rest of the network. The
-# other rows are unaffected: dRegulation() has already computed their p.adj,
-# over every gene, before this.
-dr <- dr[!dr$gene %in% present, , drop = FALSE]
-
-if (nrow(dr) == 0) {
-  skip("Only the knocked-out gene(s) came back for ", target, " in ",
-       cell_type, "; writing an empty table for this pair.")
-}
-
-# dRegulation() already returns dr sorted by p.value.
+# d_regulation() already returns dr sorted by p.value.
 dr$cell_type <- cell_type
 dr$target    <- target
 dr <- dr[, c("cell_type", "target", "gene", "distance", "Z", "FC",
