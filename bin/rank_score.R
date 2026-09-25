@@ -284,26 +284,60 @@ write_table(top_connections, "top_connections")
 
 # rank_celltype zeroes the target's row in every cell type network
 # (dpGRN[target, ] <- 0), so a gene missing from any one of them stops it with
-# "Drug target gene is not in the network". That is as deterministic as a gene
-# missing from the expression profile -- a retry rebuilds nothing -- so it is
-# dropped the same way rather than failing the task. The connections above are
-# already written and keep whatever the gene has in the networks it is in.
-in_all_nets <- vapply(usable, function(gene) {
-  all(vapply(obj@net, function(net) gene %in% rownames(net), logical(1)))
-}, logical(1))
+# "Drug target gene is not in the network". Dropping such a gene, as this used
+# to, loses the target from the score table whenever no gene is left -- even
+# for the cell types whose networks do carry it. A gene missing from a network
+# has no edges there, which is what knocking it out would leave anyway, so it
+# is added to that network as an isolated gene (a zero row and column) and the
+# target is ranked in every cell type. The same reasoning is why a gene the
+# expression profile lacks is dropped above without changing the score.
+present_in <- lapply(obj@net, function(net) intersect(usable, rownames(net)))
 
-if (!all(in_all_nets)) {
-  message("Not in every cell type network, dropped from ranking: ",
-          paste(usable[!in_all_nets], collapse = ", "), ".")
+# A gene in no network at all adds nothing anywhere, so it leaves the target
+# rather than being padded into every network.
+in_any_net <- usable %in% unlist(present_in)
+if (!all(in_any_net)) {
+  message("Not in any cell type network, dropped from ranking: ",
+          paste(usable[!in_any_net], collapse = ", "), ".")
+}
+usable <- usable[in_any_net]
+
+# A cell type whose network has none of the target's genes cannot be perturbed
+# by it: its score is 0. When that is every cell type, there is nothing for
+# rank_celltype to do, and the target still gets its rows.
+no_target_gene <- vapply(present_in, function(g) length(g) == 0, logical(1))
+
+zero_ranks <- function(cts) {
+  data.frame(cell_type = cts, target = target[1], binding = binding,
+             perb_score = rep(0, length(cts)), stringsAsFactors = FALSE)
 }
 
-usable <- usable[in_all_nets]
-
 if (length(usable) == 0) {
-  message("No gene of '", target[1], "' is in every cell type network; ",
-          "skipping ranking for this target.")
-  write_table(empty_ranks, "perbscore_all_targets")
+  message("No gene of '", target[1], "' is in any cell type network; ",
+          "writing a perturbation score of 0 for every cell type.")
+  write_table(zero_ranks(cell_types), "perbscore_all_targets")
   quit(save = "no", status = 0)
+}
+
+pad_net <- function(net, genes) {
+  add <- setdiff(genes, rownames(net))
+  if (length(add) == 0) {
+    return(net)
+  }
+  m <- as.matrix(net)
+  m <- rbind(m, matrix(0, length(add), ncol(m), dimnames = list(add, colnames(m))))
+  add_cols <- setdiff(genes, colnames(m))
+  m <- cbind(m, matrix(0, nrow(m), length(add_cols), dimnames = list(rownames(m), add_cols)))
+  if (inherits(net, "Matrix")) Matrix::Matrix(m, sparse = TRUE) else m
+}
+
+for (ct in cell_types) {
+  missing <- setdiff(usable, rownames(obj@net[[ct]]))
+  if (length(missing) > 0) {
+    message("Added to the ", ct, " network with no edges: ",
+            paste(missing, collapse = ", "), ".")
+    obj@net[[ct]] <- pad_net(obj@net[[ct]], usable)
+  }
 }
 
 # Empty but named for the same reason empty_ranks is: a target that fails for
@@ -371,6 +405,9 @@ for (target_sc in target) {
       binding = binding,
       perb_score = as.numeric(perb_scores)
     )
+    # Set outright rather than read off rank_celltype, which has only an
+    # isolated padded gene to perturb in these cell types.
+    df_long$perb_score[no_target_gene[df_long$cell_type]] <- 0
 
     # Append to the main data frame
     all_ranks <- rbind(all_ranks, df_long)
