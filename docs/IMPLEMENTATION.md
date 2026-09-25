@@ -4,10 +4,11 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
-| 25 | The report describes the run | Sep 2026 | branch `edge_cases` |
-| 24 | One seed for the whole run | Sep 2026 | branch `edge_cases` |
-| 23 | The knockout split in two | Sep 2026 | branch `edge_cases` |
-| 22 | Targets and identities checked up front | Sep 2026 | branch `edge_cases` |
+| 26 | A manuscript, and the first benchmark read critically | Sep 2026 | branch `publication` |
+| 25 | The report describes the run | Sep 2026 | #21 |
+| 24 | One seed for the whole run | Sep 2026 | #21 |
+| 23 | The knockout split in two | Sep 2026 | #21 |
+| 22 | Targets and identities checked up front | Sep 2026 | #21 |
 | 21 | Gene set enrichment on the knockout table | Sep 2026 | #20 |
 | 20 | The knockout track running in parallel | Sep 2026 | #20 |
 | 19 | scTenifoldKnk replaces scTenifoldNet | Sep 2026 | #20 |
@@ -32,9 +33,34 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 ---
 
+## Wave 26 — A manuscript, and the first benchmark read critically
+
+**Sep 2026** · branch `publication`, not yet on `main`
+
+This wave changes no pipeline code. It adds `publication/`, a draft Application Note for *Bioinformatics Advances*, and with it the first time a full run was read as a benchmark rather than checked for whether it finished. That reading found more about the pipeline than about the biology, so it is recorded here.
+
+**What is in `publication/`.** The manuscript is `netperturb.tex`, built on OUP's `oup-authoring-template` class, which is committed next to it. It is written to the journal's Application Note limits: 4 pages, a structured abstract of at most 200 words, 3 figures and tables combined, 15 references and 5 keywords. The references are BibTeX entries pulled from each DOI, one file per entry plus a combined `references.bib`, and are kept in `publication/references/`, which is git-ignored. The pipeline outputs the analysis reads sit under `publication/data/kang2018/` and are ignored by the existing `data/` rule. `analysis/fig2_kang.R` reads them and redraws Figure 2 (`Fig/fig2_kang.pdf`), and it writes every number the Results section quotes to `analysis/kang_stats.txt`, so the text can be regenerated rather than retyped when the run changes. Figure 1 is the metro map from wave 14.
+
+**The benchmark run.** Kang 2018 PBMCs, control cells only (`kang2018_pbmc_ctrl.rds`, counts under `--assay originalexp`), `--network hdwgcna --binding agonist --sctknk`, `--n_cells 2000 --min_cells 500 --n_hvg 1000`, seed 1, with the 25 targets in `testdata/test_input_kang.txt` and MSigDB C5 as the GMT. Six identities were kept, and wave 22's check dropped two, dendritic cells (258) and megakaryocytes (63). Every target passed QC. Because the object holds no stimulated cells, the run asks which identities an IFN pathway agonist would act on. It cannot compare stimulated with control cells, and the stimulated half is the obvious validation still to do. There is no `test_kang` profile yet, so the run cannot be reproduced from `conf/`.
+
+**What held up.** Monocytes had the top score for 20 of 25 targets and for all 10 ISGs. The networks agree independently of the score: in monocytes, 67% of an ISG's `--top_connections` partners are other ISGs, against 25% in other identities and 1% for the lineage controls. Wave 23's split paid for itself. The wild-type build averaged 43 min per identity and a knockout 5.5 s, so the 150 knockouts cost 4.5 task-hours, where one `scTenifoldKnk()` call per pair would have taken about 108.
+
+**What did not, and is now open.**
+
+- **Scores carry an identity-wide offset.** Fitting log score on target plus identity puts both monocyte populations about 0.85 log10 above the rest for *every* target, lineage controls included. FCGR3A+ monocytes rank first for CD19. The ISG signal is real once the offset is removed (+0.39 log10 over other identities, Wilcoxon p = 0.009), but the upstream cascade (IFNAR, JAK, STAT) has none left. A raw "which identity ranks first" therefore overstates what the score says. The pipeline has no built-in control targets or per-identity null to calibrate against, and the report's heatmap shows raw scores.
+- **Barely detected targets still score.** A target with no counts in an identity lands at the numerical floor (below 1e-10), as it should for an isolated node. But 12 pairs where the target is detected in under 1% of cells got ordinary scores, and CD19 in FCGR3A+ monocytes ranked first. Wave 22's QC removes only genes with zero counts, so these pass. hdWGCNA's metacells are the likely route, since aggregation gives a gene seen in a handful of cells a non-zero profile.
+- **The knockout track barely depends on the target.** Within an identity, the FDR < 0.05 gene sets are identical across targets in four of six identities (median pairwise Jaccard 1.0). CD14+ monocytes return FTH1 and FTL for all 25 knockouts, and the full FC rankings correlate at Spearman 0.74–0.96 between targets. Ribosomal genes make up 37% of hits against 3.2% of tested genes. The GO enrichment does not recover interferon signalling. Until this is explained, the knockout table cannot be presented as target-specific. The next checks are:
+  - the v1.1 statistic against wave 23's v1.0.3 one on the same networks;
+  - a random-gene knockout as a null;
+  - a higher `--sctknk_min_pct`.
+
+  Any of these may point back at a decision made in wave 23.
+
+The target expression figures the analysis uses were transcribed from the report's section 8.2 heatmap, because `downsample/target_expression.tsv` was not copied out of the run. They should be replaced with that file before the numbers are final.
+
 ## Wave 25 — The report describes the run
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 Until this wave the report showed results and nothing about what produced them. A reader could not tell which targets had been quietly left out, how many cells and genes each network had actually been built on, whether a target was even expressed in a given identity, or how the run had been launched. Four sections close that gap, and each reads a small table the pipeline already had the facts for.
 
@@ -50,13 +76,13 @@ Every new input is optional in `report.qmd`. A report rendered by hand, or again
 
 ## Wave 24 — One seed for the whole run
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 `--seed` (default `1`) now reaches every step that draws random numbers: which cells `DOWNSAMPLE` keeps and the UMAP it computes when the object has none, GENIE3's random forests (through doRNG, so any `--n_cores` gives the same result), hdWGCNA's metacell sampling and WGCNA's `randomSeed`, scTenifoldKnk's bootstrap networks, tensor decomposition and manifold alignment, and fgsea's sampler (seeded since wave 21, now from the same parameter). The default is `1` because scTenifoldKnk hardcodes that seed, so with defaults the knockout track matches `scTenifoldKnk()` run by hand. The exception is scRank's `Constr_net`, which seeds itself with `1` internally and ignores `--seed`, so `--network scrank` networks do not change with it. This is documented, not worked around. Changing the seed changes which cells are kept, so every step reruns, even under `-resume`.
 
 ## Wave 23 — The knockout split in two
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 **Build once, knock out many times.** `scTenifoldKnk()` builds the wild-type network and knocks one gene out of it in a single call. With one call per (cell type, gene), a run with *n* targets rebuilt the same network *n* times. The network does not depend on the target and is seeded, so every rebuild came out identical, and the build (bootstrap networks plus tensor decomposition) is the expensive half. `SCTENIFOLDKNK` became two processes. `SCTENIFOLDKNK_BUILD` runs once per cell type and saves the wild-type network as `<cell type>_sctknk_wt.rds`. `SCTENIFOLDKNK_KO` combines each network with each target and runs only the knockout, manifold alignment and differential regulation, in parallel. Both steps call scTenifoldKnk's own functions in its own order, with its defaults and seeding.
 
@@ -72,7 +98,7 @@ Every new input is optional in `report.qmd`. A report rendered by hand, or again
 
 ## Wave 22 — Targets and identities checked up front
 
-**Sep 2026** · branch `edge_cases`, not yet on `main`
+**Sep 2026** · #21
 
 Runs on new datasets kept dying deep inside a network or scoring step, over a fact that was knowable at the start: a target the object did not have, an identity too small to model, or counts under an assay other than `RNA`. This wave moves those checks into `DOWNSAMPLE`, so later steps only receive inputs they can use, and makes `RANK_SCORE` tolerate the cases that can only be discovered once a network exists.
 
