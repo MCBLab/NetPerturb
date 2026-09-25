@@ -16,6 +16,7 @@ process SCTENIFOLDKNK_BUILD {
   input:
     path scobj
     val n_cores
+    val min_pct
     val seed
 
   output:
@@ -27,7 +28,10 @@ process SCTENIFOLDKNK_BUILD {
   script:
     """
     #!/bin/bash
-    sctenifoldknk_build.R ${scobj} ${n_cores} ${seed}
+    # The image caps R's heap at 8 GB (R_MAX_VSIZE in its Dockerfile), below
+    # what the network build needs; R gets what this task was given instead.
+    export R_MAX_VSIZE=${ task.memory ? task.memory.toGiga() + 'Gb' : '100Gb' }
+    sctenifoldknk_build.R ${scobj} ${n_cores} ${min_pct} ${seed}
     """
 
   stub:

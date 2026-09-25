@@ -53,7 +53,7 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct )
 
     // Everything past DOWNSAMPLE reads the targets that passed its QC check
     // (present in the object, and with counts in the retained cells) rather
@@ -82,7 +82,7 @@ workflow {
     // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
     // --network is running too.
     if( sctknk ) {
-        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.seed )
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed )
 
         SCTENIFOLDKNK_BUILD.out.wt
         .combine( sctknk_target_ch )
@@ -183,7 +183,8 @@ workflow {
             "min_cells"       : params.min_cells,
             "n_hvg"           : params.n_hvg,
             "n_cores"         : params.n_cores,
-            "seed"            : params.seed
+            "seed"            : params.seed,
+            "sctknk_min_pct"  : params.sctknk_min_pct
         ]
         run_info_file = Channel
             .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )

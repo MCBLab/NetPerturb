@@ -76,8 +76,10 @@ wt <- as.matrix(wt)
 # outgoing edges in the same knocked-out network, the way scRank perturbs a
 # combined target. scTenifoldKnk() itself only takes one gene, but the
 # knockout is nothing more than zeroing rows, so several are zeroed at once.
-# A gene with no counts in this cell type was filtered out before the network
-# was built and has no edges to remove, so the rest of the target is knocked
+# Targets are kept in the network whatever their detection rate (see
+# sctenifoldknk_build.R), so a gene of the target is missing only when it has
+# no counts at all in this cell type. It has no edges to remove, so the rest of
+# the target is knocked
 # out without it -- "A;B" with B absent is the same knockout as "A" -- and the
 # label stays as given.
 genes   <- unique(trimws(strsplit(target, split = ";", fixed = TRUE)[[1]]))

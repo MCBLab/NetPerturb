@@ -390,6 +390,11 @@ run_value <- function(key) {
   if (length(v) == 0 || is.na(v) || !nzchar(v) || v == "null") "not recorded" else v
 }
 
+# --sctknk_min_pct as a percentage for the prose; a report without run info
+# falls back to the default the knockout networks use.
+sctknk_pct <- suppressWarnings(as.numeric(run_value("sctknk_min_pct")))
+sctknk_pct_label <- paste0(100 * if (is.finite(sctknk_pct)) sctknk_pct else 0.05, "%")
+
 # Wall-clock time from the run's start to this render. REPORT is the last task
 # of a run, so this is the whole run bar the report itself; the run's final
 # duration is only known once Nextflow exits, in the execution report under
@@ -962,10 +967,11 @@ drawn only if they clear FDR < `r gsea_fdr`, the `r gsea_top_terms` strongest
 per combination by absolute `NES`. Hover any dot for its exact values; the
 table below carries all of them, uncapped.
 
-One thing to keep in mind reading any of it: the genes ranked here are
-`gene4use`, the highly-variable, transcription-factor and drug-target set the
-pipeline builds up front, not the whole transcriptome. Enrichment is relative to
-that universe, which is already weighted toward regulators.
+One thing to keep in mind reading any of it: the genes ranked here are the
+ones each knockout network was built on -- every gene detected in more than
+`r sctknk_pct_label` of the cell type's cells, plus the targets --
+not the whole transcriptome. Enrichment is relative to that universe, so a
+pathway carried by rarely detected genes cannot show up here.
 
 ```{r gsea-figure, eval=has_gsea_fig && has_plotly}
 ink       <- "#0b0b0b"
@@ -1256,6 +1262,11 @@ cat("No UMAP figure was supplied with this report.")
 # has cells only, and the section falls back to that.
 has_gene_counts <- has_cell_counts &&
   all(c("genes_total", "genes_gene4use", "genes_expressed") %in% names(cell_counts))
+# The knockout networks pick their own genes (--sctknk_min_pct), so they get a
+# panel of their own -- only when this run built them, since DOWNSAMPLE counts
+# the column either way.
+has_sctknk_genes <- has_gene_counts && "genes_sctknk" %in% names(cell_counts) &&
+  run_value("sctknk") != "false"
 
 if (has_cell_counts) {
   n_dropped_ids <- sum(cell_counts$status != "kept")
@@ -1263,7 +1274,7 @@ if (has_cell_counts) {
   genes_note <- if (has_gene_counts) {
     expr_range <- range(kept_cc$genes_expressed, na.rm = TRUE)
     paste0(
-      "; genes: every network is offered the same **",
+      "; genes: every rank-score network (GENIE3, scRank, hdWGCNA) is offered the same **",
       comma(kept_cc$genes_gene4use[1]), "** of the object's ",
       comma(kept_cc$genes_total[1]), " genes (`gene4use`: `--n_hvg` ",
       run_value("n_hvg"), " variable genes plus the species' transcription factors, ",
@@ -1273,6 +1284,16 @@ if (has_cell_counts) {
       else paste0(comma(expr_range[1]), "–", comma(expr_range[2])),
       "** genes per network")
   } else ""
+  if (has_sctknk_genes) {
+    ko_range <- range(kept_cc$genes_sctknk, na.rm = TRUE)
+    genes_note <- paste0(
+      genes_note, "; the knockout networks (scTenifoldKnk) pick their own: every gene ",
+      "detected in more than ", sctknk_pct_label, " of the identity's cells ",
+      "(`--sctknk_min_pct`), plus the targets, **",
+      if (ko_range[1] == ko_range[2]) comma(ko_range[1])
+      else paste0(comma(ko_range[1]), "–", comma(ko_range[2])),
+      "** genes per network")
+  }
   cat(if (has_gene_counts) "Cells and genes" else "Cells", " each identity's network was built from. **",
       comma(sum(cell_counts$n_used)), "** cells were used in total, across ",
       nrow(kept_cc), " identities (`--n_cells` ", run_value("n_cells"),
@@ -1283,8 +1304,8 @@ if (has_cell_counts) {
       if (has_gene_counts) {
         paste0(" In the genes panel the pale green part is `gene4use` genes with zero ",
                "counts in that identity, which can have no edges in its network: ",
-               "scTenifoldKnk drops them, hdWGCNA pads them with zeros, and GENIE3 and ",
-               "scRank have nothing to fit them on.")
+               "hdWGCNA pads them with zeros, and GENIE3 and scRank have nothing to fit ",
+               "them on.")
       } else "",
       if (n_dropped_ids > 0) {
         paste0(" ", n_dropped_ids, " identit", ifelse(n_dropped_ids == 1, "y was", "ies were"),
@@ -1297,7 +1318,7 @@ if (has_cell_counts) {
 }
 ```
 
-```{r cell-counts, eval=has_cell_counts, fig.width=if (has_gene_counts) 12 else 9, fig.height=max(3, 0.35 * nrow(cell_counts) + 1.5)}
+```{r cell-counts, eval=has_cell_counts, fig.width=if (has_sctknk_genes) 15 else if (has_gene_counts) 12 else 9, fig.height=max(3, 0.35 * nrow(cell_counts) + 1.5)}
 # Cells and genes side by side, one facet each, sharing the identity axis.
 # Each panel is a back bar (what was available) with a front bar (what the
 # network got) drawn over it. A dropped identity has no used cells to colour,
@@ -1317,19 +1338,30 @@ panels <- cc %>%
 if (has_gene_counts) {
   panels <- bind_rows(panels, cc %>%
     filter(kept) %>%
-    transmute(identity, kept, panel = "Genes",
+    transmute(identity, kept, panel = "Genes: rank-score networks",
               back  = genes_gene4use, front = genes_expressed,
               back_fill  = "Zero counts in identity (filtered)",
               front_fill = "In network (expressed)",
               label = paste0(comma(genes_expressed), " / ", comma(genes_gene4use))))
 }
-panels$panel <- factor(panels$panel, levels = c("Cells", "Genes"))
+if (has_sctknk_genes) {
+  panels <- bind_rows(panels, cc %>%
+    filter(kept) %>%
+    transmute(identity, kept, panel = "Genes: knockout networks",
+              back  = genes_total, front = genes_sctknk,
+              back_fill  = "In input object",
+              front_fill = "In knockout network (scTenifoldKnk)",
+              label = paste0(comma(genes_sctknk), " / ", comma(genes_total))))
+}
+panels$panel <- factor(panels$panel, levels = c("Cells", "Genes: rank-score networks",
+                                                "Genes: knockout networks"))
 
 fills <- c("Used for networks"                  = "#2C7FB8",
            "In input object"                    = "grey88",
            "Dropped (below --min_cells)"        = "#F4A582",
            "In network (expressed)"             = "#41AB5D",
-           "Zero counts in identity (filtered)" = "#C7E9C0")
+           "Zero counts in identity (filtered)" = "#C7E9C0",
+           "In knockout network (scTenifoldKnk)" = "#807DBA")
 
 ggplot(panels, aes(y = identity)) +
   geom_col(aes(x = back, fill = back_fill), width = 0.8) +
@@ -1343,6 +1375,7 @@ ggplot(panels, aes(y = identity)) +
   guides(fill = guide_legend(nrow = 2)) +
   theme_minimal(base_size = 12) +
   theme(legend.position = "top", panel.grid.major.y = element_blank(),
+        panel.spacing.x = unit(2, "lines"),
         strip.text = element_text(face = "bold", size = 12))
 ```
 
@@ -1351,11 +1384,16 @@ cell_counts %>%
   transmute(Identity = identity, Status = status,
             `Cells in input` = n_input, `Cells used` = n_used,
             `Genes in object` = genes_total, `gene4use` = genes_gene4use,
-            `Genes in network` = genes_expressed, `Genes filtered` = genes_filtered) %>%
+            `Genes in network` = genes_expressed, `Genes filtered` = genes_filtered,
+            `Genes in knockout network` = if (has_sctknk_genes) genes_sctknk else NULL) %>%
   datatable(rownames = FALSE,
             options = list(dom = "t", pageLength = nrow(cell_counts)),
-            caption = paste("Cells and genes per identity. Genes filtered are gene4use",
-                            "genes with zero counts in that identity's retained cells."))
+            caption = paste("Cells and genes per identity. Genes in network and genes",
+                            "filtered refer to the rank-score networks: gene4use genes with",
+                            "and without counts in that identity's retained cells.",
+                            if (has_sctknk_genes) paste0("Genes in knockout network are those ",
+                              "detected in more than ", sctknk_pct_label,
+                              " of its cells, plus the targets.") else ""))
 ```
 
 ### Target expression per identity
@@ -1442,7 +1480,8 @@ run_fields <- c(
   "--min_cells"       = "min_cells",
   "--n_hvg"           = "n_hvg",
   "--n_cores"         = "n_cores",
-  "--seed"            = "seed"
+  "--seed"            = "seed",
+  "--sctknk_min_pct"  = "sctknk_min_pct"
 )
 datatable(
   data.frame(Field = names(run_fields), Value = vapply(run_fields, run_value, character(1))),

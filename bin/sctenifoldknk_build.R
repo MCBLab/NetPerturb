@@ -13,17 +13,32 @@ suppressPackageStartupMessages({
 # SCTENIFOLDKNK_KO then runs only the knockout, alignment and differential
 # regulation on it, once per (cell type, target), in parallel.
 #
-# The steps and their arguments are scTenifoldKnk()'s own for qc = FALSE with
-# its defaults, in the same order and seeded the same way, so a knockout run
-# on this network gives the same table scTenifoldKnk() would have -- exactly
-# so with --seed 1, the seed scTenifoldKnk() hardcodes and the pipeline default.
+# The steps and their arguments are scTenifoldKnk()'s own defaults, in the
+# same order and seeded the same way -- exactly so with --seed 1, the seed
+# scTenifoldKnk() hardcodes and the pipeline default. Of its quality control,
+# only the gene filter is applied: DOWNSAMPLE has already chosen the cells.
+#
+# The network is built on scTenifoldKnk's own gene set, not on gene4use, the
+# set DOWNSAMPLE picks for the rank-score methods. scTenifoldKnk keeps every
+# gene detected in more than qc_minPCT (5%) of cells; most of gene4use falls
+# below that in a given cell type, and most of what clears it is not in
+# gene4use, so the knockout would otherwise be modelled on sparse genes and
+# miss the well-measured ones. The knockout track never feeds RANK_SCORE, so
+# nothing requires it to share that universe. One departure: the targets are
+# kept below the threshold, where scTenifoldKnk() would refuse to knock them
+# out, so every target has a knockout wherever it is expressed at all.
 
 args <- commandArgs(trailingOnly = TRUE)
 
 seuratObj <- args[1]
 n_cores   <- as.integer(args[2])
+# --sctknk_min_pct: the fraction of the cell type's cells a gene has to be
+# detected in. Missing or out of [0, 1) falls back to 0.05, scTenifoldKnk's
+# own qc_minPCT.
+min_pct   <- suppressWarnings(as.numeric(if (length(args) >= 3) args[3] else NA))
+if (is.na(min_pct) || min_pct < 0 || min_pct >= 1) min_pct <- 0.05
 # --seed; missing or unparseable falls back to 1, the pipeline default
-seed      <- suppressWarnings(as.integer(if (length(args) >= 3) args[3] else NA))
+seed      <- suppressWarnings(as.integer(if (length(args) >= 4) args[4] else NA))
 if (is.na(seed)) seed <- 1L
 
 cell_type <- sub("\\.RDS$", "", basename(seuratObj))
@@ -35,25 +50,39 @@ n_comp <- 3
 
 sc_obj <- readRDS(seuratObj)
 
-# gene4use is the same gene universe DOWNSAMPLE hands to every other network
-# method, and it carries every target that passed DOWNSAMPLE's QC.
-genes_4_use <- intersect(sc_obj@misc$gene4use, rownames(sc_obj))
+# scTenifoldKnk's gene filter, scQC's X[rowMeans(X != 0) > minPCT, ], over
+# every gene the object carries, plus the targets that passed DOWNSAMPLE's QC.
+# The rowSums drop then takes out a target with no count in this cell type,
+# which has no edges to knock out. DOWNSAMPLE counts genes_sctknk for the
+# report by this same rule.
+counts   <- sc_obj@assays$RNA$counts
+detected <- rownames(counts)[Matrix::rowMeans(counts > 0) > min_pct]
+targets  <- intersect(sc_obj@misc$targets, rownames(counts))
+genes    <- union(detected, targets)
 
-mat <- as.matrix(sc_obj[genes_4_use, ]@assays$RNA$counts)
+mat <- as.matrix(counts[genes, , drop = FALSE])
 mat <- mat[rowSums(mat) > 0, , drop = FALSE]
+
+below <- intersect(setdiff(targets, detected), rownames(mat))
+message(nrow(mat), " genes for ", cell_type, ": detected in more than ",
+        100 * min_pct, "% of its ", ncol(mat), " cells",
+        if (length(below) > 0) {
+          paste0(", plus target(s) kept below that: ", paste(below, collapse = ", "))
+        } else "", ".")
 
 # scTenifoldKnk CPM-normalises by dividing every cell by its own total count,
 # and scTenifoldNet::cpmNormalization is a bare t(t(X)/colSums(X)) with no
 # guard for a total of zero. A cell with no counts left becomes a column of
 # NaN, and makeNetworks' per-bootstrap `Z[apply(Z, 1, sum) > 0, ]` then
 # subsets with NA (NaN > 0 is NA) and dies with "missing value where
-# TRUE/FALSE needed", before the first network is built. gene4use is only a
-# few thousand genes, so a cell that is perfectly healthy transcriptome-wide
-# can easily carry zero counts across just those. This cannot re-zero a gene:
-# every gene kept above has a count in some cell, and that cell is kept here.
+# TRUE/FALSE needed", before the first network is built. The genes kept above
+# are a subset of the transcriptome, so a cell that is healthy overall can
+# still carry zero counts across all of them, rare as that is with thousands of
+# well-detected genes. This cannot re-zero a gene: every gene kept above has a
+# count in some cell, and that cell is kept here.
 empty_cells <- sum(colSums(mat) == 0)
 if (empty_cells > 0) {
-  message("Dropping ", empty_cells, " cell(s) with no counts across gene4use in ",
+  message("Dropping ", empty_cells, " cell(s) with no counts across the network's genes in ",
           cell_type, " (CPM cannot normalise them).")
   mat <- mat[, colSums(mat) > 0, drop = FALSE]
 }

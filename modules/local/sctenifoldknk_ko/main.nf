@@ -39,6 +39,10 @@ process SCTENIFOLDKNK_KO {
   script:
     """
     #!/bin/bash
+    # The image caps R's heap at 8 GB (R_MAX_VSIZE in its Dockerfile), which
+    # the alignment of a large network can exceed; R gets what this task was
+    # given instead.
+    export R_MAX_VSIZE=${ task.memory ? task.memory.toGiga() + 'Gb' : '100Gb' }
     sctenifoldknk_ko.R ${wt} "${target}" ${n_cores} ${plot} ${seed}
     """
 

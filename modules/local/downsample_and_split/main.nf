@@ -19,6 +19,7 @@ process DOWNSAMPLE {
     val assay
     val n_hvg
     val seed
+    val sctknk_min_pct
 
   output:
     path "*.RDS", emit: scrank_obj
@@ -35,7 +36,7 @@ process DOWNSAMPLE {
     """
     #!/bin/bash
 
-    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells} ${assay} ${n_hvg} ${seed}
+    downsample_and_split.R ${obj} ${target} ${column} ${species} ${n_cells} ${min_cells} ${assay} ${n_hvg} ${seed} ${sctknk_min_pct}
     """
 
   stub:
@@ -45,9 +46,9 @@ process DOWNSAMPLE {
     touch umap.png
     grep -v '^[[:space:]]*\$' ${target} > targets_qc.txt
     printf 'target\\tgene\\treason\\taction\\n' > target_qc.tsv
-    printf 'identity\\tn_input\\tn_used\\tstatus\\tgenes_total\\tgenes_gene4use\\tgenes_expressed\\tgenes_filtered\\n' > cell_counts.tsv
-    printf 'sensitive\\t100\\t100\\tkept\\t500\\t200\\t180\\t20\\n' >> cell_counts.tsv
-    printf 'resistant\\t100\\t100\\tkept\\t500\\t200\\t190\\t10\\n' >> cell_counts.tsv
+    printf 'identity\\tn_input\\tn_used\\tstatus\\tgenes_total\\tgenes_gene4use\\tgenes_expressed\\tgenes_filtered\\tgenes_sctknk\\n' > cell_counts.tsv
+    printf 'sensitive\\t100\\t100\\tkept\\t500\\t200\\t180\\t20\\t320\\n' >> cell_counts.tsv
+    printf 'resistant\\t100\\t100\\tkept\\t500\\t200\\t190\\t10\\t340\\n' >> cell_counts.tsv
     printf 'identity\\tgene\\tavg_expression\\tpct_expressing\\n' > target_expression.tsv
     printf 'sensitive\\tBrd4\\t1.2\\t60\\n' >> target_expression.tsv
     printf 'resistant\\tBrd4\\t0.8\\t45\\n' >> target_expression.tsv

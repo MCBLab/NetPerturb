@@ -37,6 +37,15 @@ if (is.na(seed)) {
   seed <- 1L
 }
 
+# --sctknk_min_pct: the detection rate a gene needs in an identity's cells to
+# enter its scTenifoldKnk network (see sctenifoldknk_build.R). Only counted
+# here, for the report. Missing or out of [0, 1) falls back to 0.05,
+# scTenifoldKnk's own qc_minPCT.
+sctknk_min_pct <- suppressWarnings(as.numeric(if (length(args) >= 10) args[10] else NA))
+if (is.na(sctknk_min_pct) || sctknk_min_pct < 0 || sctknk_min_pct >= 1) {
+  sctknk_min_pct <- 0.05
+}
+
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
 }
@@ -343,6 +352,21 @@ cell_counts$genes_gene4use  <- ifelse(is.na(genes_expressed), NA_integer_, lengt
 cell_counts$genes_expressed <- unname(genes_expressed)
 cell_counts$genes_filtered  <- cell_counts$genes_gene4use - cell_counts$genes_expressed
 
+# Genes in each identity's scTenifoldKnk network, by the same rule
+# sctenifoldknk_build.R applies: every gene of the object detected in more
+# than --sctknk_min_pct of the identity's cells, plus the target genes with any
+# count there, which are kept below that threshold.
+all_counts <- seurat_downsample[["RNA"]]@counts
+cell_counts$genes_sctknk <- unname(vapply(cell_counts$identity, function(id) {
+  cells <- retained_ident == id
+  if (!any(cells)) return(NA_integer_)
+  sub <- all_counts[, cells, drop = FALSE]
+  detected <- Matrix::rowMeans(sub > 0) > sctknk_min_pct
+  kept_targets <- intersect(targets, rownames(sub))
+  kept_targets <- kept_targets[Matrix::rowSums(sub[kept_targets, , drop = FALSE]) > 0]
+  length(union(rownames(sub)[detected], kept_targets))
+}, integer(1)))
+
 write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = TRUE)
 
@@ -376,6 +400,9 @@ split_obj <- SplitObject(seurat_downsample, split.by = column)
 sc_obj <- lapply(split_obj, function(seuobj){
   obj <- seuobj
   obj@misc$gene4use <- genes_4_use
+  # the QC-passing target genes, which SCTENIFOLDKNK_BUILD keeps in its
+  # network even below --sctknk_min_pct
+  obj@misc$targets <- targets
   return(obj)
 })
 
