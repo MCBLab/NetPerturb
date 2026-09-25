@@ -7,6 +7,9 @@ dr_file  <- args[1]
 gmt_file <- args[2]
 min_size <- args[3]
 max_size <- args[4]
+# --seed; missing or unparseable falls back to 1, the pipeline default
+seed     <- suppressWarnings(as.integer(if (length(args) >= 5) args[5] else NA))
+if (is.na(seed)) seed <- 1L
 
 out_file <- "gsea_all_targets.txt"
 
@@ -15,7 +18,7 @@ out_file <- "gsea_all_targets.txt"
 # that on -resume, which makes pinning it more important rather than less --
 # without a seed, nobody re-running this by hand can reproduce the numbers in
 # the published table.
-set.seed(20260921)
+set.seed(seed)
 
 # Same defaulting rank_score.R applies to its own numeric args: a missing or
 # unparseable value falls back rather than propagating an NA into fgsea.
@@ -28,7 +31,7 @@ min_size <- as_int(min_size, 10)
 max_size <- as_int(max_size, 500)
 
 # The 8 columns fgsea::fgsea() returns, with cell_type/target up front, the
-# same way sctenifoldknk.R fronts dRegulation()'s columns. Explicit and
+# same way sctenifoldknk_ko.R fronts dRegulation()'s columns. Explicit and
 # empty-but-named for the reason empty_dr gives there: a bare data.frame()
 # writes no header, and every reader downstream -- MERGE-style concatenation,
 # report.qmd's filters -- needs the columns to exist even when there are no
@@ -140,7 +143,7 @@ if (length(overlap) < min_size) {
 # Serial on purpose, on two counts. fgsea's default (nproc = 0) hands the work
 # to BiocParallel::bpparam(), which is MulticoreParam over every core on the
 # machine -- in an allocation of 2 cpus that is exactly the oversubscription
-# conf/modules.config documents for SCTENIFOLDKNK. And forked workers would
+# conf/modules.config documents for SCTENIFOLDKNK_KO. And forked workers would
 # undo the set.seed() above. A few hundred ranked genes against a few hundred
 # sets is sub-second work, so there is nothing to win here anyway.
 #
@@ -175,10 +178,10 @@ for (i in seq_len(nrow(combos))) {
   # construction -- zeroing its edges is what the distance measures -- so
   # leaving it in hands a guaranteed top-of-list hit to every gene set that
   # annotates it, which is exactly the set a reader would most want to believe.
-  # This is the one place the ranking departs from the paper's "sort all
-  # genes", and report.qmd already makes the same call for the same reason when
-  # it drops the gene from its own network ring and keeps it in the table.
-  sub <- sub[sub$gene != this_target, ]
+  # SCTENIFOLDKNK_KO already drops it from the DR table for the same reason, so
+  # this only matters for a table from a run before that. A ';'-joined target
+  # is a joint knockout, so every one of its genes goes.
+  sub <- sub[!sub$gene %in% strsplit(this_target, ";", fixed = TRUE)[[1]], ]
 
   if (nrow(sub) < min_size) {
     message("Only ", nrow(sub), " ranked gene(s) for ", this_target, " in ",

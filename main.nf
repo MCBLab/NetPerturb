@@ -6,7 +6,8 @@
 
 
 include { GENIE3 } from "./modules/local/genie3/main.nf"
-include { SCTENIFOLDKNK } from "./modules/local/sctenifoldknk/main.nf"
+include { SCTENIFOLDKNK_KO } from "./modules/local/sctenifoldknk_ko/main.nf"
+include { SCTENIFOLDKNK_BUILD } from "./modules/local/sctenifoldknk_build/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { HDWGCNA } from "./modules/local/hdwgcna/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
@@ -30,22 +31,6 @@ workflow {
     n_cells = params.n_cells
     n_cores = params.n_cores
     target = file(params.target)
-    //create a list of targets from the input file, assuming one target per line
-    target_list = target.readLines().collect { it.trim() }.findAll { it } // remove empty lines
-    target_ch = Channel.fromList(target_list)
-
-    // scTenifoldKnk knocks out exactly one gene per run, so it cannot take a
-    // ';'-joined combined target the way RANK_SCORE does. Rather than skip
-    // those lines, the file is flattened to the individual genes it names and
-    // each is knocked out on its own, so "Stfa1;Mpo" yields a separate Stfa1
-    // result and Mpo result. Deduplicated across the whole file, so a gene
-    // that appears both alone and inside a combination is knocked out once.
-    // This is the same split downsample_and_split.R does to build gene4use.
-    sctknk_target_list = target_list
-        .collectMany { line -> line.split(';').collect { gene -> gene.trim() } }
-        .findAll { it }
-        .unique()
-    sctknk_target_ch = Channel.fromList(sctknk_target_list)
     network = params.network
     sctknk = params.sctknk
 
@@ -68,25 +53,44 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct )
+
+    // Everything past DOWNSAMPLE reads the targets that passed its QC check
+    // (present in the object, and with counts in the retained cells) rather
+    // than --target itself; the ones that failed go to the report instead.
+    target_qc_file = DOWNSAMPLE.out.targets
+
+    // one target per line, ';' joining genes perturbed together
+    target_ch = target_qc_file
+        .splitText()
+        .map { it.trim() }
+        .filter { it }
+
+    // The knockout track takes the same targets RANK_SCORE does, line for
+    // line: a ';'-joined target is one joint knockout of all its genes, not
+    // one knockout per gene.
+    sctknk_target_ch = target_ch.unique()
 
     DOWNSAMPLE.out.scrank_obj
     .flatten()
     .set { sc_obj }
 
-    // scTenifoldKnk knocks out the target gene as part of building its
-    // network, so unlike the rank-score methods it is target-specific by
-    // construction and runs once per (cell type, gene) pair rather than
-    // once per cell type. Its table never enters RANK_SCORE -- it goes to its
-    // own merge, and from there into REPORT when --network is running too.
+    // scTenifoldKnk in two steps. The wild-type network does not depend on
+    // the target, so SCTENIFOLDKNK_BUILD makes it once per cell type; the
+    // knockout on it is target-specific, so SCTENIFOLDKNK_KO runs once per
+    // (cell type, target) pair, in parallel. Its table never enters
+    // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
+    // --network is running too.
     if( sctknk ) {
-        sc_obj
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed )
+
+        SCTENIFOLDKNK_BUILD.out.wt
         .combine( sctknk_target_ch )
         .set { sctknk_input }
 
-        SCTENIFOLDKNK( sctknk_input, n_cores )
+        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed )
 
-        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK.out.dr_table.collect() )
+        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect() )
 
         // Ranks each pair's genes by how far the knockout moved them and asks
         // which gene sets sit at the top of that ranking -- the analysis the
@@ -98,7 +102,8 @@ workflow {
                 MERGE_SCTENIFOLDKNK.out.merged_dr_table,
                 file(params.gsea_gmt),
                 params.gsea_min_size,
-                params.gsea_max_size
+                params.gsea_max_size,
+                params.seed
             )
         }
     }
@@ -106,28 +111,28 @@ workflow {
     if( network ) {
 
         if( network == 'genie3' ) {
-           GENIE3( sc_obj, n_cores )
+           GENIE3( sc_obj, n_cores, params.seed )
 
             GENIE3.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
         else if( network == 'scrank' ) {
-            SCRANK( sc_obj, species, target, column, n_cores )
+            SCRANK( sc_obj, species, target_qc_file, column, n_cores )
 
             SCRANK.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
         else if( network == 'hdwgcna' ) {
-            HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells )
+            HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells, params.seed )
 
             HDWGCNA.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
 
-        RANK_SCORE( obj, target_ch, species, column, params.binding, params.top_connections, rank_cells )
+        RANK_SCORE( obj, target_ch, species, column, params.binding, params.top_connections, params.assay, rank_cells )
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
@@ -145,6 +150,74 @@ workflow {
             ? GSEA_SCTENIFOLDKNK.out.gsea_table
             : file("${projectDir}/assets/NO_GSEA_TABLE")
 
+        // What the report says about the run itself: when it started, the
+        // command line, and the settings that shape the result. Written as a
+        // key/value table since REPORT's container cannot see the workflow
+        // object. The epoch lets the report measure elapsed time without
+        // caring which time zone the container runs in.
+        def start = workflow.start.toInstant()
+        def run_info = [
+            "run_name"        : workflow.runName,
+            "session_id"      : workflow.sessionId,
+            "started"         : java.time.ZonedDateTime.ofInstant(start, java.time.ZoneId.systemDefault())
+                                    .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss Z")),
+            "started_epoch_ms": start.toEpochMilli(),
+            "command_line"    : workflow.commandLine,
+            "resume"          : workflow.resume,
+            "profile"         : workflow.profile,
+            "container_engine": workflow.containerEngine ?: "none",
+            "nextflow_version": workflow.nextflow.version,
+            "pipeline_version": workflow.manifest.version,
+            "revision"        : workflow.revision ?: workflow.commitId ?: "local",
+            "user"            : workflow.userName,
+            "launch_dir"      : workflow.launchDir,
+            "work_dir"        : workflow.workDir,
+            "obj"             : params.obj,
+            "target"          : params.target,
+            "column"          : params.column,
+            "species"         : params.species,
+            "assay"           : params.assay,
+            "network"         : params.network,
+            "sctknk"          : params.sctknk,
+            "n_cells"         : params.n_cells,
+            "min_cells"       : params.min_cells,
+            "n_hvg"           : params.n_hvg,
+            "n_cores"         : params.n_cores,
+            "seed"            : params.seed,
+            "sctknk_min_pct"  : params.sctknk_min_pct
+        ]
+        run_info_file = Channel
+            .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )
+            .collectFile( name: "run_info.tsv" )
+
+        // Per-step running times come from the execution trace, which
+        // Nextflow appends to one row per task as each one finishes. It is
+        // read once everything REPORT depends on has finished -- which is
+        // every task of the run bar REPORT itself -- and copied into the work
+        // dir, since the container cannot reach the published one. Rows are
+        // written asynchronously right after a task ends, hence the short
+        // wait before reading. The path is the one Nextflow is actually
+        // writing to, so a -with-trace <file> or a trace.file from -c is
+        // followed; the nextflow.config default is only the fallback. A
+        // missing trace (trace disabled) becomes a one-line note the report
+        // says it lacks -- not an empty string, which collectFile would emit
+        // no file for, leaving REPORT waiting forever.
+        def trace_cfg = workflow.session.config.navigate('trace.file')
+        def trace_path = file( trace_cfg instanceof CharSequence && trace_cfg
+            ? trace_cfg.toString()
+            : "${params.tracedir}/execution_trace_${params.trace_report_suffix}.txt" )
+        report_upstream = MERGE.out.merged_rank_scores
+        if( sctknk ) {
+            report_upstream = report_upstream.mix( MERGE_SCTENIFOLDKNK.out.merged_dr_table )
+        }
+        if( sctknk && params.gsea_gmt ) {
+            report_upstream = report_upstream.mix( GSEA_SCTENIFOLDKNK.out.gsea_table )
+        }
+        trace_snapshot = report_upstream
+            .collect()
+            .map { sleep(3000); trace_path.exists() ? trace_path.text : "# no trace file at ${trace_path}\n" }
+            .collectFile( name: "trace_snapshot.tsv" )
+
         REPORT(
             MERGE.out.merged_rank_scores,
             DOWNSAMPLE.out.umap,
@@ -154,7 +227,12 @@ workflow {
             sctknk_table,
             params.sctknk_top_genes,
             gsea_table,
-            params.gsea_top_terms
+            params.gsea_top_terms,
+            DOWNSAMPLE.out.target_qc,
+            DOWNSAMPLE.out.cell_counts,
+            DOWNSAMPLE.out.target_expression,
+            run_info_file,
+            trace_snapshot
         )
     }
 }

@@ -1,7 +1,7 @@
 process MERGE_SCTENIFOLDKNK {
   """
   Concatenate the per-(cell type, target) differentially-regulated gene
-  tables from SCTENIFOLDKNK into one file, the same way MERGE does for
+  tables from SCTENIFOLDKNK_KO into one file, the same way MERGE does for
   RANK_SCORE's tables -- kept as its own process since scTenifoldKnk has
   only the one table type, not RANK_SCORE's pair.
   """

@@ -11,6 +11,7 @@ process GENIE3 {
   input:
     path scobj
     val n_cores
+    val seed
 
   output:
     path "*.rds", emit: rank_obj
@@ -21,7 +22,7 @@ process GENIE3 {
   script:
     """
    #!/bin/bash
-    genie3.R ${scobj} ${n_cores}
+    genie3.R ${scobj} ${n_cores} ${seed}
     """
 
   stub:

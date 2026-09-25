@@ -13,6 +13,13 @@ n_cores   <- as.integer(args[3])
 cut_ratio <- as.numeric(args[4])
 min_cells <- as.integer(args[5])
 
+# --seed: ConstructMetacells() samples cells unseeded, and ConstructNetwork()
+# otherwise seeds WGCNA with its own fixed 12345. Missing or unparseable falls
+# back to 1, the pipeline default.
+seed <- suppressWarnings(as.integer(if (length(args) >= 6) args[6] else NA))
+if (is.na(seed)) seed <- 1L
+set.seed(seed)
+
 # Metacell aggregation settings
 k          <- 25
 max_shared <- 10
@@ -68,7 +75,7 @@ built <- tryCatch({
     # small cell identity is short on cells.
     npcs <- max(2, min(30, ncol(scratch) - 1, length(genes_4_use) - 1))
     scratch <- RunPCA(scratch, features = genes_4_use, npcs = npcs,
-                      verbose = FALSE)
+                      seed.use = seed, verbose = FALSE)
     sc_obj[["pca"]] <- scratch[["pca"]]
     rm(scratch)
   }
@@ -126,7 +133,8 @@ built <- tryCatch({
     minModuleSize = 20,
     networkType   = "unsigned",
     TOMType       = "unsigned",
-    maxBlockSize  = length(genes_4_use)
+    maxBlockSize  = length(genes_4_use),
+    randomSeed    = seed
   )
   TRUE
 }, error = function(e) {

@@ -14,7 +14,7 @@ process GSEA_SCTENIFOLDKNK {
   label "r_gsea"
 
   // Built from container/gsea/Dockerfile. The tag is a param so a locally
-  // built .sif can be substituted without editing this file -- SCTENIFOLDKNK
+  // built .sif can be substituted without editing this file -- SCTENIFOLDKNK_KO
   // hardcodes one and that is precisely why its track only runs on the machine
   // that path belongs to.
   // A registry tag gets the docker:// prefix under singularity; a path to a
@@ -29,6 +29,7 @@ process GSEA_SCTENIFOLDKNK {
     path gmt
     val min_size
     val max_size
+    val seed
 
   output:
     path "gsea_all_targets.txt", emit: gsea_table
@@ -39,7 +40,7 @@ process GSEA_SCTENIFOLDKNK {
   script:
     """
     #!/bin/bash
-    gsea_sctenifoldknk.R "${dr_table}" "${gmt}" ${min_size} ${max_size}
+    gsea_sctenifoldknk.R "${dr_table}" "${gmt}" ${min_size} ${max_size} ${seed}
     """
 
   stub:

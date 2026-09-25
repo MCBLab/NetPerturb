@@ -38,7 +38,7 @@ nextflow_pipeline {
                 .unique()
 
             assert processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDKNK")
+            assert !processes.contains("SCTENIFOLDKNK_KO")
             assert !processes.contains("SCRANK")
             assert !processes.contains("HDWGCNA")
         }
@@ -71,7 +71,7 @@ nextflow_pipeline {
 
             assert processes.contains("HDWGCNA")
             assert !processes.contains("GENIE3")
-            assert !processes.contains("SCTENIFOLDKNK")
+            assert !processes.contains("SCTENIFOLDKNK_KO")
             assert !processes.contains("SCRANK")
         }
     }
@@ -215,23 +215,21 @@ nextflow_pipeline {
             assert names.count { it.startsWith("RANK_SCORE") } == 3
             assert names.count { it.startsWith("REPORT") } == 1
 
-            // and the sctknk track runs beside it, once per identity x gene.
-            // test_input.txt names Brd4, Cstdc5 and Stfa1;Mpo, and the combined
-            // line is split, so that is 4 genes across 2 identities.
-            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK") }
-            assert knkTasks.size() == 8
+            // and the sctknk track runs beside it: one network build per
+            // identity, then one knockout per identity x target. test_input.txt
+            // names Brd4, Cstdc5 and Stfa1;Mpo, so that is 3 targets across 2
+            // identities. "SCTENIFOLDKNK_KO (" counts the knockouts alone.
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 2
+            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK_KO (") }
+            assert knkTasks.size() == 6
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
 
-            // each half of "Stfa1;Mpo" gets its own knockout, per identity
-            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Stfa1)")
-            assert knkTasks.contains("SCTENIFOLDKNK (resistant:Mpo)")
-            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Stfa1)")
-            assert knkTasks.contains("SCTENIFOLDKNK (sensitive:Mpo)")
-            // and no task is ever handed the combined target itself
-            assert !knkTasks.any { it.contains(";") }
+            // "Stfa1;Mpo" is one joint knockout per identity, not split
+            assert knkTasks.contains("SCTENIFOLDKNK_KO (resistant:Stfa1;Mpo)")
+            assert knkTasks.contains("SCTENIFOLDKNK_KO (sensitive:Stfa1;Mpo)")
+            assert !knkTasks.contains("SCTENIFOLDKNK_KO (resistant:Stfa1)")
 
-            // RANK_SCORE still gets the combined target intact -- only the
-            // knockout track splits it
+            // the same target RANK_SCORE scores
             assert names.contains("RANK_SCORE (Stfa1;Mpo)")
 
             // neither of the other two inference methods is dragged in
@@ -240,6 +238,38 @@ nextflow_pipeline {
 
             assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
             assert path("${outputDir}/report/netperturb_report.html").exists()
+        }
+    }
+
+    test("--sctknk_plot publishes one plotKO() PDF per knockout") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj         = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target      = "${projectDir}/testdata/test_input.txt"
+                column      = "labels"
+                species     = "mouse"
+                n_cells     = 100
+                n_cores     = 1
+                sctknk      = true
+                sctknk_plot = true
+                outdir      = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // 3 targets x 2 identities, the joint Stfa1;Mpo knockout included,
+            // named off the same sanitised target as the tables
+            def plots = path("${outputDir}/sctknk/plots").list().collect { it.fileName.toString() }
+            assert plots.size() == 6
+            assert plots.contains("sensitive_sctknk_plot_Stfa1_Mpo.pdf")
+
+            // the merged table is still there, beside the plots directory
+            assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
         }
     }
 
@@ -265,7 +295,8 @@ nextflow_pipeline {
 
             def names = workflow.trace.tasks().collect { it.@name }
 
-            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 2
+            assert names.count { it.startsWith("SCTENIFOLDKNK_KO (") } == 6
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
 
             // only the merged table is published; the per-pair tables stay in
@@ -397,7 +428,7 @@ nextflow_pipeline {
             // the knockout fan-out and the scoring track are untouched by it.
             // GSEA_SCTENIFOLDKNK starts with "GSEA_", so it cannot inflate this
             // count -- which is why the process is not named SCTENIFOLDKNK_GSEA
-            assert names.count { it.startsWith("SCTENIFOLDKNK") } == 8
+            assert names.count { it.startsWith("SCTENIFOLDKNK_KO (") } == 6
             assert names.count { it.startsWith("REPORT") } == 1
         }
     }

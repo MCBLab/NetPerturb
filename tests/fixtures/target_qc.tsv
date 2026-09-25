@@ -1,0 +1,3 @@
+target	gene	reason	action
+Hhip	Hhip	zero counts in every retained cell	target not analysed
+Stfa1;Mpo	Mpo	absent from the expression profile	dropped from the target; analysed as Stfa1

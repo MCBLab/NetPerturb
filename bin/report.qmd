@@ -19,6 +19,11 @@ params:
   sctknk_top_genes: 25
   gsea_file: ""
   gsea_top_terms: 20
+  target_qc_file: ""
+  cell_counts_file: ""
+  target_expression_file: ""
+  run_info_file: ""
+  trace_file: ""
 ---
 
 ```{r setup, include=FALSE}
@@ -109,6 +114,21 @@ if (!nzchar(network_key)) {
 }
 network_value <- if (nzchar(network_key)) network_key else "not supplied"
 
+# Target genes DOWNSAMPLE took out of the run before any network was built:
+# absent from the object, or with no counts in the cells it kept. Missing or
+# empty when the qmd is rendered by hand, or by a run from before that check,
+# which reads the same as a run where every gene passed.
+target_qc_path <- params$target_qc_file
+target_qc <- if (!is.null(target_qc_path) && nzchar(target_qc_path) &&
+                 file.exists(target_qc_path) && file.size(target_qc_path) > 0) {
+  read.delim(target_qc_path, header = TRUE, sep = "\t",
+             colClasses = "character", check.names = FALSE)
+} else {
+  data.frame(target = character(), gene = character(), reason = character(),
+             action = character())
+}
+has_target_qc <- nrow(target_qc) > 0
+
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
 umap_path <- params$umap_file
@@ -122,7 +142,7 @@ if (has_umap) umap_path <- normalizePath(umap_path)
 # The named-but-empty frame matters: everything below filters on p.adj, so a
 # bare data.frame() with no columns would fail with "object 'p.adj' not found"
 # rather than fall through to the "not run" message. Same reasoning, and the
-# same 8 columns, as empty_dr in bin/sctenifoldknk.R. The size check is for
+# same 8 columns, as empty_dr in bin/sctenifoldknk_ko.R. The size check is for
 # MERGE_SCTENIFOLDKNK's stub, which touches a zero-byte file that read.delim
 # refuses with "no lines available in input".
 sctknk_empty <- data.frame(
@@ -148,8 +168,9 @@ if (!isTRUE(is.finite(sctknk_top_genes)) || !isTRUE(sctknk_top_genes >= 1)) {
   sctknk_top_genes <- 25L
 }
 
-# dRegulation() reports FC as a gene's squared manifold-alignment distance over
-# the mean squared distance of the run, so it is a ratio to the average rather
+# FC is a gene's squared manifold-alignment distance over the mean squared
+# distance of the genes that were not knocked out (scTenifoldKnk 1.0.3's
+# statistic; see sctenifoldknk_ko.R), so it is a ratio to the average rather
 # than a differential-expression fold change, and it carries no direction: a
 # gene that moved a long way scores high whichever way it moved. log2 of it is
 # what the figure sizes nodes by and what the table reports.
@@ -178,14 +199,19 @@ n_sctknk_sig   <- nrow(sctknk_sig)
 n_sctknk_targets    <- n_distinct(sctknk_sig$target)
 n_sctknk_cell_types <- n_distinct(sctknk_sig$cell_type)
 
-# Ring nodes for the figure. The knocked-out gene is always in its own DR table
-# and always moves furthest, so it would be drawn as a spoke back to itself;
-# it is dropped here and kept in the table, where it reads as confirmation the
-# knockout took. The ring is then capped, since a target can clear FDR on
+# Ring nodes for the figure. SCTENIFOLDKNK_KO already drops the knocked-out
+# gene(s) from the DR table -- they always move furthest by construction -- so
+# this filter only matters for a table from a run before that; it would draw
+# them as spokes back to themselves. A ';'-joined target is a joint knockout,
+# so all of its genes are dropped. The ring is then capped, since a target can clear FDR on
 # hundreds of genes and every view is embedded in the HTML up front.
+is_ko_gene <- function(gene, target) {
+  mapply(function(g, t) g %in% strsplit(t, ";", fixed = TRUE)[[1]], gene, target)
+}
+
 sctknk_net <- if (has_sctknk_sig) {
   sctknk_sig %>%
-    filter(gene != target, is.finite(log2FC)) %>%
+    filter(!is_ko_gene(gene, target), is.finite(log2FC)) %>%
     group_by(target, cell_type) %>%
     slice_max(log2FC, n = sctknk_top_genes, with_ties = FALSE) %>%
     ungroup()
@@ -196,7 +222,8 @@ sctknk_net <- if (has_sctknk_sig) {
 has_sctknk_net <- nrow(sctknk_net) > 0
 
 # Counted off sctknk_net rather than sctknk_sig, because that is the frame the
-# dropdown is built from: a combination whose only significant gene was the
+# dropdown is built from: in a table from before the knocked-out genes were
+# dropped upstream, a combination whose only significant gene was the
 # knocked-out gene itself has a row in the table but no menu entry.
 n_sctknk_views <- if (has_sctknk_net) {
   nrow(distinct(sctknk_net, target, cell_type))
@@ -313,6 +340,162 @@ n_gsea_views <- if (has_gsea_fig) {
 } else {
   0
 }
+
+# Cells per identity from DOWNSAMPLE: the input object's size and what was
+# kept after downsampling, with the identities --min_cells dropped. Missing
+# when the qmd is rendered by hand, or by a run from before DOWNSAMPLE wrote it.
+cell_counts_path <- params$cell_counts_file
+cell_counts <- if (!is.null(cell_counts_path) && nzchar(cell_counts_path) &&
+                   file.exists(cell_counts_path) && file.size(cell_counts_path) > 0) {
+  read.delim(cell_counts_path, header = TRUE, sep = "\t", check.names = FALSE,
+             stringsAsFactors = FALSE)
+} else {
+  data.frame(identity = character(), n_input = integer(), n_used = integer(),
+             status = character())
+}
+has_cell_counts <- nrow(cell_counts) > 0
+
+# Mean log-normalised expression of each single target gene in each kept
+# identity, from DOWNSAMPLE; a ';'-joined target arrives split into its genes.
+# Missing when the qmd is rendered by hand, or by a run from before DOWNSAMPLE
+# wrote it.
+target_expr_path <- params$target_expression_file
+target_expr <- if (!is.null(target_expr_path) && nzchar(target_expr_path) &&
+                   file.exists(target_expr_path) && file.size(target_expr_path) > 0) {
+  read.delim(target_expr_path, header = TRUE, sep = "\t", check.names = FALSE,
+             stringsAsFactors = FALSE)
+} else {
+  data.frame(identity = character(), gene = character(),
+             avg_expression = numeric(), pct_expressing = numeric())
+}
+has_target_expr <- nrow(target_expr) > 0
+n_expr_genes <- length(unique(target_expr$gene))
+n_expr_ids   <- length(unique(target_expr$identity))
+
+# The run itself, as main.nf wrote it: a key/value table with the start time,
+# the command line and the settings behind the result. Read into a named
+# character vector; run_value() gives "not recorded" for anything absent, so
+# the section renders the same for a hand-rendered report.
+run_info_path <- params$run_info_file
+run_info <- if (!is.null(run_info_path) && nzchar(run_info_path) &&
+                file.exists(run_info_path) && file.size(run_info_path) > 0) {
+  kv <- read.delim(run_info_path, header = FALSE, sep = "\t", quote = "",
+                   col.names = c("key", "value"), colClasses = "character")
+  setNames(kv$value, kv$key)
+} else {
+  character()
+}
+has_run_info <- length(run_info) > 0
+run_value <- function(key) {
+  v <- unname(run_info[key])
+  if (length(v) == 0 || is.na(v) || !nzchar(v) || v == "null") "not recorded" else v
+}
+
+# --sctknk_min_pct as a percentage for the prose; a report without run info
+# falls back to the default the knockout networks use.
+sctknk_pct <- suppressWarnings(as.numeric(run_value("sctknk_min_pct")))
+sctknk_pct_label <- paste0(100 * if (is.finite(sctknk_pct)) sctknk_pct else 0.05, "%")
+
+# Wall-clock time from the run's start to this render. REPORT is the last task
+# of a run, so this is the whole run bar the report itself; the run's final
+# duration is only known once Nextflow exits, in the execution report under
+# pipeline_info/.
+render_time <- Sys.time()
+run_started <- suppressWarnings(as.numeric(run_value("started_epoch_ms")) / 1000)
+run_elapsed_s <- if (is.finite(run_started)) {
+  as.numeric(render_time) - run_started
+} else {
+  NA_real_
+}
+
+# Render time in the run's own time zone, taken from the offset on its start
+# time, so the two read side by side even when the container runs in UTC.
+run_offset <- regmatches(run_value("started"), regexpr("[+-][0-9]{4}$", run_value("started")))
+render_label <- if (length(run_offset) == 1) {
+  sign <- ifelse(substr(run_offset, 1, 1) == "-", -1, 1)
+  shift <- sign * (as.numeric(substr(run_offset, 2, 3)) * 3600 +
+                   as.numeric(substr(run_offset, 4, 5)) * 60)
+  paste(format(as.POSIXct(as.numeric(render_time) + shift, origin = "1970-01-01", tz = "UTC"),
+               "%Y-%m-%d %H:%M:%S"), run_offset)
+} else {
+  format(render_time, "%Y-%m-%d %H:%M:%S %z")
+}
+
+# Nextflow writes durations as "1h 2m 3s", "15.1s" or "54ms"; "-" is a task
+# that never ran (e.g. failed before starting).
+parse_nf_duration <- function(x) {
+  vapply(x, function(d) {
+    parts <- regmatches(d, gregexpr("[0-9.]+(ms|s|m|h|d)", d))[[1]]
+    if (length(parts) == 0) return(NA_real_)
+    value <- as.numeric(sub("(ms|s|m|h|d)$", "", parts))
+    unit  <- sub("^[0-9.]+", "", parts)
+    sum(value * c(ms = 1e-3, s = 1, m = 60, h = 3600, d = 86400)[unit])
+  }, numeric(1), USE.NAMES = FALSE)
+}
+
+format_seconds <- function(s) {
+  ifelse(!is.finite(s), "-",
+    ifelse(s < 60, sprintf("%.1f s", s),
+      ifelse(s < 3600, sprintf("%dm %02ds", as.integer(s %/% 60), as.integer(round(s %% 60))),
+             sprintf("%dh %02dm", as.integer(s %/% 3600), as.integer(round((s %% 3600) / 60))))))
+}
+
+# The execution trace as it stood when REPORT was launched: one row per task,
+# so every step of the run except REPORT itself. A step is the process name
+# without its tag -- "GENIE3 (3)" and "GENIE3 (7)" are both GENIE3. realtime is
+# the task's own run time; duration adds the time it sat in the queue. A task
+# restored by -resume is CACHED and keeps the times of the run that made it.
+trace_path <- params$trace_file
+trace <- if (!is.null(trace_path) && nzchar(trace_path) &&
+             file.exists(trace_path) && file.size(trace_path) > 0) {
+  tryCatch(read.delim(trace_path, header = TRUE, sep = "\t", quote = "",
+                      check.names = FALSE, stringsAsFactors = FALSE,
+                      comment.char = "#"),
+           error = function(e) data.frame())
+} else {
+  data.frame()
+}
+has_trace <- nrow(trace) > 0 && all(c("name", "status", "realtime", "duration") %in% names(trace))
+
+# Defined whatever the trace holds: chunk options such as fig.height are
+# evaluated even for a chunk that is not.
+step_times <- data.frame()
+n_cached_tasks <- 0
+
+if (has_trace) {
+  trace <- trace %>%
+    mutate(step       = sub(" \\(.*\\)$", "", name),
+           realtime_s = parse_nf_duration(realtime),
+           duration_s = parse_nf_duration(duration))
+
+  # Steps in the order they first started, which is the order a reader
+  # follows the run in.
+  step_order <- trace %>%
+    mutate(submit_t = suppressWarnings(as.POSIXct(submit))) %>%
+    group_by(step) %>%
+    summarise(first = suppressWarnings(min(submit_t, na.rm = TRUE)), .groups = "drop") %>%
+    arrange(first) %>%
+    pull(step)
+
+  step_times <- trace %>%
+    group_by(step) %>%
+    summarise(
+      tasks     = n(),
+      completed = sum(status == "COMPLETED"),
+      cached    = sum(status == "CACHED"),
+      failed    = sum(!status %in% c("COMPLETED", "CACHED")),
+      mean_s    = mean(realtime_s, na.rm = TRUE),
+      sd_s      = if (sum(is.finite(realtime_s)) > 1) sd(realtime_s, na.rm = TRUE) else NA_real_,
+      min_s     = suppressWarnings(min(realtime_s, na.rm = TRUE)),
+      max_s     = suppressWarnings(max(realtime_s, na.rm = TRUE)),
+      total_s   = sum(realtime_s, na.rm = TRUE),
+      .groups   = "drop"
+    ) %>%
+    mutate(step = factor(step, levels = step_order)) %>%
+    arrange(step)
+
+  n_cached_tasks <- sum(trace$status == "CACHED")
+}
 ```
 
 ## Overview
@@ -326,6 +509,30 @@ The gene regulatory networks these scores were computed from were inferred with
 **`r network_label`** (`--network`: `r network_value`). Every score below is
 relative to that network type, so scores from a run using a different inference
 method are not directly comparable.
+
+### Target QC
+
+```{r target-qc-note, results="asis"}
+if (has_target_qc) {
+  cat("These genes were not analyzed due to QC checking: ",
+      paste0("**", unique(target_qc$gene), "**", collapse = ", "),
+      ". A gene is excluded when it is absent from the expression profile or ",
+      "has zero counts in every cell retained after downsampling, since it can ",
+      "have no edges in any network. A combined target loses only the failing ",
+      "gene and is analysed with the rest.\n", sep = "")
+} else {
+  cat("Every requested target gene passed QC checking.\n")
+}
+```
+
+```{r target-qc-table, eval=has_target_qc}
+datatable(
+  target_qc,
+  rownames = FALSE,
+  colnames = c("Requested target", "Gene", "Reason", "Action"),
+  options = list(dom = "t", pageLength = nrow(target_qc))
+)
+```
 
 ## Perturbation score table
 
@@ -454,14 +661,16 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
 
 ## Knockout networks
 
-Each knocked-out gene and the genes its knockout moved. scTenifoldKnk zeroes the
-target's outgoing edges, realigns the knocked-out network against the wild-type
+Each knockout and the genes it moved. scTenifoldKnk zeroes the target's
+outgoing edges, realigns the knocked-out network against the wild-type
 one, and scores every gene on how far it travelled between the two; the genes
 drawn here are the ones clearing FDR < 0.05. Use the menu to switch between the
 `r n_sctknk_views` target and cell type combinations.
 
 The knocked-out gene sits at the centre and the genes it moved sit around it. A
-node's size follows its `log2FC`, scaled within the combination on display, so
+combined target such as `A;B` is a single joint knockout, with both genes' edges
+zeroed together, so all of its genes sit at the centre, each linked to every gene
+the knockout moved. A node's size follows its `log2FC`, scaled within the combination on display, so
 sizes rank genes against each other rather than across cell types. The ring is
 capped at the `r sctknk_top_genes` strongest genes per combination; the table in
 the next section is not capped. Hover any node for its exact values.
@@ -534,9 +743,13 @@ marker_size <- function(w, lo = 16, hi = 34) {
 }
 
 # star_positions() and edge_path() read target_gene and partner, so the DR
-# table is renamed into that shape rather than the helpers being rewritten.
+# table is renamed into that shape rather than the helpers being rewritten. A
+# joint knockout puts every one of its genes at the centre, each spoked to
+# every gene the knockout moved: a gene's movement belongs to the knockout as
+# a whole, not to any one of its genes.
 sctknk_edges <- sctknk_net %>%
-  mutate(target_gene = target, partner = gene)
+  mutate(target_gene = target, partner = gene) %>%
+  tidyr::separate_rows(target_gene, sep = ";")
 
 views <- sctknk_edges %>%
   distinct(target, cell_type) %>%
@@ -570,9 +783,11 @@ for (i in seq_len(nrow(views))) {
     y = (pos$y[match(edges$target_gene, pos$gene)] + pos$y[match(edges$partner, pos$gene)]) / 2
   )
 
-  # One row per gene already: sctknk_sig holds a single row per cell type x
-  # target x gene, so no grouping is needed to draw each node once.
+  # sctknk_sig holds a single row per cell type x target x gene, but a joint
+  # knockout repeats each of them once per gene at the centre, so each node
+  # is drawn from its first row.
   moved <- edges %>%
+    distinct(partner, .keep_all = TRUE) %>%
     transmute(
       partner, log2FC,
       text = paste0(
@@ -695,9 +910,9 @@ distance squared over the run's mean, logged; `p.value` tests it against the
 chi-square null and `p.adj` is the Benjamini-Hochberg adjustment within the run.
 
 `p.value` is a direct function of `log2FC`, so the two rank genes identically and
-the FDR cut above is the same thing as a `log2FC` threshold. Each knocked-out
-gene appears in its own rows, normally at the top, which is the simplest check
-that the knockout took.
+the FDR cut above is the same thing as a `log2FC` threshold. The knocked-out
+genes themselves are left out: they always move furthest by construction, so
+their rows say nothing about the knockout's effect.
 
 Currently `r n_sctknk_sig` gene(s) clear FDR < 0.05, across
 `r n_sctknk_targets` target(s) and `r n_sctknk_cell_types` cell type(s).
@@ -753,10 +968,11 @@ drawn only if they clear FDR < `r gsea_fdr`, the `r gsea_top_terms` strongest
 per combination by absolute `NES`. Hover any dot for its exact values; the
 table below carries all of them, uncapped.
 
-One thing to keep in mind reading any of it: the genes ranked here are
-`gene4use`, the highly-variable, transcription-factor and drug-target set the
-pipeline builds up front, not the whole transcriptome. Enrichment is relative to
-that universe, which is already weighted toward regulators.
+One thing to keep in mind reading any of it: the genes ranked here are the
+ones each knockout network was built on -- every gene detected in more than
+`r sctknk_pct_label` of the cell type's cells, plus the targets --
+not the whole transcriptome. Enrichment is relative to that universe, so a
+pathway carried by rarely detected genes cannot show up here.
 
 ```{r gsea-figure, eval=has_gsea_fig && has_plotly}
 ink       <- "#0b0b0b"
@@ -1038,4 +1254,287 @@ knitr::include_graphics(umap_path)
 
 ```{r umap-missing, eval=!has_umap, results="asis"}
 cat("No UMAP figure was supplied with this report.")
+```
+
+### Cells per identity
+
+```{r cell-counts-note, results="asis"}
+# Gene columns arrive with DOWNSAMPLE's newer cell_counts.tsv; an older one
+# has cells only, and the section falls back to that.
+has_gene_counts <- has_cell_counts &&
+  all(c("genes_total", "genes_gene4use", "genes_expressed") %in% names(cell_counts))
+# The knockout networks pick their own genes (--sctknk_min_pct), so they get a
+# panel of their own -- only when this run built them, since DOWNSAMPLE counts
+# the column either way.
+has_sctknk_genes <- has_gene_counts && "genes_sctknk" %in% names(cell_counts) &&
+  run_value("sctknk") != "false"
+
+if (has_cell_counts) {
+  n_dropped_ids <- sum(cell_counts$status != "kept")
+  kept_cc <- cell_counts[cell_counts$status == "kept", ]
+  genes_note <- if (has_gene_counts) {
+    expr_range <- range(kept_cc$genes_expressed, na.rm = TRUE)
+    paste0(
+      "; genes: every rank-score network (GENIE3, scRank, hdWGCNA) is offered the same **",
+      comma(kept_cc$genes_gene4use[1]), "** of the object's ",
+      comma(kept_cc$genes_total[1]), " genes (`gene4use`: `--n_hvg` ",
+      run_value("n_hvg"), " variable genes plus the species' transcription factors, ",
+      "drug targets and the requested targets), and each identity keeps those with ",
+      "counts in its own cells, **",
+      if (expr_range[1] == expr_range[2]) comma(expr_range[1])
+      else paste0(comma(expr_range[1]), "–", comma(expr_range[2])),
+      "** genes per network")
+  } else ""
+  if (has_sctknk_genes) {
+    ko_range <- range(kept_cc$genes_sctknk, na.rm = TRUE)
+    genes_note <- paste0(
+      genes_note, "; the knockout networks (scTenifoldKnk) pick their own: every gene ",
+      "detected in more than ", sctknk_pct_label, " of the identity's cells ",
+      "(`--sctknk_min_pct`), plus the targets, **",
+      if (ko_range[1] == ko_range[2]) comma(ko_range[1])
+      else paste0(comma(ko_range[1]), "–", comma(ko_range[2])),
+      "** genes per network")
+  }
+  cat(if (has_gene_counts) "Cells and genes" else "Cells", " each identity's network was built from. **",
+      comma(sum(cell_counts$n_used)), "** cells were used in total, across ",
+      nrow(kept_cc), " identities (`--n_cells` ", run_value("n_cells"),
+      " per identity, `--min_cells` ", run_value("min_cells"), genes_note, "). ",
+      if (has_gene_counts) "In the cells panel the" else "The",
+      " grey bar behind each is the identity's size in the ",
+      "input object; an identity dropped for `--min_cells` has only that bar, in orange.",
+      if (has_gene_counts) {
+        paste0(" In the genes panel the pale green part is `gene4use` genes with zero ",
+               "counts in that identity, which can have no edges in its network: ",
+               "hdWGCNA pads them with zeros, and GENIE3 and scRank have nothing to fit ",
+               "them on.")
+      } else "",
+      if (n_dropped_ids > 0) {
+        paste0(" ", n_dropped_ids, " identit", ifelse(n_dropped_ids == 1, "y was", "ies were"),
+               " dropped for having fewer than `--min_cells` cells after downsampling, ",
+               "and no network was built from ", ifelse(n_dropped_ids == 1, "it", "them"), ".")
+      } else "",
+      "\n", sep = "")
+} else {
+  cat("No cell count table was supplied with this report.\n")
+}
+```
+
+```{r cell-counts, eval=has_cell_counts, fig.width=if (has_sctknk_genes) 15 else if (has_gene_counts) 12 else 9, fig.height=max(3, 0.35 * nrow(cell_counts) + 1.5)}
+# Cells and genes side by side, one facet each, sharing the identity axis.
+# Each panel is a back bar (what was available) with a front bar (what the
+# network got) drawn over it. A dropped identity has no used cells to colour,
+# so it is its input bar that carries the flag, and it has no genes panel bar.
+cc <- cell_counts %>%
+  mutate(kept     = status == "kept",
+         identity = factor(identity, levels = identity[order(kept, n_used, n_input)]))
+
+panels <- cc %>%
+  transmute(identity, kept, panel = "Cells",
+            back  = n_input, front = n_used,
+            back_fill  = ifelse(kept, "In input object", "Dropped (below --min_cells)"),
+            front_fill = "Used for networks",
+            label = ifelse(kept, paste0(comma(n_used), " / ", comma(n_input)),
+                           paste0("0 / ", comma(n_input), " (dropped)")))
+
+if (has_gene_counts) {
+  panels <- bind_rows(panels, cc %>%
+    filter(kept) %>%
+    transmute(identity, kept, panel = "Genes: rank-score networks",
+              back  = genes_gene4use, front = genes_expressed,
+              back_fill  = "Zero counts in identity (filtered)",
+              front_fill = "In network (expressed)",
+              label = paste0(comma(genes_expressed), " / ", comma(genes_gene4use))))
+}
+if (has_sctknk_genes) {
+  panels <- bind_rows(panels, cc %>%
+    filter(kept) %>%
+    transmute(identity, kept, panel = "Genes: knockout networks",
+              back  = genes_total, front = genes_sctknk,
+              back_fill  = "In input object",
+              front_fill = "In knockout network (scTenifoldKnk)",
+              label = paste0(comma(genes_sctknk), " / ", comma(genes_total))))
+}
+panels$panel <- factor(panels$panel, levels = c("Cells", "Genes: rank-score networks",
+                                                "Genes: knockout networks"))
+
+fills <- c("Used for networks"                  = "#2C7FB8",
+           "In input object"                    = "grey88",
+           "Dropped (below --min_cells)"        = "#F4A582",
+           "In network (expressed)"             = "#41AB5D",
+           "Zero counts in identity (filtered)" = "#C7E9C0",
+           "In knockout network (scTenifoldKnk)" = "#807DBA")
+
+ggplot(panels, aes(y = identity)) +
+  geom_col(aes(x = back, fill = back_fill), width = 0.8) +
+  geom_col(aes(x = front, fill = front_fill), width = 0.8) +
+  geom_text(aes(x = back, label = label), hjust = -0.1, size = 3.3) +
+  facet_wrap(~ panel, scales = "free_x") +
+  scale_fill_manual(values = fills, breaks = intersect(names(fills), unique(c(panels$back_fill, panels$front_fill))),
+                    name = NULL) +
+  scale_x_continuous(labels = comma, expand = expansion(mult = c(0, 0.3))) +
+  labs(x = "used / available", y = NULL) +
+  guides(fill = guide_legend(nrow = 2)) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top", panel.grid.major.y = element_blank(),
+        panel.spacing.x = unit(2, "lines"),
+        strip.text = element_text(face = "bold", size = 12))
+```
+
+```{r cell-counts-table, eval=has_gene_counts}
+cell_counts %>%
+  transmute(Identity = identity, Status = status,
+            `Cells in input` = n_input, `Cells used` = n_used,
+            `Genes in object` = genes_total, `gene4use` = genes_gene4use,
+            `Genes in network` = genes_expressed, `Genes filtered` = genes_filtered,
+            `Genes in knockout network` = if (has_sctknk_genes) genes_sctknk else NULL) %>%
+  datatable(rownames = FALSE,
+            options = list(dom = "t", pageLength = nrow(cell_counts)),
+            caption = paste("Cells and genes per identity. Genes in network and genes",
+                            "filtered refer to the rank-score networks: gene4use genes with",
+                            "and without counts in that identity's retained cells.",
+                            if (has_sctknk_genes) paste0("Genes in knockout network are those ",
+                              "detected in more than ", sctknk_pct_label,
+                              " of its cells, plus the targets.") else ""))
+```
+
+### Target expression per identity
+
+```{r target-expr-note, results="asis"}
+if (has_target_expr) {
+  cat("Mean expression of each target gene in each identity, over the cells ",
+      "retained after downsampling -- the cells its network was built from. ",
+      "A combined target (`A;B`) is shown as its single genes, each on its own. ",
+      "Expression is log-normalised (counts per 10,000, then log1p), and the ",
+      "number under each value is the percentage of the identity's cells with ",
+      "at least one count of the gene. A target that is barely expressed in an ",
+      "identity has little for that identity's network to connect it to, which ",
+      "is worth keeping in mind when reading its scores above.\n", sep = "")
+} else {
+  cat("No target expression table was supplied with this report.\n")
+}
+```
+
+```{r target-expr, eval=has_target_expr, fig.width=max(5, 1.1 * n_expr_genes + 3), fig.height=max(3, 0.45 * n_expr_ids + 1.5)}
+# Genes keep the order the targets were given in; identities are sorted as in
+# the perturbation score heatmap.
+te <- target_expr %>%
+  mutate(gene     = factor(gene, levels = unique(gene)),
+         identity = factor(identity, levels = sort(unique(identity))),
+         label    = sprintf("%.2f\n%.0f%%", avg_expression, pct_expressing))
+
+ggplot(te, aes(x = gene, y = identity, fill = avg_expression)) +
+  geom_tile(color = "white", linewidth = 0.6) +
+  geom_text(aes(label = label,
+                colour = avg_expression > 0.6 * max(avg_expression, na.rm = TRUE)),
+            size = 3.2, lineheight = 0.9, show.legend = FALSE) +
+  scale_colour_manual(values = c(`TRUE` = "white", `FALSE` = "#0b0b0b")) +
+  scale_fill_distiller(palette = "YlOrRd", direction = 1,
+                       name = "Mean\nlog-normalised\nexpression") +
+  labs(x = "Target gene", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
+```
+
+## Pipeline run
+
+```{r run-summary, results="asis"}
+if (has_run_info) {
+  cat("This run (**", run_value("run_name"), "**) started on **", run_value("started"),
+      "** and reached this report **", format_seconds(run_elapsed_s), "** later, on ",
+      render_label, ". That is the whole run except rendering the report itself; ",
+      "Nextflow's own execution report in `pipeline_info/` has the final total.",
+      if (run_value("resume") == "true") {
+        paste0(" The run was resumed, so ",
+               if (has_trace) paste0(n_cached_tasks, " task(s) were restored from cache and ") else "",
+               "their times below are those of the run that first produced them.")
+      } else "",
+      "\n\n", sep = "")
+  cat("Command line:\n\n```bash\n", run_value("command_line"), "\n```\n", sep = "")
+} else {
+  cat("No run information was supplied with this report, which is what a report",
+      "rendered by hand looks like.\n")
+}
+```
+
+```{r run-info-table, eval=has_run_info}
+run_fields <- c(
+  "Run name"          = "run_name",
+  "Session ID"        = "session_id",
+  "Started"           = "started",
+  "Profile"           = "profile",
+  "Container engine"  = "container_engine",
+  "Nextflow version"  = "nextflow_version",
+  "Pipeline version"  = "pipeline_version",
+  "Revision"          = "revision",
+  "User"              = "user",
+  "Launch directory"  = "launch_dir",
+  "Work directory"    = "work_dir",
+  "Input object"      = "obj",
+  "Targets"           = "target",
+  "Identity column"   = "column",
+  "Species"           = "species",
+  "Assay"             = "assay",
+  "--network"         = "network",
+  "--sctknk"          = "sctknk",
+  "--n_cells"         = "n_cells",
+  "--min_cells"       = "min_cells",
+  "--n_hvg"           = "n_hvg",
+  "--n_cores"         = "n_cores",
+  "--seed"            = "seed",
+  "--sctknk_min_pct"  = "sctknk_min_pct"
+)
+datatable(
+  data.frame(Field = names(run_fields), Value = vapply(run_fields, run_value, character(1))),
+  rownames = FALSE,
+  options = list(dom = "t", pageLength = length(run_fields), ordering = FALSE)
+)
+```
+
+### Running time per step
+
+```{r step-times-note, results="asis"}
+if (has_trace) {
+  cat("Every task of the run bar the report, from Nextflow's execution trace. ",
+      "A step that fans out -- one task per cell type, or per cell type and target -- ",
+      "is averaged over its tasks; the time is each task's own run time (`realtime`), ",
+      "not counting time spent queued. Summed over every task that is **",
+      format_seconds(sum(step_times$total_s)), "** of compute, against **",
+      format_seconds(run_elapsed_s), "** of wall-clock time.\n", sep = "")
+} else {
+  cat("No execution trace was supplied with this report, so there are no",
+      "per-step times to show. They come from `trace.enabled` in",
+      "`nextflow.config`, which a run keeps on by default.\n")
+}
+```
+
+```{r step-times, eval=has_trace, fig.width=9, fig.height=max(3, 0.45 * nrow(step_times) + 1.5)}
+# Axis unit from the longest task, so a run of seconds is not drawn in
+# fractions of an hour, nor one of hours in thousands of seconds.
+longest <- max(trace$realtime_s, na.rm = TRUE)
+unit <- if (!is.finite(longest) || longest < 120) c(s = 1) else if (longest < 7200) c(min = 60) else c(h = 3600)
+
+step_levels <- rev(levels(step_times$step))
+ggplot(step_times, aes(y = factor(step, levels = step_levels))) +
+  geom_col(aes(x = mean_s / unit), fill = "#2C7FB8", width = 0.7) +
+  geom_errorbar(aes(xmin = pmax((mean_s - sd_s) / unit, 0), xmax = (mean_s + sd_s) / unit),
+                width = 0.25, na.rm = TRUE) +
+  geom_point(data = trace,
+             aes(x = realtime_s / unit, y = factor(step, levels = step_levels)),
+             inherit.aes = FALSE, size = 1.4, alpha = 0.5,
+             position = position_jitter(height = 0.15, width = 0, seed = 1)) +
+  labs(x = paste0("Run time per task (", names(unit),
+                  "); bar = mean, whisker = SD, dot = one task"), y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.major.y = element_blank())
+```
+
+```{r step-times-table, eval=has_trace}
+step_times %>%
+  transmute(Step = as.character(step), Tasks = tasks, Cached = cached, Failed = failed,
+            Mean = format_seconds(mean_s), SD = format_seconds(sd_s),
+            Min = format_seconds(min_s), Max = format_seconds(max_s),
+            Total = format_seconds(total_s)) %>%
+  datatable(rownames = FALSE, options = list(dom = "t", pageLength = nrow(step_times),
+                                             ordering = FALSE))
 ```

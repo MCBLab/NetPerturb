@@ -17,6 +17,10 @@ nextflow_process {
                 input[3] = "mouse"
                 input[4] = 100
                 input[5] = 150
+                input[6] = "RNA"
+                input[7] = 2000
+                input[8] = 1
+                input[9] = 0.05
                 """
             }
         }
@@ -30,6 +34,15 @@ nextflow_process {
 
             def names = process.out.scrank_obj[0].collect { file(it).name }.sort()
             assert names == ["resistant.RDS", "sensitive.RDS"]
+
+            // one row per identity, for the report's cell count figure
+            def counts = file(process.out.cell_counts[0]).readLines()
+            assert counts[0] == "identity\tn_input\tn_used\tstatus\tgenes_total\tgenes_gene4use\tgenes_expressed\tgenes_filtered\tgenes_sctknk"
+            assert counts.size() == 3
+
+            // one row per identity x single target gene, for the expression heatmap
+            def expr = file(process.out.target_expression[0]).readLines()
+            assert expr[0] == "identity\tgene\tavg_expression\tpct_expressing"
         }
     }
 }

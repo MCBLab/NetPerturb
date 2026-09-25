@@ -15,6 +15,7 @@ process HDWGCNA {
     val n_cores
     val cut_ratio
     val min_cells
+    val seed
 
   output:
     path "*_weight_hdWGCNA_*.rds", emit: rank_obj, optional: true
@@ -25,7 +26,7 @@ process HDWGCNA {
   script:
     """
     #!/bin/bash
-    hdwgcna.R ${scobj} ${column} ${n_cores} ${cut_ratio} ${min_cells}
+    hdwgcna.R ${scobj} ${column} ${n_cores} ${cut_ratio} ${min_cells} ${seed}
     """
 
   stub:
