@@ -1,0 +1,205 @@
+%% =====================================================================
+%% NetPerturb -- Application Note for Bioinformatics Advances (OUP)
+%%
+%% FIRST DRAFT TEMPLATE. Everything marked \todo{...} (red) needs your input.
+%%
+%% Bioinformatics Advances limits for an Application Note (author guidelines):
+%%   * up to 4 pages, including figures, tables and references
+%%   * abstract: at most 200 words
+%%   * at most 3 figures + tables COMBINED  (this draft: Fig 1, Fig 2, Table 1)
+%%   * at most 15 references                 (this draft cites 15)
+%%   * at most 5 keywords
+%%   * required statements: Data availability, Funding, Conflict of interest,
+%%     Author contributions; ORCID for the submitting author; any AI/LLM use
+%%     must be disclosed in the cover letter and Methods/Acknowledgements
+%%
+%% Build:  latexmk -pdf netperturb.tex
+%% =====================================================================
+
+\documentclass[unnumsec,webpdf,contemporary,large]{oup-authoring-template}
+%\onecolumn % for one column layouts
+
+\graphicspath{{Fig/}}
+\newcommand{\societylogo}{}
+
+% Draft helpers -- remove before submission
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\newcommand{\np}{\textsc{NetPerturb}}
+\newcommand{\param}[1]{\texttt{-{}-#1}}
+
+% line numbers (often requested by reviewers)
+%\usepackage[right]{lineno}
+
+\begin{document}
+
+\journaltitle{Bioinformatics Advances}
+\DOI{DOI added during production}
+\copyrightyear{2026}
+\pubyear{2026}
+\vol{XX}
+\issue{x}
+\access{Published: Date added during production}
+\appnotes{Application Note}
+
+\firstpage{1}
+
+\subtitle{Gene Regulation and Systems Biology} % \todo: confirm journal subject section
+
+\title[NetPerturb]{NetPerturb: a reproducible Nextflow pipeline for in silico perturbation of single-cell gene regulatory networks from a Seurat object}
+
+\author[1,$\ast$]{Diego Marques-Coelho\ORCID{0000-0000-0000-0000}}
+\author[1]{\todo{Second Author}}
+\author[2]{\todo{Third Author}}
+
+\address[1]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
+\address[2]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
+
+\corresp[$\ast$]{Corresponding author. \href{mailto:diegomscoelho@gmail.com}{diegomscoelho@gmail.com}}
+
+\received{Date}{0}{Year}
+\revised{Date}{0}{Year}
+\accepted{Date}{0}{Year}
+
+\editor{Associate Editor: Name}
+
+%% ---------------------------------------------------------------------
+%% Abstract: <= 200 words, structured, no citations.
+%% ---------------------------------------------------------------------
+\abstract{
+\textbf{Motivation:} Predicting how a genetic or pharmacological perturbation affects each cell population in a single-cell RNA-seq (scRNA-seq) dataset is a common question, but in silico perturbation tools based on gene regulatory networks (GRNs) are hard to install, scale poorly to large atlases, and return results that are difficult to compare across methods and to share.\\
+\textbf{Results:} We present NetPerturb, a Nextflow pipeline that starts from a processed Seurat object and a list of target genes and returns a single, self-contained HTML report. NetPerturb balances cell identities by downsampling, checks the targets before any network is built, and infers one GRN per identity with GENIE3, scRank or hdWGCNA. It then ranks identities by a target-perturbation score. In parallel, it can run a virtual knockout with scTenifoldKnk, including joint knockouts of several genes, followed by gene set enrichment of the genes the knockout affects. Every stochastic step is seeded from one parameter and every tool runs in a versioned container, so runs are reproducible across HPC and cloud environments. \todo{One sentence of headline result, e.g. runtime on dataset X / recovery of known drug-sensitive populations.}\\
+\textbf{Availability and implementation:} NetPerturb is freely available under the \todo{MIT} licence at \url{https://github.com/MCBLab/NetPerturb}, with documentation, test profiles and container recipes. \todo{Zenodo DOI of the release.}\\
+\textbf{Contact:} \href{mailto:diegomscoelho@gmail.com}{diegomscoelho@gmail.com}\\
+\textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics Advances} online.}
+
+\keywords{single-cell RNA-seq, gene regulatory network, in silico perturbation, virtual knockout, Nextflow}
+
+\maketitle
+
+%% =====================================================================
+\section{Introduction}
+%% =====================================================================
+
+Single-cell RNA-seq (scRNA-seq) resolves tissues into cell identities (cell types, clones, or treatment states), and the next question is usually which of those identities depend on a given gene or drug target. Pooled CRISPR screens with single-cell readout answer this experimentally \citep{Dixit2016perturbseq}, but they are costly and cannot be applied to archived or clinical samples. Computational alternatives therefore perturb a gene regulatory network (GRN) inferred from unperturbed cells and read the effect off the network: CellOracle simulates shifts in cell identity \citep{Kamimoto2023celloracle}, scRank ranks cell types by how much a drug target reshapes their network \citep{Li2024scrank}, and scTenifoldKnk performs a virtual knockout and reports the genes whose regulatory context changes \citep{Osorio2022sctenifoldknk}.
+
+In practice, using these methods on a new dataset takes considerable engineering work. Each method expects its own input format and gene universe, and memory grows quickly with the number of cells and genes. Targets that are not expressed in some identities can end a run late in the analysis. Results from different network inference methods are rarely placed side by side, and many steps are stochastic, so the numbers are hard to reproduce. \todo{Add 1--2 sentences on the specific gap your lab hit, e.g. drug-sensitivity questions in AML / medulloblastoma.}
+
+NetPerturb addresses this with a single Nextflow \citep{DiTommaso2017nextflow} workflow, organised following nf-core practice \citep{Ewels2020nfcore}. Its input is the object most analysts already have, a processed Seurat object \citep{Hao2023seurat}. It parallelises network inference and scoring across identities and targets, and it gathers every result, together with the quality control and provenance needed to interpret it, into one portable report.
+
+%% =====================================================================
+\section{Implementation}
+%% =====================================================================
+
+\begin{figure*}[!t]%
+\centering
+\includegraphics[width=\textwidth]{fig1_metro.pdf}
+\caption{\textbf{Overview of NetPerturb.} A processed Seurat object and a list of target genes enter \texttt{DOWNSAMPLE}, which balances cell identities and checks the targets. The rank-score track (warm lines; one of GENIE3, scRank or hdWGCNA, chosen with \param{network}) infers one GRN per identity and scores every identity $\times$ target pair. The knockout track (blue; \param{sctknk}) builds one wild-type scTenifoldKnk network per identity and runs one virtual knockout per identity $\times$ target, optionally followed by fgsea. Both tracks converge on a single self-contained HTML report.}\label{fig:overview}
+\figalttext[Metro-map diagram of the NetPerturb pipeline]{Metro-style diagram in which coloured lines represent the three alternative network inference methods and the parallel scTenifoldKnk knockout track, running from input through downsampling, network inference, scoring, merging and enrichment to the HTML report.}%
+\end{figure*}
+
+\subsection{Input and pre-processing}
+
+NetPerturb requires four inputs: a Seurat object (\param{obj}), the metadata column defining cell identities (\param{column}), the species, and a text file of targets (\param{target}), one per line. Genes joined by a semicolon (e.g.\ \texttt{CDK8;CDK19}) are treated as a single combined perturbation. The \texttt{DOWNSAMPLE} step randomly keeps at most \param{n\_cells} cells per identity, so that every identity contributes a comparable number of cells, and drops identities that end up with fewer than \param{min\_cells} cells. It also builds a shared gene universe from the highly variable genes, transcription factors, drug targets and the requested targets. Each target is checked against the retained cells before any network is built. Genes that are absent from the object or have no counts are removed and recorded, a combined target keeps whichever of its genes pass, and the run stops only when no target passes. Problems that would otherwise end a run hours later are therefore caught at the start and listed in the report.
+
+\subsection{Rank-score track}
+
+For each identity, NetPerturb infers a GRN with one of three interchangeable methods (Table~\ref{tab:methods}). GENIE3 \citep{HuynhThu2010genie3} and scRank's own network builder \citep{Li2024scrank} are used as published. hdWGCNA \citep{Morabito2023hdwgcna} produces an unsigned co-expression network on metacells, so NetPerturb adapts its topological overlap matrix to the input scRank expects in four steps. It restores the sign of each edge from the correlation between the two genes, pads every identity to the same gene set, removes edges below the \param{cut\_ratio} quantile of absolute weight, and rescales the weights to $[-1,1]$. Each identity $\times$ target pair is then scored with scRank, which compares each network before and after removing the target's edges and returns a perturbation score in either antagonist or agonist mode. The strongest \param{top\_connections} edges of each target are also exported. Networks and scores are computed as separate parallel tasks and merged into one table afterwards.
+
+\begin{table}[!t]
+\begin{center}
+\begin{minipage}{\columnwidth}
+\caption{Network inference methods available in NetPerturb.\label{tab:methods}}%
+\small\begin{tabular}{@{}llll@{}}
+\toprule
+Method & Network & Output & Track \\
+\midrule
+GENIE3      & Tree-based regression  & Directed weights       & Rank score \\
+scRank      & scRank builder   & Directed weights       & Rank score \\
+hdWGCNA     & Metacell TOM + sign    & Signed, sparsified     & Rank score \\
+scTenifoldKnk & PCR + tensor denoising & WT vs.\ KO manifold  & Knockout \\
+\botrule
+\end{tabular}
+\begin{tablenotes}%
+\item TOM, topological overlap matrix; PCR, principal component regression; WT, wild type; KO, knockout. \todo{Add runtime / peak memory columns from your benchmark.}
+\end{tablenotes}
+\end{minipage}
+\end{center}
+\end{table}
+
+\subsection{Virtual knockout track}
+
+When \param{sctknk} is set, a scTenifoldKnk track \citep{Osorio2022sctenifoldknk} runs alongside the rank-score track, or on its own. The expensive wild-type network does not depend on the target, so NetPerturb builds it once per identity (\texttt{SCTENIFOLDKNK\_BUILD}). Each identity $\times$ target knockout then runs as a separate task on that stored network (\texttt{SCTENIFOLDKNK\_KO}). With a single build per identity, one wild-type network can serve any number of knockouts, and the knockout of a combined target can zero the edges of all its genes at once, which the original single-gene interface does not allow. Differential regulation uses the statistic of scTenifoldKnk v1.0.3, which leaves the knocked-out genes out of the reference mean. \todo{Briefly justify, e.g. ``In our tests, including them inflated the mean so much that almost no gene reached significance (1 vs.\ 12 genes at FDR $<0.05$ on a 5,600-gene network).''} If a GMT file is supplied, genes are ranked by $\log_2$FC and tested with fgsea \citep{Korotkevich2016fgsea} against, for example, MSigDB collections \citep{Liberzon2015msigdb}. Gene sets are read from local files, so the step also runs on compute nodes without internet access.
+
+\subsection{Report}
+
+The \texttt{REPORT} step renders a single self-contained Quarto HTML file (Fig.~\ref{fig:report}). The report contains:
+(i) an overview recording the network method, the targets removed by quality control, the number of cells and genes available to each identity's network, and a UMAP of the retained cells;
+(ii) a heatmap of target expression per identity, so that a low score can be checked against a target that is barely expressed;
+(iii) a searchable table and a heatmap of perturbation scores;
+(iv) interactive knockout networks and a table of differentially regulated genes;
+(v) an enrichment dot plot and table; and
+(vi) provenance, with the command line, software versions, parameters and the running time of each step taken from the Nextflow trace.
+
+\subsection{Reproducibility and deployment}
+
+Every tool runs in a versioned Singularity/Docker container \citep{Kurtzer2017singularity}, so no R dependencies need to be installed. A single \param{seed} parameter sets the random seed of every step that uses one: downsampling, GENIE3 (via doRNG), hdWGCNA metacells, scTenifoldKnk and fgsea. scRank's network builder is the one exception, because it sets its own seed internally. Memory and CPU requests are defined per process and can be adjusted in a configuration profile. The pipeline is tested with nf-test at the module and workflow level, and it provides small and dataset-scale test profiles (\texttt{-profile test}).
+
+%% =====================================================================
+\section{Results}
+%% =====================================================================
+%% \todo: This section should show that the tool works and is useful.
+%% Suggested structure (keep to ~1/2 page; the whole note must fit in 4 pages).
+
+We applied NetPerturb to three public datasets that come with test profiles: interferon-$\beta$-stimulated peripheral blood mononuclear cells \citep{Kang2017demuxlet}, acute myeloid leukaemia bone marrow \citep{vanGalen2019aml}, and Sonic Hedgehog medulloblastoma treated with a Smoothened inhibitor \citep{Ocasio2019medullo}.
+
+\todo{Kang: expected result, e.g. perturbing the interferon receptor/JAK--STAT axis (IFNAR1;IFNAR2, JAK1;TYK2, STAT1;STAT2) gives the highest scores in the monocytes that respond most strongly to IFN-$\beta$.}
+
+\todo{van Galen: which malignant or normal compartments score highest for BCL2, FLT3, IDH1/2 or MEN1, and whether joint targets (e.g.\ BCL2;DNMT1) add to the single-gene scores.}
+
+\todo{Ocasio: whether perturbing \textit{Smo} separates sensitive from resistant populations, as expected from the treatment design.}
+
+\todo{Agreement between methods: correlation of identity rankings between GENIE3, scRank and hdWGCNA; knockout genes and enriched pathways.}
+
+\todo{Scalability: wall-clock time and peak memory against the number of cells, identities and targets, from the Nextflow trace; the saving from building the wild-type network once per identity instead of once per target.}
+
+\begin{figure}[!t]%
+\centering
+\fbox{\parbox[c][5cm][c]{0.95\columnwidth}{\centering\todo{Composite screenshot of the HTML report:\\ (A) perturbation score heatmap, (B) target expression heatmap,\\ (C) knockout network, (D) GSEA dot plot.}}}
+\caption{\textbf{The NetPerturb report} for \todo{dataset}. (A) Perturbation scores for each identity $\times$ target pair. (B) Mean log-normalised expression of each target in each identity. (C) Interactive scTenifoldKnk network centred on \todo{gene}, with node size proportional to $\log_2$FC. (D) Gene sets enriched among the genes the knockout moved most (fgsea; FDR $<0.25$).}\label{fig:report}
+\figalttext[Screenshots of the NetPerturb HTML report]{\todo{Long alt text describing each panel.}}%
+\end{figure}
+
+%% =====================================================================
+\section{Conclusion}
+%% =====================================================================
+
+NetPerturb takes an analyst from a Seurat object to a shareable report on GRN-based in silico perturbation with a single command. It runs several network inference methods and a virtual knockout under one interface, and its seeding, containers and provenance make each result reproducible. \todo{Limitations: scores are comparable only within one inference method; knockout effects reflect network structure, not the direction of expression change; scRank seeds itself. Future work: e.g.\ AnnData input, more methods, nf-core submission.}
+
+%% =====================================================================
+%% Back matter -- all required by Bioinformatics Advances
+%% =====================================================================
+
+\section{Acknowledgements}
+\todo{Acknowledgements.} \todo{AI disclosure: the guidelines require disclosing any AI/LLM use (e.g.\ assistance with code or drafting) here or in Methods, as well as in the cover letter.}
+
+\section{Author contributions}
+\todo{CRediT roles, e.g.\ D.M.-C.: Conceptualization, Software, Writing -- original draft. \ldots}
+
+\section{Conflict of interest}
+None declared.
+
+\section{Funding}
+\todo{Funding agencies and grant numbers.}
+
+\section{Data availability}
+The source code, container recipes and test data definitions are available at \url{https://github.com/MCBLab/NetPerturb} (release \todo{vX.Y.Z}, archived at Zenodo \todo{DOI}). The Seurat objects used in this study are available at \todo{Zenodo record 21682634 (Ocasio), figshare file 59437163 (van Galen), \ldots}; the original data are available from \todo{GEO accessions}.
+
+%% ---------------------------------------------------------------------
+%% References: numbers are capped at 15 for an Application Note.
+%% references/references.bib also holds two extra entries (WGCNA, GEARS)
+%% that are not cited yet, in case you want to swap them in.
+%% ---------------------------------------------------------------------
+\bibliographystyle{oup-abbrvnat}
+\bibliography{references/references}
+
+\end{document}
