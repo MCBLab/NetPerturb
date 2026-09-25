@@ -1,0 +1,463 @@
+/*
+ * NetPerturb docs: the readthedocs theme restyled after the MCB Lab site
+ * (https://mcblab.github.io), which is Bootswatch Sandstone with Atkinson
+ * Hyperlegible. Colours are Sandstone's; the red is the logo's perturbed node.
+ */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../fonts/Atkinson-Hyperlegible-Regular-102a.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../fonts/Atkinson-Hyperlegible-Bold-102a.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --np-blue: #325d88;
+  --np-blue-dark: #264868;
+  --np-dark: #3e3f3a;
+  --np-sand: #dfd7ca;
+  --np-cream: #f8f5f0;
+  --np-muted: #5f5d58;
+  --np-border: rgba(142, 140, 132, 0.35);
+  --np-red: #c8352b;
+  --np-orange: #d96c3f;
+  --np-green: #648b4a;
+}
+
+/* ---- type ---------------------------------------------------------------- */
+
+body,
+.wy-body-for-nav,
+.rst-content,
+.wy-menu-vertical,
+.wy-side-nav-search input[type="text"],
+h1, h2, h3, h4, h5, h6,
+legend,
+.rst-content .toctree-wrapper p.caption {
+  font-family: "Atkinson Hyperlegible", Roboto, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Arial, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  color: var(--np-dark);
+}
+
+.rst-content h1 { font-size: 2rem; }
+.rst-content h2 {
+  font-size: 1.55rem;
+  margin-top: 2.2rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--np-border);
+}
+.rst-content h3 { font-size: 1.2rem; margin-top: 1.6rem; }
+
+.wy-nav-content p,
+.wy-nav-content li {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+a,
+a:visited {
+  color: var(--np-blue);
+}
+
+a:hover {
+  color: var(--np-blue-dark);
+}
+
+/* ---- page frame ---------------------------------------------------------- */
+
+.wy-body-for-nav,
+.wy-nav-content-wrap {
+  background: var(--np-sand);
+}
+
+.wy-nav-content {
+  background: var(--np-cream);
+  max-width: 920px;
+  min-height: 100vh;
+}
+
+/* ---- sidebar ------------------------------------------------------------- */
+
+.wy-nav-side {
+  background: var(--np-dark);
+}
+
+.wy-side-nav-search {
+  background: var(--np-blue);
+  padding-top: 1.1rem;
+}
+
+.wy-side-nav-search > a,
+.wy-side-nav-search .wy-dropdown > a {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.wy-side-nav-search > a img.logo,
+.wy-side-nav-search .wy-dropdown > a img.logo {
+  width: 150px;
+  max-width: 70%;
+  padding: 0;
+  margin-bottom: 0.3rem;
+  background: transparent;
+}
+
+.wy-side-nav-search input[type="text"] {
+  border-color: var(--np-blue-dark);
+  border-radius: 0.4rem;
+}
+
+.wy-menu-vertical header,
+.wy-menu-vertical p.caption {
+  color: var(--np-sand);
+}
+
+.wy-menu-vertical a {
+  color: #e6e1d8;
+}
+
+.wy-menu-vertical a:hover {
+  background-color: #4b4c46;
+  color: #fff;
+}
+
+.wy-menu-vertical li.current > a,
+.wy-menu-vertical li.on a {
+  color: var(--np-dark);
+  background: var(--np-cream);
+  border-right: none;
+  font-weight: 700;
+}
+
+.wy-menu-vertical li.current {
+  background: #ece6dc;
+}
+
+.wy-menu-vertical li.current a {
+  color: var(--np-dark);
+  border-right: none;
+}
+
+.wy-menu-vertical li.current a:hover,
+.wy-menu-vertical li.toctree-l2.current > a,
+.wy-menu-vertical li.toctree-l2 a:hover {
+  background: var(--np-sand);
+}
+
+.wy-menu-vertical li.toctree-l2.current li.toctree-l3 > a {
+  background: #ece6dc;
+}
+
+/* mobile top bar */
+.wy-nav-top {
+  background: var(--np-blue);
+}
+
+.wy-nav-top a {
+  color: #fff;
+}
+
+/* ---- breadcrumbs / footer ------------------------------------------------ */
+
+.wy-breadcrumbs li a,
+.wy-breadcrumbs-aside a {
+  color: var(--np-blue);
+}
+
+footer {
+  color: var(--np-muted);
+}
+
+.rst-versions {
+  background: var(--np-dark);
+  font-family: "Atkinson Hyperlegible", sans-serif;
+}
+
+.rst-versions .rst-current-version {
+  background: #2f302c;
+  color: var(--np-sand);
+}
+
+.btn-neutral {
+  background: #fff !important;
+  border: 1px solid var(--np-border);
+  border-radius: 0.4rem;
+  box-shadow: none;
+  color: var(--np-dark) !important;
+}
+
+/* ---- code ---------------------------------------------------------------- */
+
+.rst-content code,
+.rst-content tt,
+code {
+  background: #efe9df;
+  border: 1px solid var(--np-sand);
+  border-radius: 0.25rem;
+  color: var(--np-dark);
+  font-size: 0.88em;
+  padding: 0.05em 0.3em;
+  /* flags like --network would otherwise break at their hyphens */
+  white-space: nowrap;
+}
+
+.rst-content pre code,
+pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  white-space: pre;
+  font-size: 0.85rem;
+}
+
+.rst-content pre,
+pre {
+  background: #fff;
+  border: 1px solid var(--np-border);
+  border-radius: 0.5rem;
+  padding: 0.9rem 1rem;
+}
+
+.hljs {
+  background: #fff;
+}
+
+/* ---- tables -------------------------------------------------------------- */
+
+.rst-content table.docutils,
+.wy-table-bordered-all,
+.rst-content table {
+  border: 1px solid var(--np-border);
+  border-radius: 0.5rem;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  width: 100%;
+  margin-bottom: 1.5rem;
+}
+
+.rst-content table th,
+.rst-content table td {
+  border: none;
+  border-bottom: 1px solid var(--np-border);
+  padding: 0.5rem 0.75rem;
+  white-space: normal;
+  vertical-align: top;
+  font-size: 0.93rem;
+  line-height: 1.5;
+}
+
+.rst-content table thead th {
+  background: #ece6dc;
+  color: var(--np-dark);
+  text-align: left;
+}
+
+/* the theme stripes odd rows blue-grey; stripe in the sand palette instead */
+.rst-content table tbody tr td,
+.rst-content table.docutils:not(.field-list) tr:nth-child(2n-1) td,
+.wy-table-odd td {
+  background: #fff;
+  border-left: none;
+  border-right: none;
+}
+
+.rst-content table tbody tr:nth-child(2n) td {
+  background: #faf8f4;
+}
+
+.rst-content table th {
+  border-left: none;
+  border-right: none;
+}
+
+.rst-content table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* wide tables scroll inside their own box rather than the page */
+.wy-table-responsive {
+  overflow-x: auto;
+}
+
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+  white-space: normal;
+}
+
+/* ---- admonitions --------------------------------------------------------- */
+
+.rst-content .admonition,
+.rst-content .note,
+.rst-content .tip,
+.rst-content .warning {
+  background: #fff;
+  border: 1px solid var(--np-border);
+  border-left: 4px solid var(--np-blue);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+}
+
+.rst-content .admonition-title {
+  background: transparent !important;
+  color: var(--np-blue);
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  padding: 0;
+}
+
+.rst-content .admonition-title::before {
+  display: none;
+}
+
+.rst-content .tip {
+  border-left-color: var(--np-green);
+}
+
+.rst-content .tip .admonition-title {
+  color: var(--np-green);
+}
+
+.rst-content .warning {
+  border-left-color: var(--np-orange);
+}
+
+.rst-content .warning .admonition-title {
+  color: #b5532b;
+}
+
+/* ---- home page ----------------------------------------------------------- */
+
+.np-hero {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 1.75rem;
+  align-items: center;
+  margin: 0.5rem 0 1.5rem;
+}
+
+.np-hero img {
+  width: 180px;
+  height: auto;
+}
+
+.np-hero h1 {
+  margin: 0 0 0.35rem;
+  font-size: 2.3rem;
+}
+
+.np-hero .lead {
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--np-dark);
+  margin: 0;
+}
+
+.eyebrow {
+  color: var(--np-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 0.25rem !important;
+}
+
+.np-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0 2rem;
+}
+
+.np-card {
+  background: rgba(223, 215, 202, 0.35);
+  border: 1px solid var(--np-border);
+  border-radius: 0.5rem;
+  padding: 1rem 1.1rem;
+}
+
+.np-card h3 {
+  margin-top: 0 !important;
+  font-size: 1.05rem;
+}
+
+.np-card p {
+  margin-bottom: 0 !important;
+  font-size: 0.95rem !important;
+}
+
+.np-card .np-swatch {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: 0.05rem;
+}
+
+.np-figure {
+  background: #fff;
+  border: 1px solid var(--np-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.np-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+@media (max-width: 800px) {
+  .np-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .np-hero {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .np-hero img {
+    width: 150px;
+  }
+}
+
+/* on phones a long path in inline code must be allowed to wrap */
+@media (max-width: 560px) {
+  .rst-content code,
+  code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* wide tab-separated examples scroll instead of being clipped */
+.rst-content pre,
+pre {
+  overflow-x: auto;
+}
+
+.rst-content table td,
+.rst-content table th {
+  border-left: none !important;
+  border-right: none !important;
+}

@@ -1,4 +1,8 @@
+<img src="docs/img/logo.svg" alt="NetPerturb logo" align="right" width="150">
+
 # NetPerturb 🧬
+
+📖 **Documentation: [mcblab.github.io/NetPerturb](https://mcblab.github.io/NetPerturb/)** (usage, output and FAQ)
 
 **MCBLab/NetPerturb** is a scalable Nextflow pipeline designed to infer Gene Regulatory Networks (GRNs) and calculate single-cell expression ranking perturbation scores using the scRank algorithm. 
 
