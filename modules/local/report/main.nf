@@ -26,6 +26,7 @@ process REPORT {
     path identity_qc
     path network_qc
     path target_network_qc
+    path sctknk_status
 
   output:
     path "netperturb_report.html", emit: report
@@ -65,6 +66,7 @@ process REPORT {
       -P identity_qc_file:${identity_qc} \
       -P network_qc_file:${network_qc} \
       -P target_network_qc_file:${target_network_qc} \
+      -P sctknk_status_file:${sctknk_status} \
       --output netperturb_report.html
     """
 

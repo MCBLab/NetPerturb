@@ -18,6 +18,7 @@ process SCTENIFOLDKNK_BUILD {
     val n_cores
     val min_pct
     val seed
+    val td_k
 
   output:
     path "*_sctknk_wt.rds", emit: wt
@@ -31,7 +32,7 @@ process SCTENIFOLDKNK_BUILD {
     # The image caps R's heap at 8 GB (R_MAX_VSIZE in its Dockerfile), below
     # what the network build needs; R gets what this task was given instead.
     export R_MAX_VSIZE=${ task.memory ? task.memory.toGiga() + 'Gb' : '100Gb' }
-    sctenifoldknk_build.R ${scobj} ${n_cores} ${min_pct} ${seed}
+    sctenifoldknk_build.R ${scobj} ${n_cores} ${min_pct} ${seed} ${td_k}
     """
 
   stub:

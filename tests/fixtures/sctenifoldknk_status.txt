@@ -1,0 +1,7 @@
+cell_type	target	status	genes_knocked	out_degree	out_strength	out_strength_pct	median_distance	effect_pct	n_null	n_tested	hits_raw	hits_null
+resistant	Brd4	ok	Brd4	812	14.2	72	2.1e-09	68	50	1500	34	6
+sensitive	Brd4	ok	Brd4	790	11.8	70	1.7e-09	62	50	1500	8	2
+resistant	Cstdc5	ok	Cstdc5	23	0.08	4	9.3e-12	2	50	1500	3	1
+sensitive	Cstdc5	no outgoing edges	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA
+resistant	Mpo	ok	Mpo	41	0.05	2	7.6e-12	0	50	1500	0	0
+sensitive	Mpo	not expressed	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA

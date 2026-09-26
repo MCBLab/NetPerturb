@@ -220,6 +220,8 @@ nextflow_pipeline {
             // names Brd4, Cstdc5 and Stfa1;Mpo, so that is 3 targets across 2
             // identities. "SCTENIFOLDKNK_KO (" counts the knockouts alone.
             assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 2
+            // and one null model per identity, which every knockout of it reads
+            assert names.count { it.startsWith("SCTENIFOLDKNK_NULL") } == 2
             def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK_KO (") }
             assert knkTasks.size() == 6
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
@@ -237,6 +239,7 @@ nextflow_pipeline {
             assert !names.any { it.startsWith("HDWGCNA") }
 
             assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
+            assert path("${outputDir}/sctknk/sctenifoldknk_status.txt").exists()
             assert path("${outputDir}/report/netperturb_report.html").exists()
         }
     }

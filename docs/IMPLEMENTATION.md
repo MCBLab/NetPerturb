@@ -4,6 +4,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
+| 29 | Why every knockout returned the same genes | Sep 2026 | branch `fix-ribo-mito` |
 | 28 | A Data quality section, and a knockout summary | Sep 2026 | branch `fix-ribo-mito` |
 | 27 | Mitochondrial and ribosomal genes removed on load | Sep 2026 | branch `fix-ribo-mito` |
 | 26 | A documentation website | Sep 2026 | #22 |
@@ -34,6 +35,34 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 | 1 | Prototype pipeline | Dec 2024 | — |
 
 ---
+
+## Wave 29 — Why every knockout returned the same genes
+
+**Sep 2026** · branch `fix-ribo-mito`, not yet on `main`
+
+On Kang 2018 control PBMCs, after wave 27 had removed the ribosomal genes, every one of 25 targets still returned the same two or three genes per cell type: FTH1 and FTL in CD14+ monocytes, B2M and TMSB4X in CD4 T cells, MALAT1 in B cells. Eight knockouts that removed nothing at all — targets with no outgoing edge, whose maximum distance was 1e-16 — reported 9 to 35 "significant" genes. This wave is the diagnosis, done on a wild-type network the pipeline's own `sctenifoldknk_build.R` built from the AML test object (1,503 genes, 189 cells, 14 min), and what it changed.
+
+**What the statistic measures.** scTenifoldKnk's `FC` is a gene's squared distance over the mean squared distance, so it only ranks a knockout's genes against each other and carries no scale: a knockout that changed nothing gives the same number of hits as one that changed everything. Its chi-square null does not fit either; the distances' 99th percentile sits 100 to 200 times above their median where a chi-square would put it at 15. So every knockout produces hits, whatever it did.
+
+**What the alignment measures.** With 28 knockouts of the test network (the 4 test targets plus random genes stratified by out-degree), at `d` of 2, 5, 10 and 30 alike: the pattern of distances over genes is shared between knockouts (median Spearman 0.89–0.90), a gene's mean rank tracks its total edge strength at 0.96–0.97, and the overall size of a knockout tracks the out-strength of the knocked-out gene at 0.98. The scale says how much was removed; the pattern says which genes are hubs. Seeds change nothing (three seeds, Spearman 1.0), and the eigen-solver's tolerance is not the floor (distances agree to eight digits from `tol` 1e-10 to 1e-16), so distances of 1e-12 are real values and the no-op's 1e-16 is a real zero. On Kang, a rank-1 model — one pattern per cell type times a scale per target — explains 99.2–99.9% of the variance of log distance.
+
+**Where the pattern comes from.** The wild-type network is the CP tensor decomposition of the bootstrap networks with K = 3, and the result is a matrix of rank 3: the top three singular values carry 0.568, 0.288 and 0.137 of the spectrum and the rest is zero, and the median gene's outgoing edges sit 99.5% inside that three-dimensional space. A knockout removes one row, so every knockout removes a mix of the same three patterns and only the mix differs. Rebuilding from the same bootstrap networks: at K = 3 the median Jaccard of two knockouts' top-20 genes is 0.54 and their Spearman 0.74; at K = 10 it is 0.05–0.21 and 0.29–0.40; on the plain mean of the bootstrap networks 0.05 and 0.16–0.21 — and in every case the genes that move still track the edges the knockout removed (residual Spearman 0.6 with the removed edge weight). The shared pattern is the rank-3 denoising, not the alignment.
+
+**Is there a target in the residue?** After subtracting each gene's mean log distance over the other knockouts, what is left correlates with the edge the knockout removed from that gene at 0.52 (`d` = 2) to 0.68 (`d` = 10), and with the gene's hubness at only 0.1–0.3. So the alignment carries target-specific information; the statistic scores the hub pattern on top of it. That residue depends on how much the knockout removed, though: against a null of knockouts far from the target's out-strength, z-scores of 11–32 appear that are strength artefacts.
+
+**What changed.**
+
+- **No-op knockouts are skipped.** A target with no outgoing edge in a cell type's network removes nothing; `SCTENIFOLDKNK_KO` writes no rows and a status line saying so. On Kang this is exactly the set of knockouts whose pattern did not correlate with the cell type's (Spearman with the mean pattern below 0.5).
+- **A null model, `SCTENIFOLDKNK_NULL`** (`--sctknk_null`, default 50). One task per cell type runs the same knockout for random genes with an outgoing edge, never a target, stratified over log out-strength with both ends always in. `SCTENIFOLDKNK_KO` fits, per gene, a line of the median-centred log distance on log out-strength across them and scores the target's residual in MAD units: `z_null`, `p_null`, `p_null_adj`. Three forms were tried on the test network. Mean-centring alone gave few hits but its z depended on which random genes were drawn; projecting out three components of the null added heavy tails and lowered specificity; the regression used every null, kept the tails moderate (kurtosis 2–9 against up to 41 for nearest-strength matching) and kept the top genes on the removed edges (median edge percentile 0.68). Brd4, a hub, comes out with z of sd 1.03 and no hit; the weak targets with a few. The MAD rather than the SD because a few random knockouts can move a gene far. On a K = 10 network the weakest target (2% of random knockouts moved the network less) still came out with z spread 1.99 and 146 hits, the lines at the bottom of the strength range resting on few nulls, so the scores are standardised once more by their own median and MAD over the knockout's genes, an empirical null per knockout in Efron's sense. After it, on the K = 10 network Brd4 and the weak target each have 5 hits, and for both the twenty highest-scoring genes are the target's own removed edges (median percentile of removed-edge weight 0.79 and 0.90); on the K = 3 network Brd4 has none, since nothing about a hub's knockout there differs from a random hub's. Each knockout's `effect_pct` and `out_strength_pct` go on the status line.
+- **`--sctknk_td_k`** exposes the decomposition's rank, and 0 averages the bootstrap networks. The default stays at 3 until a real dataset confirms the test network, so the published setting is still the published method.
+- **`--sctknk_ndim`** exposes the alignment's dimensions; default 2, the published one.
+- **A status table**, `sctknk/sctenifoldknk_status.txt`, merged by `MERGE_SCTENIFOLDKNK` from one line per pair, feeds the report: the per-knockout heatmap labels skipped pairs with the reason, and the enrichment ranks by `z_null` when it is there. The summary's "affected" is on `p_null_adj` when the null ran.
+
+**What did not change.** scTenifoldKnk's own columns are all still there, and a run with `--sctknk_null 0` is the run before this wave plus the no-op gate.
+
+**Checked here.** The build, null and knockout scripts ran on the test network (null of 30 in 36 s; Stfa1 gated as a no-op; the calibrated columns and status lines written; the merge's `awk` summary checked on calibrated and older tables). The report rendered on a fixture table with the calibrated columns and a status fixture, and its knockout figure, table, summary and enrichment text were looked at. Nextflow and nf-test are not installed on this machine, so the workflow and its updated tests did not run. The two K = 3 networks built here from the same object and seed differed in density (0.64 and 0.50) although `makeNetworks` and `tensorDecomposition` each reproduced under their seed; unexplained, and worth building one Kang cell type twice on the cluster.
+
+**Still to do.** Re-run Kang on this branch, then with `--sctknk_td_k 10`, and read the knockout of a well-expressed hub against its status line before believing any list of affected genes. The null makes the hits specific but few; whether they are biologically right needs the stimulated half of Kang.
 
 ## Wave 28 — A Data quality section, and a knockout summary
 

@@ -35,6 +35,7 @@ nextflow_process {
                 input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
                 input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
                 input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }
@@ -70,6 +71,7 @@ nextflow_process {
                 input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
                 input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
                 input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }
@@ -104,6 +106,7 @@ nextflow_process {
                 input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
                 input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
                 input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }

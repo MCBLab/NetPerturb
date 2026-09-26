@@ -8,6 +8,7 @@
 include { GENIE3 } from "./modules/local/genie3/main.nf"
 include { SCTENIFOLDKNK_KO } from "./modules/local/sctenifoldknk_ko/main.nf"
 include { SCTENIFOLDKNK_BUILD } from "./modules/local/sctenifoldknk_build/main.nf"
+include { SCTENIFOLDKNK_NULL } from "./modules/local/sctenifoldknk_null/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { HDWGCNA } from "./modules/local/hdwgcna/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
@@ -85,15 +86,34 @@ workflow {
     // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
     // --network is running too.
     if( sctknk ) {
-        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed )
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed, params.sctknk_td_k )
 
-        SCTENIFOLDKNK_BUILD.out.wt
+        // The null model: the same knockout run for --sctknk_null random
+        // genes of each cell type's network, once per cell type, which every
+        // knockout of that cell type is then tested against. With
+        // --sctknk_null 0 the sentinel stands in and the knockout tables
+        // carry scTenifoldKnk's own statistic only. Keyed by cell type to
+        // meet the network it was built from.
+        sctknk_wt_keyed = SCTENIFOLDKNK_BUILD.out.wt
+            .map { wt -> [ wt.name.replace('_sctknk_wt.rds', ''), wt ] }
+        if( params.sctknk_null > 0 ) {
+            SCTENIFOLDKNK_NULL( SCTENIFOLDKNK_BUILD.out.wt, target_qc_file, params.sctknk_null, n_cores, params.seed, params.sctknk_ndim )
+            sctknk_null_keyed = SCTENIFOLDKNK_NULL.out.null_model
+                .map { nm -> [ nm.name.replace('_sctknk_null.rds', ''), nm ] }
+        } else {
+            sctknk_null_keyed = sctknk_wt_keyed
+                .map { ct, wt -> [ ct, file("${projectDir}/assets/NO_SCTKNK_NULL") ] }
+        }
+
+        sctknk_wt_keyed
+        .join( sctknk_null_keyed )
         .combine( sctknk_target_ch )
+        .map { ct, wt, nm, target -> tuple( wt, nm, target ) }
         .set { sctknk_input }
 
-        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed )
+        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed, params.sctknk_ndim )
 
-        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect() )
+        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect(), SCTENIFOLDKNK_KO.out.status.collect() )
 
         // Ranks each pair's genes by how far the knockout moved them and asks
         // which gene sets sit at the top of that ranking -- the analysis the
@@ -160,6 +180,12 @@ workflow {
             ? MERGE_SCTENIFOLDKNK.out.merged_dr_table
             : file("${projectDir}/assets/NO_SCTKNK_TABLE")
 
+        // And for the knockout status table, one line per cell type x target
+        // saying whether the knockout ran and how far it moved the network.
+        sctknk_status = sctknk
+            ? MERGE_SCTENIFOLDKNK.out.status
+            : file("${projectDir}/assets/NO_SCTKNK_STATUS")
+
         // Same sentinel arrangement for the enrichment table, which has two
         // ways of not existing: the knockout track was not run at all, or it
         // was run without a --gsea_gmt to enrich against.
@@ -202,6 +228,9 @@ workflow {
             "n_cores"         : params.n_cores,
             "seed"            : params.seed,
             "sctknk_min_pct"  : params.sctknk_min_pct,
+            "sctknk_null"     : params.sctknk_null,
+            "sctknk_ndim"     : params.sctknk_ndim,
+            "sctknk_td_k"     : params.sctknk_td_k,
             "batch"           : params.batch
         ]
         run_info_file = Channel
@@ -253,7 +282,8 @@ workflow {
             trace_snapshot,
             DOWNSAMPLE.out.identity_qc,
             NETWORK_QC.out.network_qc,
-            NETWORK_QC.out.target_network_qc
+            NETWORK_QC.out.target_network_qc,
+            sctknk_status
         )
     }
 }

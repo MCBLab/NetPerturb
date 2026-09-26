@@ -42,6 +42,17 @@ if (is.na(min_pct) || min_pct < 0 || min_pct >= 1) min_pct <- 0.05
 # --seed; missing or unparseable falls back to 1, the pipeline default
 seed      <- suppressWarnings(as.integer(if (length(args) >= 4) args[4] else NA))
 if (is.na(seed)) seed <- 1L
+# --sctknk_td_k: components of the CP tensor decomposition that denoises the
+# bootstrap networks into the wild-type one, scTenifoldKnk's td_K (default
+# 3). The decomposition returns a network of rank at most K, so with K = 3
+# every gene's outgoing edges are a mix of the same three patterns and every
+# knockout removes a mix of the same three patterns: whatever the target, the
+# same hub genes move. More components keep more of each gene's own edges
+# (on a test network, K = 10 made the knockouts of different targets move
+# different genes where K = 3 moved the same ones). 0 skips the
+# decomposition and averages the bootstrap networks instead.
+td_k      <- suppressWarnings(as.integer(if (length(args) >= 5) args[5] else NA))
+if (is.na(td_k) || td_k < 0) td_k <- 3L
 
 cell_type <- sub("\\.RDS$", "", basename(seuratObj))
 out_file  <- paste0(cell_type, "_sctknk_wt.rds")
@@ -127,11 +138,17 @@ wt <- tryCatch({
                        nCells = min(500, ncol(X)), scaleScores = TRUE,
                        symmetric = FALSE, nComp = n_comp, nCores = n_cores)
 
-  set.seed(seed)
-  td <- tensorDecomposition(xList = nets, K = 3, maxError = 1e-05,
-                            maxIter = 1000, nDecimal = 3)
+  X_wt <- if (td_k > 0) {
+    set.seed(seed)
+    td <- tensorDecomposition(xList = nets, K = td_k, maxError = 1e-05,
+                              maxIter = 1000, nDecimal = 3)
+    td$X
+  } else {
+    message("--sctknk_td_k 0: averaging the ", length(nets), " bootstrap networks, no tensor decomposition.")
+    Reduce(`+`, lapply(nets, as.matrix)) / length(nets)
+  }
 
-  W <- as.matrix(strict_direction(td$X, lambda = 0))
+  W <- as.matrix(strict_direction(X_wt, lambda = 0))
   diag(W) <- 0
   t(W)
 }, error = function(e) {

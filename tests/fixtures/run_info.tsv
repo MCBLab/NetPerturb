@@ -26,3 +26,6 @@ n_cores	4
 seed	1
 sctknk_min_pct	0.05
 batch	donor
+sctknk_td_k	3
+sctknk_null	50
+sctknk_ndim	2

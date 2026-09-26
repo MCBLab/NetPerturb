@@ -113,6 +113,9 @@ Symbols must match the object (MGI for mouse, HGNC for human), and `--species` m
 |---|---|---|
 | `--sctknk` | `false` | Switch on the scTenifoldKnk knockout track. |
 | `--sctknk_min_pct` | `0.05` | A gene must be detected in more than this fraction of an identity's cells to enter its knockout network. Targets are always kept. Build cost grows with the square of the gene count. |
+| `--sctknk_null` | `50` | Random-gene knockouts per identity used as the knockout track's null model; each gene of a target's knockout is tested against what it does under them (`z_null`, `p_null_adj`). `0` leaves scTenifoldKnk's own statistic only. |
+| `--sctknk_ndim` | `2` | Dimensions of the aligned manifold (scTenifoldKnk's default). More carry more target-specific signal at a higher alignment cost. |
+| `--sctknk_td_k` | `3` | Rank of the tensor decomposition that builds the wild-type network (scTenifoldKnk's `td_K`). At 3 every knockout moves the same hub genes; 10 separated targets on a test network; `0` averages the bootstrap networks instead. |
 | `--sctknk_plot` | `false` | Also draw scTenifoldKnk's `plotKO()` network per identity × target, as PDFs under `sctknk/plots/`. |
 | `--sctknk_top_genes` | `25` | Report only: genes drawn around each knocked-out target in the knockout network figure. |
 

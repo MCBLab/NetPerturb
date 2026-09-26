@@ -23,13 +23,19 @@ process SCTENIFOLDKNK_KO {
   container "/home/lgdqamorim/scratch/singularity_images/sctenifoldknk-v1.0.sif"
 
   input:
-    tuple path(wt), val(target)
+    // null_model is the cell type's SCTENIFOLDKNK_NULL file, or the empty
+    // assets/NO_SCTKNK_NULL sentinel when --sctknk_null is 0
+    tuple path(wt), path(null_model), val(target)
     val n_cores
     val plot
     val seed
+    val ndim
 
   output:
     path "*.txt", emit: dr_table
+    // one line per pair: ran or why not, what the knockout removed, how far
+    // it moved the network next to the null knockouts
+    path "*.status.tsv", emit: status
     // only written with --sctknk_plot
     path "*_sctknk_plot_*.pdf", optional: true, emit: plot
 
@@ -43,7 +49,7 @@ process SCTENIFOLDKNK_KO {
     # the alignment of a large network can exceed; R gets what this task was
     # given instead.
     export R_MAX_VSIZE=${ task.memory ? task.memory.toGiga() + 'Gb' : '100Gb' }
-    sctenifoldknk_ko.R ${wt} "${target}" ${n_cores} ${plot} ${seed}
+    sctenifoldknk_ko.R ${wt} "${target}" ${n_cores} ${plot} ${seed} ${null_model} ${ndim}
     """
 
   stub:
@@ -52,6 +58,7 @@ process SCTENIFOLDKNK_KO {
     def plot_cmd = plot ? "touch ${cell_type}_sctknk_plot_${target_id}.pdf" : ""
     """
     touch ${cell_type}_sctenifoldknk_${target_id}.txt
+    printf 'cell_type\\ttarget\\tstatus\\tgenes_knocked\\tout_degree\\tout_strength\\tout_strength_pct\\tmedian_distance\\teffect_pct\\tn_null\\tn_tested\\thits_raw\\thits_null\\n${cell_type}\\t${target}\\tok\\t${target}\\t10\\t1.5\\t50\\t1e-9\\t50\\t50\\t1500\\t3\\t1\\n' > ${cell_type}_sctenifoldknk_${target_id}.status.tsv
     ${plot_cmd}
     """
 }

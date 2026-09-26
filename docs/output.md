@@ -113,7 +113,8 @@ resistant  Brd4    G17_Brd4  14.43217  7.09  41.1  1.41e-10  9.83e-08
 | `distance` | How far the gene moved between the wild-type and knocked-out networks after manifold alignment. |
 | `Z` | Box-Cox transformed, standardised distance. |
 | `FC` | Squared distance over the mean squared distance of the genes not knocked out. This is a ratio to the average gene, not an expression fold change, and it **has no direction**. |
-| `p.value`, `p.adj` | Chi-square test on `FC` and its Benjamini-Hochberg FDR. |
+| `p.value`, `p.adj` | Chi-square test on `FC` and its Benjamini-Hochberg FDR. On its own this only ranks a knockout's genes against each other, and whatever gene is knocked out that ranking is led by the network's hubs. |
+| `z_null`, `p_null`, `p_null_adj` | With `--sctknk_null` > 0: the gene's centred log distance against a line fitted to that gene's distances over random knockouts of the same network by their out-strength, in MAD units; its two-sided normal tail; the BH adjustment over the tested genes. A gene counts as moved when `p_null_adj` < 0.05 and `z_null` > 0. The report, the summary and the enrichment ranking use these when present. |
 
 The knocked-out gene or genes are not in their own rows. They always move furthest by construction, so they say nothing about the effect of the knockout.
 
@@ -131,7 +132,20 @@ Genes are ranked by `log2(FC)`, so `NES` is signed. **Positive** means the set s
 
 ### `sctenifoldknk_summary.txt`
 
-One row per knockout (identity × target): `genes_tested`, `genes_affected` (FDR < 0.05), `share_affected` and `top_gene`, the gene it moved furthest. A knockout that affected nothing has a row with 0; one that failed, or timed out on every attempt, has no row.
+One row per knockout (identity × target): `genes_tested`, `genes_affected` (`p_null_adj` < 0.05 with `z_null` > 0 when the null ran, `p.adj` < 0.05 otherwise), `share_affected` and `top_gene`, the gene it moved furthest. A knockout that affected nothing has a row with 0; one that was skipped, failed, or timed out on every attempt has no row — see the status table.
+
+### `sctenifoldknk_status.txt`
+
+One row per identity × target from `SCTENIFOLDKNK_KO`, written whether or not the knockout ran.
+
+| Column | Meaning |
+|---|---|
+| `status` | `ok`, or why not: `no outgoing edges` (the target has no edge out of this identity's network, so the knockout is a no-op and is skipped), `not expressed`, `no wild-type network`, `alignment failed`. |
+| `genes_knocked`, `out_degree`, `out_strength` | The genes zeroed and how many edges, of what total weight, that removed. |
+| `out_strength_pct`, `effect_pct` | Share of the null knockouts weaker than this target, and share that moved the network less than this knockout (its median distance). A knockout with a low `effect_pct` moved the network less than most random genes would. |
+| `n_null`, `n_tested`, `hits_raw`, `hits_null` | Null knockouts used; genes tested; hits under `p.adj` and under `p_null_adj`. |
+
+A pair missing from this table timed out on every attempt and was ignored.
 
 ### `plots/`
 
