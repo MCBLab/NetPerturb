@@ -16,6 +16,7 @@ include { MERGE } from "./modules/local/merge/main.nf"
 include { MERGE_SCTENIFOLDKNK } from "./modules/local/merge_sctenifoldknk/main.nf"
 include { GSEA_SCTENIFOLDKNK } from "./modules/local/gsea_sctenifoldknk/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
+include { NETWORK_QC } from "./modules/local/network_qc/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,7 +54,7 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct )
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct, params.batch )
 
     // Everything past DOWNSAMPLE reads the targets that passed its QC check
     // (present in the object, and with counts in the retained cells) rather
@@ -136,6 +137,20 @@ workflow {
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
+        // Structure of every network this run built, for the report's Data
+        // quality section: the rank-score networks, hdWGCNA's metacell and fit
+        // numbers when that was the method, and the knockout networks when
+        // that track ran too. Summarised once here, since REPORT only ever
+        // receives tables.
+        qc_networks = rank_cells
+        if( network == 'hdwgcna' ) {
+            qc_networks = qc_networks.mix( HDWGCNA.out.qc.collect() )
+        }
+        if( sctknk ) {
+            qc_networks = qc_networks.mix( SCTENIFOLDKNK_BUILD.out.wt.collect() )
+        }
+        NETWORK_QC( qc_networks.collect(), target_qc_file, network )
+
         // REPORT always takes a scTenifoldKnk table path; when it was not
         // requested this is a sentinel empty file report.qmd recognises and
         // renders as "not run for this session" rather than a real table.
@@ -184,7 +199,8 @@ workflow {
             "n_hvg"           : params.n_hvg,
             "n_cores"         : params.n_cores,
             "seed"            : params.seed,
-            "sctknk_min_pct"  : params.sctknk_min_pct
+            "sctknk_min_pct"  : params.sctknk_min_pct,
+            "batch"           : params.batch
         ]
         run_info_file = Channel
             .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )
@@ -206,7 +222,7 @@ workflow {
         def trace_path = file( trace_cfg instanceof CharSequence && trace_cfg
             ? trace_cfg.toString()
             : "${params.tracedir}/execution_trace_${params.trace_report_suffix}.txt" )
-        report_upstream = MERGE.out.merged_rank_scores
+        report_upstream = MERGE.out.merged_rank_scores.mix( NETWORK_QC.out.network_qc )
         if( sctknk ) {
             report_upstream = report_upstream.mix( MERGE_SCTENIFOLDKNK.out.merged_dr_table )
         }
@@ -232,7 +248,10 @@ workflow {
             DOWNSAMPLE.out.cell_counts,
             DOWNSAMPLE.out.target_expression,
             run_info_file,
-            trace_snapshot
+            trace_snapshot,
+            DOWNSAMPLE.out.identity_qc,
+            NETWORK_QC.out.network_qc,
+            NETWORK_QC.out.target_network_qc
         )
     }
 }

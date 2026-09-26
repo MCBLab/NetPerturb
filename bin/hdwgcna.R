@@ -121,6 +121,13 @@ built <- tryCatch({
   # the per-cell-type fit stays auditable.
   sc_obj <- TestSoftPowers(sc_obj, networkType = "unsigned")
   power_est <- GetActiveWGCNA(sc_obj)$sft$powerEstimate
+  # The scale-free fit at the power actually used, for the report's Data
+  # quality section: a low R^2 (WGCNA's convention is 0.8) means the network
+  # has little of the structure the method assumes.
+  sft_r2 <- tryCatch({
+    pt <- GetPowerTable(sc_obj)
+    pt$SFT.R.sq[match(soft_power, pt$Power)]
+  }, error = function(e) NA_real_)
   message("Soft power: using fixed ", soft_power, ", per-cell-type estimate was ",
           if (is.null(power_est) || is.na(power_est) || is.infinite(power_est)) "NA" else power_est)
 
@@ -227,6 +234,19 @@ if (length(i) == 0) {
 full[i] <- sign(full[i]) * rank(abs(full[i])) / length(i)
 
 n_metacells <- ncol(GetMetacellObject(sc_obj))
+
+# What NETWORK_QC joins to this identity's network summary: how many metacells
+# the correlations were taken over, and how scale-free the fit was.
+write.table(
+  data.frame(
+    identity       = cell_type,
+    n_metacells    = n_metacells,
+    soft_power     = soft_power,
+    power_estimate = if (is.null(power_est) || !is.finite(power_est)) NA else power_est,
+    sft_r2         = if (length(sft_r2) == 1) sft_r2 else NA
+  ),
+  paste0(cell_type, "_hdwgcna_qc.tsv"), sep = "\t", quote = FALSE, row.names = FALSE
+)
 
 # Save the object
 saveRDS(full, file = paste0(cell_type, "_weight_hdWGCNA_", n_metacells, ".rds"))

@@ -93,6 +93,7 @@ Symbols must match the object (MGI for mouse, HGNC for human), and `--species` m
 | `--n_cells` | — | Maximum cells kept per identity. Smaller identities keep every cell. |
 | `--min_cells` | `150` | Identities with fewer cells after downsampling are dropped before any network is built. `0` keeps all. |
 | `--n_hvg` | `2000` | Highly variable genes added to `gene4use`, the gene set of the scoring-track networks. |
+| `--batch` | none | Metadata column naming each cell's donor, sample or batch. Used only by the report's *Data quality* section: batch composition of each identity and the variance batch explains. |
 | `--seed` | `1` | Seed for every random step: cell sampling, GENIE3, hdWGCNA/WGCNA, scTenifoldKnk and fgsea. |
 
 ### Scoring track

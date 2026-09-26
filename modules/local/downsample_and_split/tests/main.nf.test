@@ -21,6 +21,7 @@ nextflow_process {
                 input[7] = 2000
                 input[8] = 1
                 input[9] = 0.05
+                input[10] = ""
                 """
             }
         }
@@ -42,7 +43,11 @@ nextflow_process {
 
             // one row per identity x single target gene, for the expression heatmap
             def expr = file(process.out.target_expression[0]).readLines()
-            assert expr[0] == "identity\tgene\tavg_expression\tpct_expressing"
+            assert expr[0] == "identity\tgene\tavg_expression\tpct_expressing\tvar_standardized\tvar_percentile"
+
+            // one row per identity for the report's Data quality section
+            def iqc = file(process.out.identity_qc[0]).readLines()
+            assert iqc[0].startsWith("identity\tidentity_id\tn_cells\tmedian_counts")
         }
     }
 }

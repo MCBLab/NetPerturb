@@ -30,6 +30,8 @@ Intermediate files, such as the per-identity objects, per-target tables and the 
 | **Knockout differentially-regulated genes** | `--sctknk`: every gene clearing FDR < 0.05, queryable. |
 | **Knockout gene set enrichment** | `--gsea_gmt`: a dot plot of the strongest sets per combination (`NES`, leading-edge size, significance) over a table of every set with FDR < 0.25. |
 | **Cell identity overview** | The UMAP, **cells per identity** (input vs. kept, dropped identities flagged, genes each network was built on) and **target expression per identity** (mean log-normalised expression heatmap). |
+| **Genes affected per knockout** | `--sctknk`: a heatmap of how many genes each knockout affected (FDR < 0.05), per identity and target, with knockouts that produced no table marked. |
+| **Data quality** | Diagnostics for reading the results, not filters. A table of flagged checks, each with the reason it can skew a result, then input quality per identity, network structure per identity and track, and where each target sits in each network. See [QC tables](#qc). |
 | **Pipeline run** | Command line, versions, settings, elapsed time and **running time per step** from the execution trace. |
 
 A section whose track was not run shows a short "not run" note instead.
@@ -45,7 +47,8 @@ A section whose track was not run shows a short "not run" note instead.
 | `targets_qc.txt` | The targets that passed QC, in `--target` format. Every later step reads this file. |
 | `target_qc.tsv` | Genes removed by QC: one row per gene, with its target, the reason and the action taken. Header only when everything passed. |
 | `cell_counts.tsv` | Cells and genes per identity: input size, cells kept, status (`kept`/dropped), and the gene counts behind each network. |
-| `target_expression.tsv` | Mean log-normalised expression and percentage of expressing cells for each target gene in each kept identity. |
+| `target_expression.tsv` | Mean log-normalised expression and percentage of expressing cells for each target gene in each kept identity, and its `vst` standardised variance (`var_standardized`; about 1 is sampling noise) with its percentile among the identity's genes. |
+| `identity_qc.tsv` | Input quality per kept identity: depth, genes detected, mito/ribo share, sparsity, variance in the leading principal components and their correlation with depth, and with `--batch` the batch composition. See [QC tables](#qc). |
 
 ```text
 # target_qc.tsv
@@ -126,9 +129,41 @@ sensitive  Brd4    GOBP_CHROMATIN_REMODELING  1.67e-11  3.33e-11  0.863    0.773
 
 Genes are ranked by `log2(FC)`, so `NES` is signed. **Positive** means the set sits among the genes the knockout moved furthest. **Negative** means it sits among genes that stayed still while the rest of the network moved. Neither means up- or down-regulation. `size` is counted after intersecting the set with the knockout network's genes, so it is smaller than the set's nominal size. A `pval` of `1e-50` with `log2err` `NA` is fgsea's floor: the true value is even smaller.
 
+### `sctenifoldknk_summary.txt`
+
+One row per knockout (identity × target): `genes_tested`, `genes_affected` (FDR < 0.05), `share_affected` and `top_gene`, the gene it moved furthest. A knockout that affected nothing has a row with 0; one that failed, or timed out on every attempt, has no row.
+
 ### `plots/`
 
 With `--sctknk_plot`: `<identity>_sctknk_plot_<target>.pdf`, scTenifoldKnk's `plotKO()` drawing of the knocked-out gene(s), the genes it moved (`p.adj < 0.05`) and the wild-type edges among them. Red edges are positive and blue edges are negative.
+
+## qc/ {#qc}
+
+Written by `NETWORK_QC` from every network the run built, for the report's *Data quality* section.
+
+| File | Contents |
+|---|---|
+| `network_qc.tsv` | One row per network (identity × track): genes, edges, density, mean absolute weight, share of isolated genes, share of strength in the top 1% of genes, and the Gini coefficient of strength. For hdWGCNA, also the number of metacells, the soft power used, WGCNA's estimate and the scale-free fit R². |
+| `target_network_qc.tsv` | One row per network × target gene: whether it is in the network, its degree and strength, and its strength percentile (the share of genes weaker than it; 0 is isolated). |
+
+The checks the report flags, and why each can skew a result:
+
+| Check | Flagged when | Why it matters |
+|---|---|---|
+| Few cells | < 200 cells | Networks from few cells are noisier. |
+| Shallow cells | depth < 0.5 × run median | More zeros; weaker, less reproducible edges. |
+| High mito/ribo share | > run median + 10 points | Stressed or damaged cells. |
+| Sparse matrix | > 95% zeros | Unstable regressions and correlations. |
+| Variation tracks depth | a leading PC with \|rho\| ≥ 0.5 against log depth | Co-expression partly reflects sequencing depth. |
+| One programme dominates | PC1 share > 2 × run median | One programme or a mixture of states drives co-expression. |
+| One batch dominates / batch drives variation | one batch > 80% of cells / batch R² > 0.2 (`--batch`) | Correlation from donors differing, not regulation. |
+| Network unlike the others | density or mean \|weight\| outside 0.5–2 × the track median | Every score in that identity can shift together. |
+| Many isolated genes, empty network | > 50% isolated / no edges | The network is thin or empty. |
+| Few metacells, weak scale-free fit | < 50 metacells / R² < 0.8 (hdWGCNA) | Correlations are noisy, or the network lacks the assumed structure. |
+| Target barely detected, at noise level, weakly connected | < 5% of cells / `var_standardized` < 1 / strength percentile < 10 | The score or knockout mostly reflects the rest of the network. |
+| Same knockout genes whatever the target | median Jaccard of affected genes between targets ≥ 0.8 | Knockouts describe the network, not the target. |
+
+These thresholds are rules of thumb, set at the top of the report's *Data quality* section.
 
 ## pipeline_info/
 

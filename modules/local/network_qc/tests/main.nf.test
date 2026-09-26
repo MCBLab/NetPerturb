@@ -1,0 +1,34 @@
+nextflow_process {
+
+    name "NETWORK_QC"
+    script "modules/local/network_qc/main.nf"
+    process "NETWORK_QC"
+
+    test("writes the network and target-in-network tables") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    file("\${projectDir}/tests/fixtures/sensitive.RDS"),
+                    file("\${projectDir}/tests/fixtures/resistant.RDS")
+                ]
+                input[1] = file("\${projectDir}/testdata/test_input.txt")
+                input[2] = "genie3"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def net = file(process.out.network_qc[0]).readLines()
+            assert net[0].startsWith("track\tmethod\tidentity\tn_genes\tn_edges\tdensity")
+
+            def tgt = file(process.out.target_network_qc[0]).readLines()
+            assert tgt[0] == "track\tmethod\tidentity\tgene\tin_network\tdegree\tstrength\tstrength_percentile"
+        }
+    }
+}

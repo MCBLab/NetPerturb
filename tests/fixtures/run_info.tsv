@@ -25,3 +25,4 @@ n_hvg	2000
 n_cores	4
 seed	1
 sctknk_min_pct	0.05
+batch	donor

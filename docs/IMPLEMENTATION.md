@@ -4,6 +4,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
+| 28 | A Data quality section, and a knockout summary | Sep 2026 | branch `fix-ribo-mito` |
 | 27 | Mitochondrial and ribosomal genes removed on load | Sep 2026 | branch `fix-ribo-mito` |
 | 26 | A documentation website | Sep 2026 | #22 |
 | 25 | The report describes the run | Sep 2026 | #21 |
@@ -33,6 +34,45 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 | 1 | Prototype pipeline | Dec 2024 | — |
 
 ---
+
+## Wave 28 — A Data quality section, and a knockout summary
+
+**Sep 2026** · branch `fix-ribo-mito`, not yet on `main`
+
+Reading the Kang run as a benchmark raised three skews: monocytes scored higher for every target, some barely detected targets still received ordinary scores, and the knockout returned the same genes whatever the target. None of these could be explained from the report, because it showed results and not the state of the data and networks behind them. This wave adds a **Data quality** section to the report, made of diagnostics rather than filters. Each check comes with the reason it can skew a result.
+
+**Per identity, from `DOWNSAMPLE`** (`identity_qc.tsv`), over the retained cells:
+
+- depth and genes detected per cell;
+- the share of each cell's counts in the mito/ribo genes removed on load (wave 27 keeps the pre-removal library size, so this is exact);
+- the sparsity of the `gene4use` matrix;
+- the variance in its first principal components, and their Spearman correlation with log depth;
+- with the new `--batch`: batch composition, and the share of the leading components' variance that batch explains.
+
+The components are computed with `irlba` on log-normalised, scaled `gene4use` counts, seeded with `--seed`.
+
+**Per target** (`target_expression.tsv` gains `var_standardized` and `var_percentile`): Seurat's `vst` standardised variance, in each identity, over all its genes. It is computed from the sparse counts with a closed form for zeros, not through `FindVariableFeatures()`/`HVFInfo()`. `HVFInfo()`'s arguments differ between the container's Seurat v4 and v5, and inside the script the call failed with "Please run FindVariableFeatures". On a test object the result matches Seurat's own to 1e-15.
+
+**Per network, from the new `NETWORK_QC`** (`qc/network_qc.tsv`, `qc/target_network_qc.tsv`):
+
+- It reads every network the run built, once: the rank-score networks, plus the knockout's wild-type networks when that track ran.
+- Per network it records genes, edges, density, mean absolute weight, the share of isolated genes, the share of strength held by the top 1% of genes, and the Gini coefficient of strength. Strength is summed absolute weight in and out, so it is defined for GENIE3's dense networks too.
+- For each target it records degree, strength and strength percentile. The percentile is the share of genes weaker than the target, so an isolated target is at 0.
+- `hdwgcna.R` now writes the number of metacells and the scale-free fit R² at the power used, taken from its `TestSoftPowers()` table. `NETWORK_QC` joins them in.
+
+This is a separate process rather than part of `RANK_SCORE`, which runs once per target and would have repeated the summary for every one. `REPORT` never receives networks, only tables.
+
+**In the report.** The section opens with a table of flagged checks, each with its value, threshold and why it matters. Three figures follow:
+
+- input quality, as lollipops with flagged values in red;
+- network structure, as a heatmap coloured by distance from the track's median;
+- target placement, as strength percentile, with `var_standardized` under it.
+
+The thresholds are named constants at the top of the section. Several are relative to the run's median, since "shallow" or "dense" depends on dataset and method. A first version drew the network metrics as faceted lollipops, but mixing tracks on one axis and a dozen panels made the tick labels collide. The heatmap needs no axes and shows "unlike the others" directly.
+
+**Knockout summary.** `MERGE_SCTENIFOLDKNK` now also writes `sctknk/sctenifoldknk_summary.txt`. It has one row per knockout: genes tested, genes affected at FDR < 0.05, their share, and the gene moved furthest. It is written with `awk` beside the merged table, so it exists in knockout-only runs, which have no report. The report adds a **Genes affected per knockout** heatmap after the gene table, and marks knockouts with no table (failed, or ignored after timing out) as *no result*. The Data quality section flags an identity where the affected-gene sets of different targets overlap at a median Jaccard of 0.8 or more. That is the Kang pattern, where knockouts describe the network rather than the target.
+
+**Checked here.** `downsample_and_split.R` ran on a synthetic mouse object with an injected depth effect and a random donor column. PC1 correlated with depth at 0.85, batch R² was near 0, and an unknown `--batch` stopped with the list of columns. `network_qc.R` ran on synthetic dense, sparse and empty networks. The report rendered with Quarto against the fixtures, and every figure was looked at. The summary `awk` was checked against an independent count on the fixture table. The nf-test suites were updated but not run, and neither was the pipeline itself, because Nextflow is not installed on the machine this was written on.
 
 ## Wave 27 — Mitochondrial and ribosomal genes removed on load
 
