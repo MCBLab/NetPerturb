@@ -4,7 +4,8 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
-| 26 | A documentation website | Sep 2026 | branch `mkdocs` |
+| 27 | Mitochondrial and ribosomal genes removed on load | Sep 2026 | branch `fix-ribo-mito` |
+| 26 | A documentation website | Sep 2026 | #22 |
 | 25 | The report describes the run | Sep 2026 | #21 |
 | 24 | One seed for the whole run | Sep 2026 | #21 |
 | 23 | The knockout split in two | Sep 2026 | #21 |
@@ -33,9 +34,42 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 ---
 
+## Wave 27 — Mitochondrial and ribosomal genes removed on load
+
+**Sep 2026** · branch `fix-ribo-mito`, not yet on `main`
+
+The first full run read as a benchmark (Kang 2018 control PBMCs, hdWGCNA plus the knockout track) found that the knockout barely depended on the target. Within a cell type, the genes clearing FDR < 0.05 were the same for most targets. CD14+ monocytes returned FTH1 and FTL for all 25 knockouts, and ribosomal protein genes were 37% of all hits while being 3% of the tested genes. Wave 23 had moved the knockout network onto scTenifoldKnk's own gene filter, detection in more than `--sctknk_min_pct` of cells. That filter has no mitochondrial or ribosomal exclusion, while `gene4use` has always had one, inherited from scRank. Ribosomal genes are among the most highly and uniformly expressed and the most tightly co-expressed, so they move in the manifold alignment whatever is knocked out.
+
+**Removed on load, once.** Mitochondrial and ribosomal protein genes are now removed from the object in `DOWNSAMPLE`, right after the assay is chosen and before downsampling, variable-gene selection, target QC or anything else reads it. Before this, `gene4use` dropped them, which covered GENIE3, scRank and hdWGCNA, but the knockout networks did not, since wave 23 had moved them onto scTenifoldKnk's own gene filter. Filtering in each place that picks genes would have meant the same rule, and the same helper, in several scripts, each one a place for it to drift. Removing them from the object once means no step downstream can see them, including a network method added later. `SCTENIFOLDKNK_BUILD` and the `gene4use` step no longer filter them; `gene4use` keeps only its `RP11-…` lncRNA pattern. Stored variable features are intersected with what is left, so reusing them still gives `--n_hvg` genes.
+
+Two things are kept from before the removal:
+
+- **Targets.** A gene requested as a target is exempt, so it can still pass QC, be scored and be knocked out. Otherwise it would be reported as absent from the object.
+- **Library size.** Each cell's total count over every gene goes into the metadata as `netperturb_lib_size`, and the report's target-expression heatmap normalises by it. Ribosomal genes can be a fifth or more of a cell's counts, so normalising over what is left would shift every gene by a different amount in every cell.
+
+Subsetting genes leaves the `data` layer's values as they were, so an object normalised before it reached the pipeline keeps that normalisation. Steps that normalise on their own do so over the remaining genes: hdWGCNA's `NormalizeMetacells`, scTenifoldKnk's CPM, and the UMAP computed when the object has none. `cell_counts.tsv` gains `genes_mt_rb`, the number removed, and the report states it beside the object's gene count.
+
+This is deliberately not a parameter. A first version had `--sctknk_filter_mt_rb` for the knockout track alone, to restore `scTenifoldKnk()`'s own gene set. It was dropped, because a switch on one track would let the two tracks disagree about which genes a network may use. The helper was checked on a synthetic mouse object run through `downsample_and_split.R`: the six mitochondrial and ribosomal genes went, and a ribosomal target (Rpl5), Rps6kb1, Rpl22l1 and Mt2 stayed. The `data` layer was unchanged. Whether this makes the knockout target-specific has not been checked yet: the Kang run has to be repeated, before and after a random-gene knockout null.
+
+**Tighter patterns.** `DOWNSAMPLE` used to match `^RP[0-9]+|^RPL|^RPS|^MT-`. On the Kang knockout genes, that also took:
+
+- the RPS6K kinases (RPS6KA1, RPS6KB2; RPS6KA1, RPS6KA3 and RPS6KA6 are drug targets in scRank's own table);
+- the RPL*L paralogues, RPS27L and RPS19BP1;
+- the pseudogene RPSAP58;
+- the gene RP1, through `^RP[0-9]+`.
+
+The helper, `is_mt_rb()`, lives in `downsample_and_split.R` only.
+
+- **Ribosomal:** only the cytosolic ribosomal proteins, `^RP[SL][0-9]+[AXY]?[0-9]*$`, `RPLP0`–`RPLP2` and `RPSA`.
+- **Mitochondrial:** `^MT[-._]`. The `.` and `_` forms cover `make.names()` output such as `MT.CO1`. A bare `^MT` was rejected because it takes nuclear genes: 15 of them in the Kang networks, MT2A, MTCH2 and MTIF3 among them.
+
+Both match on uppercased symbols, so mouse `mt-`, `Rps` and `Rpl` count. `DOWNSAMPLE` still drops the clone-named lncRNAs (`RP11-…`, `RP5-…`) that scRank's selection removes, now through its own `^RP[0-9]+-` pattern. As a result `gene4use` gains back the handful of genes above, and rank-score results can shift slightly from earlier runs.
+
+**A time limit on each knockout.** A knockout takes seconds (2–10 s on Kang), so `SCTENIFOLDKNK_KO` now has `time = 10.min`. A task killed for time (exit 143 locally, 140 under SLURM) is retried up to three times. A pair that times out on all four attempts is ignored: it is left out of the merged table, and the run carries on. Any other exit status still terminates the run. Retries get the same 10 minutes. The knockout is seeded, so a stuck pair tends to stay stuck, and a retry mainly helps when the slowness came from tasks competing for the node's cores (`cpus = n_cores`). An ignored pair is visible only in the trace, as `IGNORED`. The report does not list it yet.
+
 ## Wave 26 — A documentation website
 
-**Sep 2026** · branch `mkdocs`, not yet on `main`
+**Sep 2026** · #22
 
 The README had grown into the only manual: one long page mixing a pipeline description, every parameter, every output file and the development notes. The pipeline now also has a website at `https://mcblab.github.io/NetPerturb/`, laid out like the one [Causeway](https://juliaapolonio.github.io/Causeway/) uses: MkDocs with the readthedocs theme and four pages, **Home**, **Usage**, **Output** and **FAQ**, built from `docs/` by `mkdocs.yml` at the repository root.
 

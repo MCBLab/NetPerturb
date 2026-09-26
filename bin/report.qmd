@@ -1277,7 +1277,13 @@ if (has_cell_counts) {
     paste0(
       "; genes: every rank-score network (GENIE3, scRank, hdWGCNA) is offered the same **",
       comma(kept_cc$genes_gene4use[1]), "** of the object's ",
-      comma(kept_cc$genes_total[1]), " genes (`gene4use`: `--n_hvg` ",
+      comma(kept_cc$genes_total[1]), " genes",
+      # genes_mt_rb arrives with DOWNSAMPLE's newer cell_counts.tsv; an older
+      # one ran before those genes were removed on load, and says nothing.
+      if ("genes_mt_rb" %in% names(kept_cc) && !is.na(kept_cc$genes_mt_rb[1]))
+        paste0(" left after removing ", comma(kept_cc$genes_mt_rb[1]),
+               " mitochondrial and ribosomal protein genes on load") else "",
+      " (`gene4use`: `--n_hvg` ",
       run_value("n_hvg"), " variable genes plus the species' transcription factors, ",
       "drug targets and the requested targets), and each identity keeps those with ",
       "counts in its own cells, **",

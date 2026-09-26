@@ -54,7 +54,7 @@ Hhip        Hhip   zero counts in every retained cell   target not analysed
 Stfa1;Mpo   Mpo    absent from the expression profile   dropped from the target; analysed as Stfa1
 ```
 
-In `cell_counts.tsv`, `genes_gene4use` is the gene set offered to the scoring-track networks and `genes_expressed` is how many of those actually have counts in that identity. `genes_filtered` is the difference. `genes_sctknk` is the size of that identity's knockout network (see `--sctknk_min_pct`).
+In `cell_counts.tsv`, `genes_gene4use` is the gene set offered to the scoring-track networks and `genes_expressed` is how many of those actually have counts in that identity. `genes_filtered` is the difference. `genes_sctknk` is the size of that identity's knockout network (see `--sctknk_min_pct`). `genes_total` counts the object's genes after `DOWNSAMPLE` removed the mitochondrial and ribosomal protein genes on load, and `genes_mt_rb` is how many it removed.
 
 ```text
 # cell_counts.tsv

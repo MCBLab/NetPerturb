@@ -36,7 +36,7 @@ The pipeline is built with [Nextflow](https://www.nextflow.io) DSL2 and runs eve
 
 The three warm lines are the `--network` methods. They are mutually exclusive, so a run takes exactly one of them from the input object to the report. They share downsampling, scoring and reporting, and only diverge at network inference. The blue `sctknk` line is separate: `--sctknk` switches it on, and it runs alongside whichever `--network` line was chosen, or on its own.
 
-1. **Downsampling and QC (`DOWNSAMPLE`)**: splits the object by `--column`, randomly keeps up to `--n_cells` cells per identity and drops identities below `--min_cells`. It then checks every target gene against the retained cells and builds `gene4use`, the gene set the networks are built on: highly variable genes, transcription factors, drug targets and the targets themselves.
+1. **Downsampling and QC (`DOWNSAMPLE`)**: splits the object by `--column`, randomly keeps up to `--n_cells` cells per identity and drops identities below `--min_cells`. It then checks every target gene against the retained cells and builds `gene4use`, the gene set the networks are built on: highly variable genes, transcription factors, drug targets and the targets themselves. Before any of this, it removes mitochondrial and ribosomal protein genes from the object, so no network is built on them.
 2. **Network inference (`GENIE3`, `SCRANK`, `HDWGCNA`)**: one regulatory network per identity with the method `--network` selects.
 3. **Perturbation scoring (`RANK_SCORE`)**: one task per target line. Each scores the target in every identity with scRank and records its strongest edges.
 4. **Consolidation (`MERGE`)**: gathers every target's scores and connections into one table each.

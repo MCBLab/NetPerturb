@@ -26,7 +26,9 @@ suppressPackageStartupMessages({
 # miss the well-measured ones. The knockout track never feeds RANK_SCORE, so
 # nothing requires it to share that universe. One departure: the targets are
 # kept below the threshold, where scTenifoldKnk() would refuse to knock them
-# out, so every target has a knockout wherever it is expressed at all.
+# out, so every target has a knockout wherever it is expressed at all. And the
+# mitochondrial and ribosomal protein genes scTenifoldKnk() would keep are not
+# here to keep: DOWNSAMPLE removes them from the object on load.
 
 args <- commandArgs(trailingOnly = TRUE)
 

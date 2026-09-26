@@ -45,6 +45,23 @@ sctknk_min_pct <- suppressWarnings(as.numeric(if (length(args) >= 10) args[10] e
 if (is.na(sctknk_min_pct) || sctknk_min_pct < 0 || sctknk_min_pct >= 1) {
   sctknk_min_pct <- 0.05
 }
+# Mitochondrial and ribosomal protein genes, by symbol. They are removed from
+# the object as soon as it is loaded (below), so no step of the pipeline ever
+# sees them. Symbols are uppercased first, so mouse (mt-, Rps, Rpl) matches the
+# same patterns as human (MT-, RPS, RPL).
+#   mitochondrial: MT- plus the "." or "_" some converters write in its place
+#     (make.names() turns MT-CO1 into MT.CO1). A bare ^MT would also take
+#     nuclear genes such as MT2A, MTCH2 and MTIF3.
+#   ribosomal: the cytosolic ribosomal proteins only -- RPS/RPL followed by a
+#     number and an optional A/X/Y variant (RPL13A, RPS4X, RPS4Y1), plus RPLP0-2
+#     and RPSA. A bare ^RPS/^RPL also took the RPS6K kinases (RPS6KA1/3/6
+#     are drug targets in scRank's table), the RPL*L paralogues, RPS27L,
+#     RPS19BP1 and pseudogenes like RPSAP58.
+is_mt_rb <- function(genes) {
+  g <- toupper(genes)
+  grepl("^MT[-._]", g) |
+    grepl("^RP[SL][0-9]+[AXY]?[0-9]*$|^RPLP[0-2]$|^RPSA$", g)
+}
 
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
@@ -137,6 +154,30 @@ if (seuratObj == 'AML_object.rda') {
 }
 
 seuratObj <- select_assay(seuratObj, assay)
+
+# Mitochondrial and ribosomal protein genes are removed here, before anything
+# else reads the object, so no network, gene set, QC check or figure downstream
+# is built on them. They are highly expressed and tightly co-expressed, and
+# they pull edges and alignment distance towards themselves whatever the
+# question: on Kang 2018 PBMCs ribosomal genes were 3% of the knockout network
+# but 37% of its differentially-regulated genes, the same ones for every target.
+#
+# Two things are kept from before the removal. A gene requested as a target is
+# never removed for its name, so it can still be scored and knocked out. And
+# each cell's total count over every gene is kept in the metadata, because
+# ribosomal genes alone can be a fifth or more of a cell's counts: normalising
+# over what is left would shift every gene by a different amount in every
+# cell. Subsetting genes leaves the data layer's values as they were, so an
+# object normalised before it reached the pipeline keeps that normalisation.
+seuratObj$netperturb_lib_size <- Matrix::colSums(seuratObj[["RNA"]]@counts)
+mt_rb_genes <- setdiff(rownames(seuratObj)[is_mt_rb(rownames(seuratObj))],
+                       unlist(target_genes))
+n_genes_input <- nrow(seuratObj)
+if (length(mt_rb_genes) > 0) {
+  seuratObj <- seuratObj[setdiff(rownames(seuratObj), mt_rb_genes), ]
+}
+message("Removed ", length(mt_rb_genes), " mitochondrial/ribosomal protein ",
+        "gene(s) of ", n_genes_input, "; ", nrow(seuratObj), " left.")
 
 if (!column %in% colnames(seuratObj@meta.data)) {
   stop("--column '", column, "' is not a metadata column of this object. ",
@@ -298,7 +339,7 @@ if (!species %in% c("human", "mouse")) {
 # there are at least that many -- the first n_hvg of them -- and computed
 # otherwise, since reusing a shorter list would quietly hand back fewer genes
 # than were asked for. nfeatures cannot exceed the number of genes present.
-stored_hvg <- VariableFeatures(seurat_downsample)
+stored_hvg <- intersect(VariableFeatures(seurat_downsample), rownames(seurat_downsample))
 hvg <- if (length(stored_hvg) >= n_hvg) {
   stored_hvg
 } else {
@@ -320,15 +361,14 @@ drug_gene <- if (species == "human") {
 
 genes_4_use <- unique(c(target, hvg, tf_gene, drug_gene))
 
-# Drop mitochondrial and ribosomal genes. The match is guarded because `-x` on
-# an empty index vector would empty the whole set instead of removing nothing.
-mt_rb <- grep("^RP[[:digit:]]+|^RPL|^RPS|^MT-", toupper(genes_4_use))
-if (length(mt_rb) > 0) {
-  genes_4_use <- genes_4_use[-mt_rb]
-}
+# Drop the clone-named lncRNAs (RP11-..., RP5-...), which scRank's own
+# selection removes alongside the mitochondrial and ribosomal genes already
+# gone from the object. Indexed with a logical, so nothing matching removes
+# nothing.
+genes_4_use <- genes_4_use[!grepl("^RP[0-9]+-", toupper(genes_4_use))]
 
 # Targets are added back after that filter so a target is never dropped for
-# looking ribosomal, and anything missing from the object is then dropped.
+# its name, and anything missing from the object is then dropped.
 genes_4_use <- unique(c(genes_4_use, targets))
 genes_4_use <- genes_4_use[genes_4_use %in% rownames(seurat_downsample)]
 
@@ -355,7 +395,8 @@ cell_counts$genes_filtered  <- cell_counts$genes_gene4use - cell_counts$genes_ex
 # Genes in each identity's scTenifoldKnk network, by the same rule
 # sctenifoldknk_build.R applies: every gene of the object detected in more
 # than --sctknk_min_pct of the identity's cells, plus the target genes with any
-# count there, which are kept below that threshold.
+# count there, which are kept below that threshold. The mitochondrial and
+# ribosomal protein genes are already gone from the object.
 all_counts <- seurat_downsample[["RNA"]]@counts
 cell_counts$genes_sctknk <- unname(vapply(cell_counts$identity, function(id) {
   cells <- retained_ident == id
@@ -367,6 +408,10 @@ cell_counts$genes_sctknk <- unname(vapply(cell_counts$identity, function(id) {
   length(union(rownames(sub)[detected], kept_targets))
 }, integer(1)))
 
+# How many mitochondrial/ribosomal protein genes were removed on load, so the
+# report can say what genes_total is short of. The same for every identity.
+cell_counts$genes_mt_rb <- ifelse(cell_counts$status == "kept", length(mt_rb_genes), NA_integer_)
+
 write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = TRUE)
 
@@ -376,9 +421,11 @@ write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
 # what the networks were built from. Log-normalised here from the counts
 # (per 10,000, then log1p) rather than read from the data layer, which holds
 # raw counts in an object that was never normalised; the library size is the
-# cell's total over every gene, as NormalizeData() would take it.
+# cell's total over every gene, as NormalizeData() would take it -- taken
+# before the mitochondrial and ribosomal genes were removed, so the values do
+# not depend on that removal.
 target_counts <- seurat_downsample[["RNA"]]@counts[targets, , drop = FALSE]
-lib_size <- Matrix::colSums(seurat_downsample[["RNA"]]@counts)
+lib_size <- seurat_downsample$netperturb_lib_size
 target_lognorm <- log1p(t(t(as.matrix(target_counts)) / pmax(lib_size, 1)) * 1e4)
 
 target_expression <- do.call(rbind, lapply(keep_identities, function(id) {
