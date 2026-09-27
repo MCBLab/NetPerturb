@@ -1,0 +1,41 @@
+site_name: NetPerturb
+site_url: https://mcblab.github.io/NetPerturb/
+site_description: A Nextflow pipeline for gene regulatory network perturbation in single-cell RNA-seq data
+site_author: MCB Lab
+repo_url: https://github.com/MCBLab/NetPerturb/
+repo_name: MCBLab/NetPerturb
+edit_uri: blob/main/docs/
+copyright: "© MCB Lab — Marques-Coelho Bioinformatics Lab"
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - Output: output.md
+  - FAQ: faq.md
+
+theme:
+  name: readthedocs
+  logo: img/logo.svg
+  navigation_depth: 3
+  collapse_navigation: false
+  prev_next_buttons_location: both
+
+extra_css:
+  - css/docs.css
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - admonition
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+
+# Pages that live in docs/ for the repository, not for the website
+exclude_docs: |
+  IMPLEMENTATION.md
+  netperturb_metro.mmd
+  img/make_logo.py
+  images/netperturb_metro_poster*

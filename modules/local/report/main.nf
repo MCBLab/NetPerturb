@@ -23,6 +23,10 @@ process REPORT {
     path target_expression
     path run_info
     path trace_snapshot, stageAs: "trace_snapshot.tsv"
+    path identity_qc
+    path network_qc
+    path target_network_qc
+    path sctknk_status
 
   output:
     path "netperturb_report.html", emit: report
@@ -59,6 +63,10 @@ process REPORT {
       -P target_expression_file:${target_expression} \
       -P run_info_file:${run_info} \
       -P trace_file:trace_snapshot.tsv \
+      -P identity_qc_file:${identity_qc} \
+      -P network_qc_file:${network_qc} \
+      -P target_network_qc_file:${target_network_qc} \
+      -P sctknk_status_file:${sctknk_status} \
       --output netperturb_report.html
     """
 

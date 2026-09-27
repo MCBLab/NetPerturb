@@ -8,6 +8,7 @@
 include { GENIE3 } from "./modules/local/genie3/main.nf"
 include { SCTENIFOLDKNK_KO } from "./modules/local/sctenifoldknk_ko/main.nf"
 include { SCTENIFOLDKNK_BUILD } from "./modules/local/sctenifoldknk_build/main.nf"
+include { SCTENIFOLDKNK_NULL } from "./modules/local/sctenifoldknk_null/main.nf"
 include { SCRANK } from "./modules/local/scrank/main.nf"
 include { HDWGCNA } from "./modules/local/hdwgcna/main.nf"
 include { DOWNSAMPLE } from "./modules/local/downsample_and_split/main.nf"
@@ -16,6 +17,7 @@ include { MERGE } from "./modules/local/merge/main.nf"
 include { MERGE_SCTENIFOLDKNK } from "./modules/local/merge_sctenifoldknk/main.nf"
 include { GSEA_SCTENIFOLDKNK } from "./modules/local/gsea_sctenifoldknk/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
+include { NETWORK_QC } from "./modules/local/network_qc/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -53,7 +55,9 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
-    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct )
+    // --batch is optional, but a process input cannot be null, so an unset one
+    // is passed as an empty string, which DOWNSAMPLE reads as no batch.
+    DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct, params.batch ?: "" )
 
     // Everything past DOWNSAMPLE reads the targets that passed its QC check
     // (present in the object, and with counts in the retained cells) rather
@@ -82,15 +86,34 @@ workflow {
     // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
     // --network is running too.
     if( sctknk ) {
-        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed )
+        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed, params.sctknk_td_k )
 
-        SCTENIFOLDKNK_BUILD.out.wt
+        // The null model: the same knockout run for --sctknk_null random
+        // genes of each cell type's network, once per cell type, which every
+        // knockout of that cell type is then tested against. With
+        // --sctknk_null 0 the sentinel stands in and the knockout tables
+        // carry scTenifoldKnk's own statistic only. Keyed by cell type to
+        // meet the network it was built from.
+        sctknk_wt_keyed = SCTENIFOLDKNK_BUILD.out.wt
+            .map { wt -> [ wt.name.replace('_sctknk_wt.rds', ''), wt ] }
+        if( params.sctknk_null > 0 ) {
+            SCTENIFOLDKNK_NULL( SCTENIFOLDKNK_BUILD.out.wt, target_qc_file, params.sctknk_null, n_cores, params.seed, params.sctknk_ndim )
+            sctknk_null_keyed = SCTENIFOLDKNK_NULL.out.null_model
+                .map { nm -> [ nm.name.replace('_sctknk_null.rds', ''), nm ] }
+        } else {
+            sctknk_null_keyed = sctknk_wt_keyed
+                .map { ct, wt -> [ ct, file("${projectDir}/assets/NO_SCTKNK_NULL") ] }
+        }
+
+        sctknk_wt_keyed
+        .join( sctknk_null_keyed )
         .combine( sctknk_target_ch )
+        .map { ct, wt, nm, target -> tuple( wt, nm, target ) }
         .set { sctknk_input }
 
-        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed )
+        SCTENIFOLDKNK_KO( sctknk_input, n_cores, params.sctknk_plot, params.seed, params.sctknk_ndim )
 
-        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect() )
+        MERGE_SCTENIFOLDKNK( SCTENIFOLDKNK_KO.out.dr_table.collect(), SCTENIFOLDKNK_KO.out.status.collect() )
 
         // Ranks each pair's genes by how far the knockout moved them and asks
         // which gene sets sit at the top of that ranking -- the analysis the
@@ -136,12 +159,32 @@ workflow {
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
+        // Structure of every network this run built, for the report's Data
+        // quality section: the rank-score networks, hdWGCNA's metacell and fit
+        // numbers when that was the method, and the knockout networks when
+        // that track ran too. Summarised once here, since REPORT only ever
+        // receives tables.
+        qc_networks = rank_cells
+        if( network == 'hdwgcna' ) {
+            qc_networks = qc_networks.mix( HDWGCNA.out.qc.collect() )
+        }
+        if( sctknk ) {
+            qc_networks = qc_networks.mix( SCTENIFOLDKNK_BUILD.out.wt.collect() )
+        }
+        NETWORK_QC( qc_networks.collect(), target_qc_file, network )
+
         // REPORT always takes a scTenifoldKnk table path; when it was not
         // requested this is a sentinel empty file report.qmd recognises and
         // renders as "not run for this session" rather than a real table.
         sctknk_table = sctknk
             ? MERGE_SCTENIFOLDKNK.out.merged_dr_table
             : file("${projectDir}/assets/NO_SCTKNK_TABLE")
+
+        // And for the knockout status table, one line per cell type x target
+        // saying whether the knockout ran and how far it moved the network.
+        sctknk_status = sctknk
+            ? MERGE_SCTENIFOLDKNK.out.status
+            : file("${projectDir}/assets/NO_SCTKNK_STATUS")
 
         // Same sentinel arrangement for the enrichment table, which has two
         // ways of not existing: the knockout track was not run at all, or it
@@ -184,7 +227,11 @@ workflow {
             "n_hvg"           : params.n_hvg,
             "n_cores"         : params.n_cores,
             "seed"            : params.seed,
-            "sctknk_min_pct"  : params.sctknk_min_pct
+            "sctknk_min_pct"  : params.sctknk_min_pct,
+            "sctknk_null"     : params.sctknk_null,
+            "sctknk_ndim"     : params.sctknk_ndim,
+            "sctknk_td_k"     : params.sctknk_td_k,
+            "batch"           : params.batch
         ]
         run_info_file = Channel
             .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )
@@ -206,7 +253,7 @@ workflow {
         def trace_path = file( trace_cfg instanceof CharSequence && trace_cfg
             ? trace_cfg.toString()
             : "${params.tracedir}/execution_trace_${params.trace_report_suffix}.txt" )
-        report_upstream = MERGE.out.merged_rank_scores
+        report_upstream = MERGE.out.merged_rank_scores.mix( NETWORK_QC.out.network_qc )
         if( sctknk ) {
             report_upstream = report_upstream.mix( MERGE_SCTENIFOLDKNK.out.merged_dr_table )
         }
@@ -232,7 +279,11 @@ workflow {
             DOWNSAMPLE.out.cell_counts,
             DOWNSAMPLE.out.target_expression,
             run_info_file,
-            trace_snapshot
+            trace_snapshot,
+            DOWNSAMPLE.out.identity_qc,
+            NETWORK_QC.out.network_qc,
+            NETWORK_QC.out.target_network_qc,
+            sctknk_status
         )
     }
 }

@@ -32,6 +32,10 @@ nextflow_process {
                 input[11] = file("\${projectDir}/tests/fixtures/target_expression.tsv")
                 input[12] = file("\${projectDir}/tests/fixtures/run_info.tsv")
                 input[13] = file("\${projectDir}/tests/fixtures/execution_trace.txt")
+                input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
+                input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
+                input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }
@@ -64,6 +68,10 @@ nextflow_process {
                 input[11] = file("\${projectDir}/tests/fixtures/target_expression.tsv")
                 input[12] = file("\${projectDir}/tests/fixtures/run_info.tsv")
                 input[13] = file("\${projectDir}/tests/fixtures/execution_trace.txt")
+                input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
+                input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
+                input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }
@@ -95,6 +103,10 @@ nextflow_process {
                 input[11] = file("\${projectDir}/tests/fixtures/target_expression.tsv")
                 input[12] = file("\${projectDir}/tests/fixtures/run_info.tsv")
                 input[13] = file("\${projectDir}/tests/fixtures/execution_trace.txt")
+                input[14] = file("\${projectDir}/tests/fixtures/identity_qc.tsv")
+                input[15] = file("\${projectDir}/tests/fixtures/network_qc.tsv")
+                input[16] = file("\${projectDir}/tests/fixtures/target_network_qc.tsv")
+                input[17] = file("\${projectDir}/tests/fixtures/sctenifoldknk_status.txt")
                 """
             }
         }

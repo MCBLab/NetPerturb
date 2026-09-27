@@ -4,7 +4,11 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
-| 26 | A manuscript, and the first benchmark read critically | Sep 2026 | branch `publication` |
+| 30 | A manuscript, and the first benchmark read critically | Sep 2026 | branch `publication` |
+| 29 | Why every knockout returned the same genes | Sep 2026 | #24 |
+| 28 | A Data quality section, and a knockout summary | Sep 2026 | #24 |
+| 27 | Mitochondrial and ribosomal genes removed on load | Sep 2026 | #24 |
+| 26 | A documentation website | Sep 2026 | #22 |
 | 25 | The report describes the run | Sep 2026 | #21 |
 | 24 | One seed for the whole run | Sep 2026 | #21 |
 | 23 | The knockout split in two | Sep 2026 | #21 |
@@ -33,7 +37,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 ---
 
-## Wave 26 — A manuscript, and the first benchmark read critically
+## Wave 30 — A manuscript, and the first benchmark read critically
 
 **Sep 2026** · branch `publication`, not yet on `main`
 
@@ -57,6 +61,129 @@ This wave changes no pipeline code. It adds `publication/`, a draft Application 
   Any of these may point back at a decision made in wave 23.
 
 The target expression figures the analysis uses were transcribed from the report's section 8.2 heatmap, because `downsample/target_expression.tsv` was not copied out of the run. They should be replaced with that file before the numbers are final.
+
+## Wave 29 — Why every knockout returned the same genes
+
+**Sep 2026** · #24
+
+On Kang 2018 control PBMCs, after wave 27 had removed the ribosomal genes, every one of 25 targets still returned the same two or three genes per cell type: FTH1 and FTL in CD14+ monocytes, B2M and TMSB4X in CD4 T cells, MALAT1 in B cells. Eight knockouts that removed nothing at all — targets with no outgoing edge, whose maximum distance was 1e-16 — reported 9 to 35 "significant" genes. This wave is the diagnosis, done on a wild-type network the pipeline's own `sctenifoldknk_build.R` built from the AML test object (1,503 genes, 189 cells, 14 min), and what it changed.
+
+**What the statistic measures.** scTenifoldKnk's `FC` is a gene's squared distance over the mean squared distance, so it only ranks a knockout's genes against each other and carries no scale: a knockout that changed nothing gives the same number of hits as one that changed everything. Its chi-square null does not fit either; the distances' 99th percentile sits 100 to 200 times above their median where a chi-square would put it at 15. So every knockout produces hits, whatever it did.
+
+**What the alignment measures.** With 28 knockouts of the test network (the 4 test targets plus random genes stratified by out-degree), at `d` of 2, 5, 10 and 30 alike: the pattern of distances over genes is shared between knockouts (median Spearman 0.89–0.90), a gene's mean rank tracks its total edge strength at 0.96–0.97, and the overall size of a knockout tracks the out-strength of the knocked-out gene at 0.98. The scale says how much was removed; the pattern says which genes are hubs. Seeds change nothing (three seeds, Spearman 1.0), and the eigen-solver's tolerance is not the floor (distances agree to eight digits from `tol` 1e-10 to 1e-16), so distances of 1e-12 are real values and the no-op's 1e-16 is a real zero. On Kang, a rank-1 model — one pattern per cell type times a scale per target — explains 99.2–99.9% of the variance of log distance.
+
+**Where the pattern comes from.** The wild-type network is the CP tensor decomposition of the bootstrap networks with K = 3, and the result is a matrix of rank 3: the top three singular values carry 0.568, 0.288 and 0.137 of the spectrum and the rest is zero, and the median gene's outgoing edges sit 99.5% inside that three-dimensional space. A knockout removes one row, so every knockout removes a mix of the same three patterns and only the mix differs. Rebuilding from the same bootstrap networks: at K = 3 the median Jaccard of two knockouts' top-20 genes is 0.54 and their Spearman 0.74; at K = 10 it is 0.05–0.21 and 0.29–0.40; on the plain mean of the bootstrap networks 0.05 and 0.16–0.21 — and in every case the genes that move still track the edges the knockout removed (residual Spearman 0.6 with the removed edge weight). The shared pattern is the rank-3 denoising, not the alignment.
+
+**Is there a target in the residue?** After subtracting each gene's mean log distance over the other knockouts, what is left correlates with the edge the knockout removed from that gene at 0.52 (`d` = 2) to 0.68 (`d` = 10), and with the gene's hubness at only 0.1–0.3. So the alignment carries target-specific information; the statistic scores the hub pattern on top of it. That residue depends on how much the knockout removed, though: against a null of knockouts far from the target's out-strength, z-scores of 11–32 appear that are strength artefacts.
+
+**What changed.**
+
+- **No-op knockouts are skipped.** A target with no outgoing edge in a cell type's network removes nothing; `SCTENIFOLDKNK_KO` writes no rows and a status line saying so. On Kang this is exactly the set of knockouts whose pattern did not correlate with the cell type's (Spearman with the mean pattern below 0.5).
+- **A null model, `SCTENIFOLDKNK_NULL`** (`--sctknk_null`, default 50). One task per cell type runs the same knockout for random genes with an outgoing edge, never a target, stratified over log out-strength with both ends always in. `SCTENIFOLDKNK_KO` fits, per gene, a line of the median-centred log distance on log out-strength across them and scores the target's residual in MAD units: `z_null`, `p_null`, `p_null_adj`. Three forms were tried on the test network. Mean-centring alone gave few hits but its z depended on which random genes were drawn; projecting out three components of the null added heavy tails and lowered specificity; the regression used every null, kept the tails moderate (kurtosis 2–9 against up to 41 for nearest-strength matching) and kept the top genes on the removed edges (median edge percentile 0.68). Brd4, a hub, comes out with z of sd 1.03 and no hit; the weak targets with a few. The MAD rather than the SD because a few random knockouts can move a gene far. On a K = 10 network the weakest target (2% of random knockouts moved the network less) still came out with z spread 1.99 and 146 hits, the lines at the bottom of the strength range resting on few nulls, so the scores are standardised once more by their own median and MAD over the knockout's genes, an empirical null per knockout in Efron's sense. After it, on the K = 10 network Brd4 and the weak target each have 5 hits, and for both the twenty highest-scoring genes are the target's own removed edges (median percentile of removed-edge weight 0.79 and 0.90); on the K = 3 network Brd4 has none, since nothing about a hub's knockout there differs from a random hub's. Each knockout's `effect_pct` and `out_strength_pct` go on the status line.
+- **`--sctknk_td_k`** exposes the decomposition's rank, and 0 averages the bootstrap networks. The default stays at 3 until a real dataset confirms the test network, so the published setting is still the published method.
+- **`--sctknk_ndim`** exposes the alignment's dimensions; default 2, the published one.
+- **A status table**, `sctknk/sctenifoldknk_status.txt`, merged by `MERGE_SCTENIFOLDKNK` from one line per pair, feeds the report: the per-knockout heatmap labels skipped pairs with the reason, and the enrichment ranks by `z_null` when it is there. The summary's "affected" is on `p_null_adj` when the null ran.
+
+**What did not change.** scTenifoldKnk's own columns are all still there, and a run with `--sctknk_null 0` is the run before this wave plus the no-op gate.
+
+**Checked here.** The build, null and knockout scripts ran on the test network (null of 30 in 36 s; Stfa1 gated as a no-op; the calibrated columns and status lines written; the merge's `awk` summary checked on calibrated and older tables). The report rendered on a fixture table with the calibrated columns and a status fixture, and its knockout figure, table, summary and enrichment text were looked at. Nextflow and nf-test are not installed on this machine, so the workflow and its updated tests did not run. The two K = 3 networks built here from the same object and seed differed in density (0.64 and 0.50) although `makeNetworks` and `tensorDecomposition` each reproduced under their seed; unexplained, and worth building one Kang cell type twice on the cluster.
+
+**On Kang, with K = 10 and a null of 50.** The well-connected targets (effect_pct 80–98) came back with 0 to 7 calibrated hits; the three weakest knockouts — CD19 in CD14+ monocytes, detected in 0.1% of cells, STAT2 and TYK2 in CD8 T cells — with 119, 57 and 47. Their out-strength lay below every random gene's, since the null is drawn among the network's genes with edges excluding the targets and a target kept below `--sctknk_min_pct` is by construction the weakest gene in the network, so the per-gene lines were extrapolated below their support. A target outside the null's strength range is now left uncalibrated: its rows and `z_null` stay, `p_null` and `p_null_adj` are NA, its status says `weaker (stronger) than every null knockout` and the report's tile shows that instead of a count. The Data quality section also flags a knockout whose effect_pct is below 5, and its overlap flag now ignores pairs of targets that share a gene (IFNAR1 and IFNAR1;IFNAR2 had tripped it with one shared hit) and needs three targets.
+
+**Still to do.** Re-run Kang on this branch, then with `--sctknk_td_k 10`, and read the knockout of a well-expressed hub against its status line before believing any list of affected genes. The null makes the hits specific but few; whether they are biologically right needs the stimulated half of Kang.
+
+## Wave 28 — A Data quality section, and a knockout summary
+
+**Sep 2026** · #24
+
+Reading the Kang run as a benchmark raised three skews: monocytes scored higher for every target, some barely detected targets still received ordinary scores, and the knockout returned the same genes whatever the target. None of these could be explained from the report, because it showed results and not the state of the data and networks behind them. This wave adds a **Data quality** section to the report, made of diagnostics rather than filters. Each check comes with the reason it can skew a result.
+
+**Per identity, from `DOWNSAMPLE`** (`identity_qc.tsv`), over the retained cells:
+
+- depth and genes detected per cell;
+- the share of each cell's counts in the mito/ribo genes removed on load (wave 27 keeps the pre-removal library size, so this is exact);
+- the sparsity of the `gene4use` matrix;
+- the variance in its first principal components, and their Spearman correlation with log depth;
+- with the new `--batch`: batch composition, and the share of the leading components' variance that batch explains.
+
+The components are computed with `irlba` on log-normalised, scaled `gene4use` counts, seeded with `--seed`.
+
+**Per target** (`target_expression.tsv` gains `var_standardized` and `var_percentile`): Seurat's `vst` standardised variance, in each identity, over all its genes. It is computed from the sparse counts with a closed form for zeros, not through `FindVariableFeatures()`/`HVFInfo()`. `HVFInfo()`'s arguments differ between the container's Seurat v4 and v5, and inside the script the call failed with "Please run FindVariableFeatures". On a test object the result matches Seurat's own to 1e-15.
+
+**Per network, from the new `NETWORK_QC`** (`qc/network_qc.tsv`, `qc/target_network_qc.tsv`):
+
+- It reads every network the run built, once: the rank-score networks, plus the knockout's wild-type networks when that track ran.
+- Per network it records genes, edges, density, mean absolute weight, the share of isolated genes, the share of strength held by the top 1% of genes, and the Gini coefficient of strength. Strength is summed absolute weight in and out, so it is defined for GENIE3's dense networks too.
+- For each target it records degree, strength and strength percentile. The percentile is the share of genes weaker than the target, so an isolated target is at 0.
+- `hdwgcna.R` now writes the number of metacells and the scale-free fit R² at the power used, taken from its `TestSoftPowers()` table. `NETWORK_QC` joins them in.
+
+This is a separate process rather than part of `RANK_SCORE`, which runs once per target and would have repeated the summary for every one. `REPORT` never receives networks, only tables.
+
+**In the report.** The section opens with a table of flagged checks, each with its value, threshold and why it matters. Three figures follow:
+
+- input quality, as lollipops with flagged values in red;
+- network structure, as a heatmap coloured by distance from the track's median;
+- target placement, as strength percentile, with `var_standardized` under it.
+
+The thresholds are named constants at the top of the section. Several are relative to the run's median, since "shallow" or "dense" depends on dataset and method. A first version drew the network metrics as faceted lollipops, but mixing tracks on one axis and a dozen panels made the tick labels collide. The heatmap needs no axes and shows "unlike the others" directly.
+
+**Knockout summary.** `MERGE_SCTENIFOLDKNK` now also writes `sctknk/sctenifoldknk_summary.txt`. It has one row per knockout: genes tested, genes affected at FDR < 0.05, their share, and the gene moved furthest. It is written with `awk` beside the merged table, so it exists in knockout-only runs, which have no report. The report adds a **Genes affected per knockout** heatmap after the gene table, and marks knockouts with no table (failed, or ignored after timing out) as *no result*. The Data quality section flags an identity where the affected-gene sets of different targets overlap at a median Jaccard of 0.8 or more. That is the Kang pattern, where knockouts describe the network rather than the target.
+
+**Checked here.** `downsample_and_split.R` ran on a synthetic mouse object with an injected depth effect and a random donor column. PC1 correlated with depth at 0.85, batch R² was near 0, and an unknown `--batch` stopped with the list of columns. `network_qc.R` ran on synthetic dense, sparse and empty networks. The report rendered with Quarto against the fixtures, and every figure was looked at. The summary `awk` was checked against an independent count on the fixture table. The nf-test suites were updated but not run, and neither was the pipeline itself, because Nextflow is not installed on the machine this was written on.
+
+## Wave 27 — Mitochondrial and ribosomal genes removed on load
+
+**Sep 2026** · #24
+
+The first full run read as a benchmark (Kang 2018 control PBMCs, hdWGCNA plus the knockout track) found that the knockout barely depended on the target. Within a cell type, the genes clearing FDR < 0.05 were the same for most targets. CD14+ monocytes returned FTH1 and FTL for all 25 knockouts, and ribosomal protein genes were 37% of all hits while being 3% of the tested genes. Wave 23 had moved the knockout network onto scTenifoldKnk's own gene filter, detection in more than `--sctknk_min_pct` of cells. That filter has no mitochondrial or ribosomal exclusion, while `gene4use` has always had one, inherited from scRank. Ribosomal genes are among the most highly and uniformly expressed and the most tightly co-expressed, so they move in the manifold alignment whatever is knocked out.
+
+**Removed on load, once.** Mitochondrial and ribosomal protein genes are now removed from the object in `DOWNSAMPLE`, right after the assay is chosen and before downsampling, variable-gene selection, target QC or anything else reads it. Before this, `gene4use` dropped them, which covered GENIE3, scRank and hdWGCNA, but the knockout networks did not, since wave 23 had moved them onto scTenifoldKnk's own gene filter. Filtering in each place that picks genes would have meant the same rule, and the same helper, in several scripts, each one a place for it to drift. Removing them from the object once means no step downstream can see them, including a network method added later. `SCTENIFOLDKNK_BUILD` and the `gene4use` step no longer filter them; `gene4use` keeps only its `RP11-…` lncRNA pattern. Stored variable features are intersected with what is left, so reusing them still gives `--n_hvg` genes.
+
+Two things are kept from before the removal:
+
+- **Targets.** A gene requested as a target is exempt, so it can still pass QC, be scored and be knocked out. Otherwise it would be reported as absent from the object.
+- **Library size.** Each cell's total count over every gene goes into the metadata as `netperturb_lib_size`, and the report's target-expression heatmap normalises by it. Ribosomal genes can be a fifth or more of a cell's counts, so normalising over what is left would shift every gene by a different amount in every cell.
+
+Subsetting genes leaves the `data` layer's values as they were, so an object normalised before it reached the pipeline keeps that normalisation. Steps that normalise on their own do so over the remaining genes: hdWGCNA's `NormalizeMetacells`, scTenifoldKnk's CPM, and the UMAP computed when the object has none. `cell_counts.tsv` gains `genes_mt_rb`, the number removed, and the report states it beside the object's gene count.
+
+This is deliberately not a parameter. A first version had `--sctknk_filter_mt_rb` for the knockout track alone, to restore `scTenifoldKnk()`'s own gene set. It was dropped, because a switch on one track would let the two tracks disagree about which genes a network may use. The helper was checked on a synthetic mouse object run through `downsample_and_split.R`: the six mitochondrial and ribosomal genes went, and a ribosomal target (Rpl5), Rps6kb1, Rpl22l1 and Mt2 stayed. The `data` layer was unchanged. Whether this makes the knockout target-specific has not been checked yet: the Kang run has to be repeated, before and after a random-gene knockout null.
+
+**Tighter patterns.** `DOWNSAMPLE` used to match `^RP[0-9]+|^RPL|^RPS|^MT-`. On the Kang knockout genes, that also took:
+
+- the RPS6K kinases (RPS6KA1, RPS6KB2; RPS6KA1, RPS6KA3 and RPS6KA6 are drug targets in scRank's own table);
+- the RPL*L paralogues, RPS27L and RPS19BP1;
+- the pseudogene RPSAP58;
+- the gene RP1, through `^RP[0-9]+`.
+
+The helper, `is_mt_rb()`, lives in `downsample_and_split.R` only.
+
+- **Ribosomal:** only the cytosolic ribosomal proteins, `^RP[SL][0-9]+[AXY]?[0-9]*$`, `RPLP0`–`RPLP2` and `RPSA`.
+- **Mitochondrial:** `^MT[-._]`. The `.` and `_` forms cover `make.names()` output such as `MT.CO1`. A bare `^MT` was rejected because it takes nuclear genes: 15 of them in the Kang networks, MT2A, MTCH2 and MTIF3 among them.
+
+Both match on uppercased symbols, so mouse `mt-`, `Rps` and `Rpl` count. `DOWNSAMPLE` still drops the clone-named lncRNAs (`RP11-…`, `RP5-…`) that scRank's selection removes, now through its own `^RP[0-9]+-` pattern. As a result `gene4use` gains back the handful of genes above, and rank-score results can shift slightly from earlier runs.
+
+**A time limit on each knockout.** A knockout takes seconds (2–10 s on Kang), so `SCTENIFOLDKNK_KO` now has `time = 10.min`. A task killed for time (exit 143 locally, 140 under SLURM) is retried up to three times. A pair that times out on all four attempts is ignored: it is left out of the merged table, and the run carries on. Any other exit status still terminates the run. Retries get the same 10 minutes. The knockout is seeded, so a stuck pair tends to stay stuck, and a retry mainly helps when the slowness came from tasks competing for the node's cores (`cpus = n_cores`). An ignored pair is visible only in the trace, as `IGNORED`. The report does not list it yet.
+
+## Wave 26 — A documentation website
+
+**Sep 2026** · #22
+
+The README had grown into the only manual: one long page mixing a pipeline description, every parameter, every output file and the development notes. The pipeline now also has a website at `https://mcblab.github.io/NetPerturb/`, laid out like the one [Causeway](https://juliaapolonio.github.io/Causeway/) uses: MkDocs with the readthedocs theme and four pages, **Home**, **Usage**, **Output** and **FAQ**, built from `docs/` by `mkdocs.yml` at the repository root.
+
+**Content.** The site is a reorganisation of the README for someone running the pipeline, not a copy of it:
+
+- *Home* has the overview, the metro map and a quick start.
+- *Usage* turns the parameter prose into grouped tables (required, downsampling, scoring, knockout, enrichment, general) and adds profiles, per-process resources and a custom `-c` config example.
+- *Output* walks the `--outdir` tree folder by folder, including the report's sections.
+- *FAQ* is new. Its questions are the failure modes the pipeline already handles and explains in its code: missing targets and identities, an empty GSEA from a species mismatch, what a signed `NES` or a directionless `FC` means, the unpublished scTenifoldKnk image and how to point the processes at a local `.sif`, and the uutils `date` bug.
+
+The reasoning behind design decisions stays here in `IMPLEMENTATION.md`, which is kept out of the site with `exclude_docs`, along with the metro source, the poster exports and the logo script.
+
+**Theme.** The site follows the MCB Lab site (`mcblab.github.io`), which is Quarto with Bootswatch Sandstone. Sandstone's palette is mapped onto the readthedocs theme in `docs/css/docs.css`: a dark sidebar (`#3e3f3a`), a blue header (`#325d88`), a sand frame (`#dfd7ca`) around cream content (`#f8f5f0`), and the lab's font, Atkinson Hyperlegible, self-hosted in `docs/fonts/`. The home page borrows the lab site's card grid for the two tracks and the report. Readthedocs has no dark mode, so the metro map is shown in its light rendering only. Inline code does not wrap on desktop, so a flag like `--network` is never split at its hyphens; on phones it may wrap, so a long path cannot push the page sideways. Wide tab-separated examples scroll inside their own box instead of being clipped.
+
+**Logo.** A hexagon sticker in the same palette: a small network whose red node reaches its neighbours through dashed edges (the perturbed gene and the edges a knockout removes), solid edges among the rest, and a cell beside it. `docs/img/make_logo.py` generates it. The title is drawn from Atkinson Hyperlegible's glyph outlines rather than as SVG `<text>`, so it renders the same in a browser, in cairosvg and on GitHub, where the font is not installed. The script also writes a text-free mark for the favicons, since the title cannot be read at 16–32 px. The README now shows the logo and links to the site.
+
+**Deployment.** `.github/workflows/docs.yml` runs `mkdocs gh-deploy --strict` on pushes to `main` that touch `docs/` or `mkdocs.yml`, publishing to the `gh-pages` branch. Strict mode fails the build on a broken internal link or anchor, which matters because the FAQ and Usage link into each other's sections. GitHub Pages has to be set to serve that branch once, in the repository settings.
 
 ## Wave 25 — The report describes the run
 
