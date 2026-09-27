@@ -302,11 +302,15 @@ nextflow_pipeline {
             assert names.count { it.startsWith("SCTENIFOLDKNK_KO (") } == 6
             assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
 
-            // only the merged table is published; the per-pair tables stay in
-            // the work dir. One file rather than two because no --gsea_gmt was
-            // given -- the enrichment publishes beside it when there is one.
+            // the merge publishes its three tables -- the merged knockout
+            // table, the per-knockout summary and the status lines -- and the
+            // per-pair tables stay in the work dir. Three rather than four
+            // because no --gsea_gmt was given -- the enrichment publishes
+            // beside them when there is one.
             assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
-            assert path("${outputDir}/sctknk").list().size() == 1
+            assert path("${outputDir}/sctknk/sctenifoldknk_summary.txt").exists()
+            assert path("${outputDir}/sctknk/sctenifoldknk_status.txt").exists()
+            assert path("${outputDir}/sctknk").list().size() == 3
 
             // no --network, so the whole scoring and reporting track stays off
             assert !names.any { it.startsWith("GENIE3") }
@@ -424,9 +428,10 @@ nextflow_pipeline {
             assert names.count { it.startsWith("GSEA_SCTENIFOLDKNK") } == 1
             assert path("${outputDir}/sctknk/gsea_all_targets.txt").exists()
 
-            // published beside the knockout table, so the directory now holds
-            // both -- the knockout-alone test above asserts one for want of a GMT
-            assert path("${outputDir}/sctknk").list().size() == 2
+            // published beside the merge's three tables, so the directory now
+            // holds four -- the knockout-alone test above asserts three for
+            // want of a GMT
+            assert path("${outputDir}/sctknk").list().size() == 4
 
             // the knockout fan-out and the scoring track are untouched by it.
             // GSEA_SCTENIFOLDKNK starts with "GSEA_", so it cannot inflate this
