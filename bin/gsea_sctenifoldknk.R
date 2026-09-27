@@ -93,6 +93,19 @@ if (nrow(dr) == 0) {
 # log2(0) = -Inf, which is dropped with the other non-finite values below.
 dr$log2FC <- ifelse(is.finite(dr$FC) & dr$FC > 0, log2(dr$FC), NA_real_)
 
+# When the table carries the null calibration (--sctknk_null > 0), the
+# ranking is z_null instead: how far the knockout moved each gene beyond what
+# random knockouts of comparable strength move it. log2FC ranks a knockout's
+# genes against each other, and whatever gene is knocked out that ranking is
+# led by the network's hubs, so every knockout's enrichment came out the same.
+# z_null is signed around the null the same way log2FC is signed around the
+# mean, so the two-tailed scoring below reads the same: a positive NES is a
+# set the knockout moved more than random knockouts do, a negative one a set
+# that sat still while the rest of the network moved.
+rank_stat <- if ("z_null" %in% names(dr)) "z_null" else "log2FC"
+message("Ranking genes by ", rank_stat, ".")
+dr$rank_stat <- dr[[rank_stat]]
+
 pathways <- tryCatch(
   fgsea::gmtPathways(gmt_file),
   error = function(e) {
@@ -162,7 +175,7 @@ for (i in seq_len(nrow(combos))) {
 
   # fgsea stops with "Not all stats values are finite numbers", so non-finite
   # values are dropped here rather than taken to it.
-  sub <- sub[!is.na(sub$gene) & nzchar(sub$gene) & is.finite(sub$log2FC), ]
+  sub <- sub[!is.na(sub$gene) & nzchar(sub$gene) & is.finite(sub$rank_stat), ]
 
   # Genes sorted on log2FC, furthest-moved first. The order is the paper's --
   # log2FC is a monotone transform of the manifold-alignment distance, so
@@ -171,7 +184,7 @@ for (i in seq_len(nrow(combos))) {
   # is what makes the score two-tailed. A gene appearing twice keeps its
   # largest value, since a duplicated name in the stats vector would make the
   # ranking ambiguous.
-  sub <- sub[order(sub$log2FC, decreasing = TRUE), ]
+  sub <- sub[order(sub$rank_stat, decreasing = TRUE), ]
   sub <- sub[!duplicated(sub$gene), ]
 
   # The knocked-out gene is dropped from its own ranking. It is first by
@@ -189,7 +202,7 @@ for (i in seq_len(nrow(combos))) {
     next
   }
 
-  stats <- stats::setNames(sub$log2FC, sub$gene)
+  stats <- stats::setNames(sub$rank_stat, sub$gene)
 
   # scoreType = "std", fgsea's default, because log2FC has a real negative tail
   # -- genes the knockout moved less than the run's average gene. Both ends of

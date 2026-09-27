@@ -45,6 +45,27 @@ sctknk_min_pct <- suppressWarnings(as.numeric(if (length(args) >= 10) args[10] e
 if (is.na(sctknk_min_pct) || sctknk_min_pct < 0 || sctknk_min_pct >= 1) {
   sctknk_min_pct <- 0.05
 }
+# --batch: metadata column naming the donor, sample or batch of each cell,
+# used only for the Data quality section. Missing, empty or "null" (what
+# Nextflow passes for an unset parameter) means none.
+batch <- if (length(args) >= 11 && nzchar(args[11]) && args[11] != "null") args[11] else NA_character_
+# Mitochondrial and ribosomal protein genes, by symbol. They are removed from
+# the object as soon as it is loaded (below), so no step of the pipeline ever
+# sees them. Symbols are uppercased first, so mouse (mt-, Rps, Rpl) matches the
+# same patterns as human (MT-, RPS, RPL).
+#   mitochondrial: MT- plus the "." or "_" some converters write in its place
+#     (make.names() turns MT-CO1 into MT.CO1). A bare ^MT would also take
+#     nuclear genes such as MT2A, MTCH2 and MTIF3.
+#   ribosomal: the cytosolic ribosomal proteins only -- RPS/RPL followed by a
+#     number and an optional A/X/Y variant (RPL13A, RPS4X, RPS4Y1), plus RPLP0-2
+#     and RPSA. A bare ^RPS/^RPL also took the RPS6K kinases (RPS6KA1/3/6
+#     are drug targets in scRank's table), the RPL*L paralogues, RPS27L,
+#     RPS19BP1 and pseudogenes like RPSAP58.
+is_mt_rb <- function(genes) {
+  g <- toupper(genes)
+  grepl("^MT[-._]", g) |
+    grepl("^RP[SL][0-9]+[AXY]?[0-9]*$|^RPLP[0-2]$|^RPSA$", g)
+}
 
 if (is.na(n_cells) || n_cells < 1) {
   stop("--n_cells must be a positive whole number, got: ", args[5])
@@ -138,8 +159,36 @@ if (seuratObj == 'AML_object.rda') {
 
 seuratObj <- select_assay(seuratObj, assay)
 
+# Mitochondrial and ribosomal protein genes are removed here, before anything
+# else reads the object, so no network, gene set, QC check or figure downstream
+# is built on them. They are highly expressed and tightly co-expressed, and
+# they pull edges and alignment distance towards themselves whatever the
+# question: on Kang 2018 PBMCs ribosomal genes were 3% of the knockout network
+# but 37% of its differentially-regulated genes, the same ones for every target.
+#
+# Two things are kept from before the removal. A gene requested as a target is
+# never removed for its name, so it can still be scored and knocked out. And
+# each cell's total count over every gene is kept in the metadata, because
+# ribosomal genes alone can be a fifth or more of a cell's counts: normalising
+# over what is left would shift every gene by a different amount in every
+# cell. Subsetting genes leaves the data layer's values as they were, so an
+# object normalised before it reached the pipeline keeps that normalisation.
+seuratObj$netperturb_lib_size <- Matrix::colSums(seuratObj[["RNA"]]@counts)
+mt_rb_genes <- setdiff(rownames(seuratObj)[is_mt_rb(rownames(seuratObj))],
+                       unlist(target_genes))
+n_genes_input <- nrow(seuratObj)
+if (length(mt_rb_genes) > 0) {
+  seuratObj <- seuratObj[setdiff(rownames(seuratObj), mt_rb_genes), ]
+}
+message("Removed ", length(mt_rb_genes), " mitochondrial/ribosomal protein ",
+        "gene(s) of ", n_genes_input, "; ", nrow(seuratObj), " left.")
+
 if (!column %in% colnames(seuratObj@meta.data)) {
   stop("--column '", column, "' is not a metadata column of this object. ",
+       "Available: ", paste(colnames(seuratObj@meta.data), collapse = ", "))
+}
+if (!is.na(batch) && !batch %in% colnames(seuratObj@meta.data)) {
+  stop("--batch '", batch, "' is not a metadata column of this object. ",
        "Available: ", paste(colnames(seuratObj@meta.data), collapse = ", "))
 }
 
@@ -298,7 +347,7 @@ if (!species %in% c("human", "mouse")) {
 # there are at least that many -- the first n_hvg of them -- and computed
 # otherwise, since reusing a shorter list would quietly hand back fewer genes
 # than were asked for. nfeatures cannot exceed the number of genes present.
-stored_hvg <- VariableFeatures(seurat_downsample)
+stored_hvg <- intersect(VariableFeatures(seurat_downsample), rownames(seurat_downsample))
 hvg <- if (length(stored_hvg) >= n_hvg) {
   stored_hvg
 } else {
@@ -320,15 +369,14 @@ drug_gene <- if (species == "human") {
 
 genes_4_use <- unique(c(target, hvg, tf_gene, drug_gene))
 
-# Drop mitochondrial and ribosomal genes. The match is guarded because `-x` on
-# an empty index vector would empty the whole set instead of removing nothing.
-mt_rb <- grep("^RP[[:digit:]]+|^RPL|^RPS|^MT-", toupper(genes_4_use))
-if (length(mt_rb) > 0) {
-  genes_4_use <- genes_4_use[-mt_rb]
-}
+# Drop the clone-named lncRNAs (RP11-..., RP5-...), which scRank's own
+# selection removes alongside the mitochondrial and ribosomal genes already
+# gone from the object. Indexed with a logical, so nothing matching removes
+# nothing.
+genes_4_use <- genes_4_use[!grepl("^RP[0-9]+-", toupper(genes_4_use))]
 
 # Targets are added back after that filter so a target is never dropped for
-# looking ribosomal, and anything missing from the object is then dropped.
+# its name, and anything missing from the object is then dropped.
 genes_4_use <- unique(c(genes_4_use, targets))
 genes_4_use <- genes_4_use[genes_4_use %in% rownames(seurat_downsample)]
 
@@ -355,7 +403,8 @@ cell_counts$genes_filtered  <- cell_counts$genes_gene4use - cell_counts$genes_ex
 # Genes in each identity's scTenifoldKnk network, by the same rule
 # sctenifoldknk_build.R applies: every gene of the object detected in more
 # than --sctknk_min_pct of the identity's cells, plus the target genes with any
-# count there, which are kept below that threshold.
+# count there, which are kept below that threshold. The mitochondrial and
+# ribosomal protein genes are already gone from the object.
 all_counts <- seurat_downsample[["RNA"]]@counts
 cell_counts$genes_sctknk <- unname(vapply(cell_counts$identity, function(id) {
   cells <- retained_ident == id
@@ -367,6 +416,10 @@ cell_counts$genes_sctknk <- unname(vapply(cell_counts$identity, function(id) {
   length(union(rownames(sub)[detected], kept_targets))
 }, integer(1)))
 
+# How many mitochondrial/ribosomal protein genes were removed on load, so the
+# report can say what genes_total is short of. The same for every identity.
+cell_counts$genes_mt_rb <- ifelse(cell_counts$status == "kept", length(mt_rb_genes), NA_integer_)
+
 write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = TRUE)
 
@@ -376,9 +429,11 @@ write.table(cell_counts, "cell_counts.tsv", quote = FALSE, sep = "\t",
 # what the networks were built from. Log-normalised here from the counts
 # (per 10,000, then log1p) rather than read from the data layer, which holds
 # raw counts in an object that was never normalised; the library size is the
-# cell's total over every gene, as NormalizeData() would take it.
+# cell's total over every gene, as NormalizeData() would take it -- taken
+# before the mitochondrial and ribosomal genes were removed, so the values do
+# not depend on that removal.
 target_counts <- seurat_downsample[["RNA"]]@counts[targets, , drop = FALSE]
-lib_size <- Matrix::colSums(seurat_downsample[["RNA"]]@counts)
+lib_size <- seurat_downsample$netperturb_lib_size
 target_lognorm <- log1p(t(t(as.matrix(target_counts)) / pmax(lib_size, 1)) * 1e4)
 
 target_expression <- do.call(rbind, lapply(keep_identities, function(id) {
@@ -391,7 +446,136 @@ target_expression <- do.call(rbind, lapply(keep_identities, function(id) {
     stringsAsFactors = FALSE
   )
 }))
+
+# Data quality ---------------------------------------------------------------
+# Diagnostics for the report, not filters: each one is a reason an identity's
+# network, and so every score from it, might be skewed. All are taken over the
+# retained cells, since those are what the networks were built from.
+#
+# Per target and identity, how much the target varies beyond what its mean
+# predicts: Seurat's vst standardised variance, over every gene of the
+# identity. Around 1 is what sampling noise alone gives, so a target near it
+# has no structure for a network to connect it to, however well it is detected.
+# The percentile places it among the identity's genes.
+# Seurat's vst standardised variance, computed here from the sparse counts
+# rather than through FindVariableFeatures()/HVFInfo(), whose arguments differ
+# between the Seurat v4 in the container and v5: a loess fit of log10 variance
+# on log10 mean gives each gene's expected variance, values are standardised
+# by it and clipped above at sqrt(cells), and their variance is returned. Zeros
+# are handled in closed form, so the matrix is never made dense.
+vst_variance <- function(counts) {
+  n  <- ncol(counts)
+  mu <- Matrix::rowMeans(counts)
+  vr <- (Matrix::rowSums(counts^2) - n * mu^2) / (n - 1)
+  ok <- vr > 0
+  out <- setNames(rep(NA_real_, nrow(counts)), rownames(counts))
+  if (sum(ok) < 10) return(out)
+  fit <- loess(log10(vr[ok]) ~ log10(mu[ok]), span = 0.3)
+  sd_exp <- sqrt(10^fit$fitted)
+  clip <- sqrt(n)
+  trip <- Matrix::summary(as(counts[ok, , drop = FALSE], "dgCMatrix"))
+  z <- pmin((trip$x - mu[ok][trip$i]) / sd_exp[trip$i], clip)
+  nz <- tabulate(trip$i, nbins = sum(ok))
+  z0 <- pmin(-mu[ok] / sd_exp, clip)
+  s1 <- (n - nz) * z0 + vapply(split(z, factor(trip$i, levels = seq_len(sum(ok)))), sum, numeric(1))
+  s2 <- (n - nz) * z0^2 + vapply(split(z^2, factor(trip$i, levels = seq_len(sum(ok)))), sum, numeric(1))
+  out[ok] <- (s2 - s1^2 / n) / (n - 1)
+  out
+}
+
+target_var <- do.call(rbind, lapply(keep_identities, function(id) {
+  v <- vst_variance(all_counts[, retained_ident == id, drop = FALSE])
+  data.frame(identity = id, gene = targets,
+             var_standardized = unname(v[targets]),
+             var_percentile = unname(vapply(targets, function(g) {
+               if (is.na(v[g])) NA_real_ else 100 * mean(v <= v[g], na.rm = TRUE)
+             }, numeric(1))),
+             stringsAsFactors = FALSE)
+}))
+# Joined by position rather than merge(), which would reorder the rows the
+# report reads targets in the order they were given.
+m <- match(paste(target_expression$identity, target_expression$gene),
+           paste(target_var$identity, target_var$gene))
+target_expression$var_standardized <- target_var$var_standardized[m]
+target_expression$var_percentile   <- target_var$var_percentile[m]
+
 write.table(target_expression, "target_expression.tsv", quote = FALSE, sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+# Per identity:
+#   median_counts / median_genes: sequencing depth and genes detected per cell.
+#   median_mt_rb_frac: share of each cell's counts in the mitochondrial and
+#     ribosomal genes removed on load; high values point at stressed or
+#     damaged cells, and at how much normalisation leaned on those genes.
+#   sparsity_gene4use: share of zeros in the matrix the rank-score networks are
+#     fitted on; mostly-zero genes give unstable regressions and correlations.
+#   pc1_var_frac / top5_var_frac: variance carried by the leading principal
+#     components of that matrix. A large share in one component means one
+#     programme, or a mixture of cell states, dominates the identity, and its
+#     co-expression is then about that rather than regulation.
+#   pc1_depth_rho, max_pc_depth_rho (and which PC): Spearman correlation of
+#     component scores with log sequencing depth. When the main axis of
+#     variation is depth, co-expression edges mostly are too.
+#   with --batch: n_batches, largest_batch_frac, batch_entropy (0 = one batch,
+#     1 = evenly split) and batch_r2, the share of the top 10 components'
+#     variance explained by batch -- correlation that comes from donors
+#     differing, not from regulation within them.
+log_depth <- log10(pmax(seurat_downsample$netperturb_lib_size, 1))
+lib_after <- Matrix::colSums(all_counts)
+identity_qc <- do.call(rbind, lapply(keep_identities, function(id) {
+  cells <- retained_ident == id
+  cnt   <- all_counts[genes_4_use, cells, drop = FALSE]
+  lib   <- seurat_downsample$netperturb_lib_size[cells]
+  row <- data.frame(
+    identity          = id,
+    identity_id       = gsub("[^A-Za-z0-9_\\-]", "_", id),
+    n_cells           = sum(cells),
+    median_counts     = median(lib),
+    median_genes      = median(Matrix::colSums(all_counts[, cells, drop = FALSE] > 0)),
+    median_mt_rb_frac = median(1 - lib_after[cells] / pmax(lib, 1)),
+    sparsity_gene4use = 1 - Matrix::nnzero(cnt) / length(cnt),
+    pc1_var_frac = NA_real_, top5_var_frac = NA_real_,
+    pc1_depth_rho = NA_real_, max_pc_depth_rho = NA_real_, max_pc_depth = NA_integer_,
+    n_batches = NA_integer_, largest_batch_frac = NA_real_,
+    batch_entropy = NA_real_, batch_r2 = NA_real_,
+    stringsAsFactors = FALSE
+  )
+  # Log-normalised by the pre-removal library size, as target_expression is,
+  # then scaled per gene; genes with no variance here carry no information.
+  x <- log1p(t(t(as.matrix(cnt)) / pmax(lib, 1)) * 1e4)
+  x <- x[apply(x, 1, var) > 0, , drop = FALSE]
+  n_pc <- min(10, nrow(x) - 1, ncol(x) - 1)
+  if (n_pc >= 2) {
+    set.seed(seed)
+    pca <- tryCatch(irlba::prcomp_irlba(t(x), n = n_pc, center = TRUE, scale. = TRUE),
+                    error = function(e) NULL)
+    if (!is.null(pca)) {
+      total <- nrow(x)  # scaled genes each carry unit variance
+      pc_var <- pca$sdev^2
+      rho <- apply(pca$x, 2, function(s) suppressWarnings(cor(s, log_depth[cells], method = "spearman")))
+      row$pc1_var_frac     <- pc_var[1] / total
+      row$top5_var_frac    <- sum(head(pc_var, 5)) / total
+      row$pc1_depth_rho    <- rho[1]
+      row$max_pc_depth     <- which.max(abs(head(rho, 5)))
+      row$max_pc_depth_rho <- rho[row$max_pc_depth]
+      if (!is.na(batch)) {
+        b <- factor(seurat_downsample@meta.data[[batch]][cells])
+        p <- as.numeric(table(b)) / length(b)
+        p <- p[p > 0]
+        row$n_batches          <- length(p)
+        row$largest_batch_frac <- max(p)
+        row$batch_entropy      <- if (length(p) > 1) -sum(p * log(p)) / log(length(p)) else 0
+        if (length(p) > 1) {
+          r2 <- apply(pca$x, 2, function(s) summary(lm(s ~ b))$r.squared)
+          row$batch_r2 <- sum(r2 * pc_var) / sum(pc_var)
+        }
+      }
+    }
+  }
+  row
+}))
+
+write.table(identity_qc, "identity_qc.tsv", quote = FALSE, sep = "\t",
             row.names = FALSE, col.names = TRUE)
 
 split_obj <- SplitObject(seurat_downsample, split.by = column)

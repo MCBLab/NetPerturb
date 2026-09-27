@@ -24,10 +24,26 @@ params:
   target_expression_file: ""
   run_info_file: ""
   trace_file: ""
+  identity_qc_file: ""
+  network_qc_file: ""
+  target_network_qc_file: ""
+  sctknk_status_file: ""
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE, echo = FALSE)
+
+# An optional table: read when its path names a non-empty file, an empty
+# frame otherwise -- for every input a hand-rendered report, or a run from
+# before that table existed, may lack.
+read_optional <- function(path) {
+  if (!is.null(path) && nzchar(path) && file.exists(path) && file.size(path) > 0) {
+    read.delim(path, header = TRUE, sep = "\t", check.names = FALSE,
+               stringsAsFactors = FALSE)
+  } else {
+    data.frame()
+  }
+}
 
 library(dplyr)
 library(tidyr)
@@ -183,12 +199,42 @@ if (has_sctknk) {
   sctknk_dr$log2FC <- numeric()
 }
 
+# Which statistic the knockout sections are cut and ranked on. A table from a
+# run with --sctknk_null > 0 carries z_null / p_null / p_null_adj: each gene
+# tested against what the same gene does under random knockouts of comparable
+# strength in the same cell type. That is the cut when it is there, since
+# scTenifoldKnk's own p.adj only ranks a knockout's genes against each other
+# and, whatever gene is knocked out, that ranking is led by the network's
+# hubs. An older table, or one from a run with the null switched off, falls
+# back to p.adj and log2FC.
+sctknk_calibrated <- has_sctknk && all(c("z_null", "p_null_adj") %in% names(sctknk_dr))
+if (sctknk_calibrated) {
+  sctknk_dr$sig_p    <- sctknk_dr$p_null_adj
+  sctknk_dr$sig_stat <- sctknk_dr$z_null
+} else {
+  sctknk_dr$sig_p    <- sctknk_dr$p.adj
+  sctknk_dr$sig_stat <- sctknk_dr$log2FC
+}
+sig_label  <- if (sctknk_calibrated) "p_null_adj" else "p.adj"
+stat_label <- if (sctknk_calibrated) "z_null" else "log2FC"
+
+# The knockout status table from MERGE_SCTENIFOLDKNK: one line per cell type
+# x target, whether the knockout ran and, if not, why -- a target with no
+# outgoing edge in that cell type's network is a no-op and is skipped -- plus
+# what it removed and how far it moved the network next to the null
+# knockouts. Header-only when the track did not run, or from a run before
+# the status table existed.
+sctknk_status <- read_optional(params$sctknk_status_file)
+has_sctknk_status <- nrow(sctknk_status) > 0
+
 # p.value is pchisq(FC, df = 1) and p.adj is BH over that, so the FDR cut is a
-# monotone function of FC: filtering here is the same as taking everything
-# above a log2FC threshold. Both sections below start from this frame.
+# monotone function of FC: filtering on p.adj is the same as taking everything
+# above a log2FC threshold. Under the null calibration the cut is one-sided:
+# genes the knockout moved further than random knockouts do (z_null > 0),
+# not the ones it moved less. Both sections below start from this frame.
 sctknk_sig <- sctknk_dr %>%
-  filter(!is.na(p.adj), p.adj < 0.05) %>%
-  arrange(target, cell_type, p.value)
+  filter(!is.na(sig_p), sig_p < 0.05, !sctknk_calibrated | sig_stat > 0) %>%
+  arrange(target, cell_type, sig_p, desc(sig_stat))
 
 has_sctknk_sig <- nrow(sctknk_sig) > 0
 n_sctknk_sig   <- nrow(sctknk_sig)
@@ -211,9 +257,9 @@ is_ko_gene <- function(gene, target) {
 
 sctknk_net <- if (has_sctknk_sig) {
   sctknk_sig %>%
-    filter(!is_ko_gene(gene, target), is.finite(log2FC)) %>%
+    filter(!is_ko_gene(gene, target), is.finite(sig_stat)) %>%
     group_by(target, cell_type) %>%
-    slice_max(log2FC, n = sctknk_top_genes, with_ties = FALSE) %>%
+    slice_max(sig_stat, n = sctknk_top_genes, with_ties = FALSE) %>%
     ungroup()
 } else {
   sctknk_sig
@@ -371,6 +417,17 @@ target_expr <- if (!is.null(target_expr_path) && nzchar(target_expr_path) &&
 has_target_expr <- nrow(target_expr) > 0
 n_expr_genes <- length(unique(target_expr$gene))
 n_expr_ids   <- length(unique(target_expr$identity))
+
+# The Data quality section's three tables: identity_qc.tsv from DOWNSAMPLE,
+# and network_qc.tsv / target_network_qc.tsv from NETWORK_QC. Each is missing
+# when the qmd is rendered by hand, or by a run from before they existed, and
+# its part of the section then says so instead.
+identity_qc       <- read_optional(params$identity_qc_file)
+network_qc        <- read_optional(params$network_qc_file)
+target_network_qc <- read_optional(params$target_network_qc_file)
+has_identity_qc       <- nrow(identity_qc) > 0
+has_network_qc        <- nrow(network_qc) > 0
+has_target_network_qc <- nrow(target_network_qc) > 0
 
 # The run itself, as main.nf wrote it: a key/value table with the start time,
 # the command line and the settings behind the result. Read into a named
@@ -664,21 +721,44 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
 Each knockout and the genes it moved. scTenifoldKnk zeroes the target's
 outgoing edges, realigns the knocked-out network against the wild-type
 one, and scores every gene on how far it travelled between the two; the genes
-drawn here are the ones clearing FDR < 0.05. Use the menu to switch between the
+drawn here are the ones clearing FDR < 0.05 on `r sig_label`. Use the menu to switch between the
 `r n_sctknk_views` target and cell type combinations.
+
+```{r sctknk-null-note, results="asis"}
+if (sctknk_calibrated) {
+  cat("Whatever gene is knocked out of a network, the genes that move most are its ",
+      "hubs, by an amount set by how many edges the knocked-out gene had: on its own, ",
+      "scTenifoldKnk's ranking says which genes are hubs, not what the target did. So ",
+      "every gene here is tested against what the same gene does under **",
+      run_value("sctknk_null"), "** random-gene knockouts of the same network ",
+      "(`--sctknk_null`): its distance, centred on the knockout's median, against a line ",
+      "fitted to that gene's distances over the random knockouts' outgoing edge strength, ",
+      "in MAD units of the residuals. `z_null` is that score, `p_null_adj` its two-sided ",
+      "normal tail with Benjamini-Hochberg over the tested genes, and a gene counts as ",
+      "moved when `p_null_adj` < 0.05 and `z_null` > 0. A target with no outgoing edge ",
+      "in a cell type's network changes nothing when knocked out and is skipped; the ",
+      "*Genes affected per knockout* section lists those.\n", sep = "")
+} else if (has_sctknk) {
+  cat("This table carries scTenifoldKnk's own statistic only (`--sctknk_null 0`, or a ",
+      "run from before the null model). It ranks a knockout's genes against each other, ",
+      "and whatever gene is knocked out that ranking is led by the network's hubs, so ",
+      "read the same genes coming back for every target as the network's hubs rather ",
+      "than as the targets' effects.\n", sep = "")
+}
+```
 
 The knocked-out gene sits at the centre and the genes it moved sit around it. A
 combined target such as `A;B` is a single joint knockout, with both genes' edges
 zeroed together, so all of its genes sit at the centre, each linked to every gene
-the knockout moved. A node's size follows its `log2FC`, scaled within the combination on display, so
+the knockout moved. A node's size follows its `r stat_label`, scaled within the combination on display, so
 sizes rank genes against each other rather than across cell types. The ring is
 capped at the `r sctknk_top_genes` strongest genes per combination; the table in
 the next section is not capped. Hover any node for its exact values.
 
-`log2FC` here is the log2 ratio of a gene's squared alignment distance to the
+`log2FC` is the log2 ratio of a gene's squared alignment distance to the
 mean squared distance of its run, so it says how far a gene moved and not which
 way it went. It carries no direction, which is why no edge on this figure has a
-sign to read off: every gene shown simply moved further than its run's average.
+sign to read off: every gene shown simply moved further than its run's average`r if (sctknk_calibrated) ", and further than random knockouts move it" else ""`.
 
 ```{r sctknk-network, eval=has_sctknk_net && has_plotly}
 # log2FC has no sign and is already carried by node size, so nothing on this
@@ -775,8 +855,8 @@ for (i in seq_len(nrow(views))) {
 
   hover <- paste0(
     edges$target_gene, " — ", edges$partner,
-    "<br>log2FC ", signif(edges$log2FC, 4),
-    "<br>p.adj ", signif(edges$p.adj, 3)
+    "<br>", stat_label, " ", signif(edges$sig_stat, 4),
+    "<br>", sig_label, " ", signif(edges$sig_p, 3)
   )
   mid <- data.frame(
     x = (pos$x[match(edges$target_gene, pos$gene)] + pos$x[match(edges$partner, pos$gene)]) / 2,
@@ -789,12 +869,12 @@ for (i in seq_len(nrow(views))) {
   moved <- edges %>%
     distinct(partner, .keep_all = TRUE) %>%
     transmute(
-      partner, log2FC,
+      partner, sig_stat,
       text = paste0(
         partner,
+        "<br>", stat_label, " ", signif(sig_stat, 4),
         "<br>log2FC ", signif(log2FC, 4),
-        "<br>p.value ", signif(p.value, 3),
-        "<br>p.adj ", signif(p.adj, 3)
+        "<br>", sig_label, " ", signif(sig_p, 3)
       )
     ) %>%
     left_join(pos, by = c(partner = "gene"))
@@ -815,7 +895,7 @@ for (i in seq_len(nrow(views))) {
     plotly::add_trace(
       x = moved$x, y = moved$y, type = "scatter", mode = "markers+text",
       marker = list(
-        size = marker_size(moved$log2FC),
+        size = marker_size(moved$sig_stat),
         color = node_fill, opacity = 1,
         line = list(color = node_line, width = 1.5)
       ),
@@ -903,14 +983,15 @@ if (!has_sctknk) {
 
 ## Knockout differentially-regulated genes
 
-Every gene clearing FDR < 0.05, across all cell type and target combinations and
+Every gene clearing FDR < 0.05 on `r sig_label`, across all cell type and target combinations and
 with no cap on how many are listed per combination. `distance` is how far the
 gene moved between the wild-type and knocked-out networks; `log2FC` is that
 distance squared over the run's mean, logged; `p.value` tests it against the
 chi-square null and `p.adj` is the Benjamini-Hochberg adjustment within the run.
+`r if (sctknk_calibrated) "\x60z_null\x60 and \x60p_null_adj\x60 test the gene against random knockouts of the same network (see the note above)."`
 
 `p.value` is a direct function of `log2FC`, so the two rank genes identically and
-the FDR cut above is the same thing as a `log2FC` threshold. The knocked-out
+a cut on `p.adj` is the same thing as a `log2FC` threshold. The knocked-out
 genes themselves are left out: they always move furthest by construction, so
 their rows say nothing about the knockout's effect.
 
@@ -918,16 +999,18 @@ Currently `r n_sctknk_sig` gene(s) clear FDR < 0.05, across
 `r n_sctknk_targets` target(s) and `r n_sctknk_cell_types` cell type(s).
 
 ```{r sctknk-table, eval=has_sctknk_sig}
+show_cols <- c("cell_type", "target", "gene", "distance", "log2FC", "p.value", "p.adj",
+               if (sctknk_calibrated) c("z_null", "p_null_adj"))
 sctknk_sig %>%
-  select(cell_type, target, gene, distance, log2FC, p.value, p.adj) %>%
+  select(all_of(show_cols)) %>%
   datatable(
     filter = "top",
     rownames = FALSE,
-    # 0-based: column 5 is p.value
-    options = list(pageLength = 15, order = list(list(5, "asc"))),
-    caption = "scTenifoldKnk differentially-regulated genes at FDR < 0.05, per cell type x target."
+    # 0-based: the column the cut was made on
+    options = list(pageLength = 15, order = list(list(match(sig_label, show_cols) - 1, "asc"))),
+    caption = paste0("scTenifoldKnk differentially-regulated genes at FDR < 0.05 (", sig_label, "), per cell type x target.")
   ) %>%
-  formatSignif(columns = c("distance", "log2FC", "p.value", "p.adj"), digits = 4)
+  formatSignif(columns = setdiff(show_cols, c("cell_type", "target", "gene")), digits = 4)
 ```
 
 ```{r sctknk-table-empty, eval=!has_sctknk_sig, results="asis"}
@@ -940,13 +1023,101 @@ if (!has_sctknk) {
 }
 ```
 
+### Genes affected per knockout
+
+```{r sctknk-summary-setup}
+# One row per knockout (cell type x target): genes tested, genes affected
+# (FDR < 0.05 on sig_p) and their share, the same numbers
+# MERGE_SCTENIFOLDKNK publishes as sctknk/sctenifoldknk_summary.txt. The
+# knocked-out genes are left out, as SCTENIFOLDKNK_KO already does for
+# current runs. A pair with no rows in the table is looked up in the status
+# table: skipped as a no-op (no outgoing edges), not expressed, no network,
+# or failed. One in neither never produced anything -- it timed out on every
+# attempt and was ignored.
+ko_summary <- if (has_sctknk) {
+  sctknk_dr %>%
+    filter(!mapply(function(g, t) g %in% strsplit(t, ";")[[1]], gene, target)) %>%
+    group_by(cell_type, target) %>%
+    summarise(genes_tested   = n(),
+              genes_affected = sum(!is.na(sig_p) & sig_p < 0.05 & (!sctknk_calibrated | sig_stat > 0)),
+              .groups = "drop") %>%
+    mutate(share_affected = genes_affected / genes_tested) %>%
+    right_join(expand.grid(cell_type = unique(c(sctknk_dr$cell_type, sctknk_status$cell_type)),
+                           target = unique(c(sctknk_dr$target, sctknk_status$target)), stringsAsFactors = FALSE),
+               by = c("cell_type", "target"))
+} else {
+  data.frame()
+}
+if (nrow(ko_summary) > 0) {
+  st <- if (has_sctknk_status) sctknk_status %>% select(cell_type, target, status, out_strength_pct, effect_pct) else
+    data.frame(cell_type = character(), target = character(), status = character(),
+               out_strength_pct = numeric(), effect_pct = numeric())
+  ko_summary <- ko_summary %>%
+    left_join(st, by = c("cell_type", "target")) %>%
+    mutate(status = ifelse(is.na(status), ifelse(is.na(genes_tested), "no result", "ok"), status))
+}
+has_ko_summary <- nrow(ko_summary) > 0
+```
+
+```{r sctknk-summary-note, results="asis"}
+if (has_ko_summary) {
+  skipped <- ko_summary %>% filter(status != "ok") %>% count(status)
+  cat("How many genes each knockout affected (FDR < 0.05 on `", sig_label, "`), per cell type and target, ",
+      "with the share of the genes it tested underneath. Compare along a row: if a ",
+      "cell type returns about the same number for every target, check the Data quality ",
+      "section for whether they are also the same genes, which would mean the knockout ",
+      "is not telling targets apart there.",
+      if (nrow(skipped) > 0) paste0(" Knockouts that did not run, or could not be calibrated, are labelled with the reason: ",
+                                    paste0("**", skipped$n, "** ", skipped$status, collapse = ", "),
+                                    ". *No outgoing edges* means the target has no edge out of that cell type's ",
+                                    "network, so knocking it out changes nothing. *Weaker (stronger) than every null ",
+                                    "knockout* means the target's outgoing edges weigh less (more) than any random gene's, ",
+                                    "so the null has nothing to compare it with: its rows and `z_null` are in the table, ",
+                                    "but no gene of it counts as affected.") else "",
+      if (sctknk_calibrated && has_sctknk_status)
+        " The table below also gives each knockout's `effect_pct`, the share of random knockouts that moved the network less than it did, and `out_strength_pct`, the same for the edges it removed." else "",
+      "\n", sep = "")
+} else {
+  cat("scTenifoldKnk was not run for this session.\n")
+}
+```
+
+```{r sctknk-summary, eval=has_ko_summary, fig.width=max(5, 0.9 * length(unique(ko_summary$target)) + 3), fig.height=max(3, 0.45 * length(unique(ko_summary$cell_type)) + 1.5)}
+ks <- ko_summary %>%
+  mutate(target = factor(target, levels = sort(unique(target))),
+         cell_type = factor(cell_type, levels = sort(unique(cell_type))),
+         label = ifelse(status != "ok", gsub(" ", "\n", status),
+                        sprintf("%s\n%.1f%%", comma(genes_affected), 100 * share_affected)),
+         genes_affected = ifelse(status != "ok", NA_real_, genes_affected))
+ggplot(ks, aes(x = target, y = cell_type, fill = genes_affected)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = label,
+                colour = !is.na(genes_affected) & genes_affected > 0.6 * max(genes_affected, na.rm = TRUE)),
+            size = 3, lineheight = 0.9, show.legend = FALSE) +
+  scale_colour_manual(values = c(`TRUE` = "white", `FALSE` = "#0b0b0b")) +
+  scale_fill_gradientn(colours = c("#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"),
+                       na.value = "#f0efec", name = "Genes\naffected") +
+  labs(x = "Knocked-out target", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
+```
+
+```{r sctknk-summary-table, eval=has_ko_summary}
+datatable(ko_summary %>% mutate(share_affected = signif(share_affected, 3)) %>%
+            select(cell_type, target, status, genes_tested, genes_affected, share_affected, out_strength_pct, effect_pct),
+          rownames = FALSE, filter = "top",
+          colnames = c("Cell type", "Target", "Status", "Genes tested", "Genes affected", "Share affected",
+                       "Out-strength pct", "Effect pct"),
+          options = list(pageLength = 10, dom = "tip"),
+          caption = paste0("Genes affected (FDR < 0.05 on ", sig_label, ") per knockout."))
+```
+
 
 ## Knockout gene set enrichment
 
 What the knockout moved, read as processes rather than genes. Every gene is
-ranked by `log2FC` -- the log2 of its squared manifold-alignment distance over
-the run's mean squared distance, so the ranking is the one scTenifoldKnk's own
-paper feeds to GSEA, centred on the average gene rather than on zero -- and each
+ranked by `r stat_label` -- `r if (sctknk_calibrated) "how far the knockout moved it beyond what random knockouts of comparable strength move it (see the note under *Knockout networks*)" else "the log2 of its squared manifold-alignment distance over the run's mean squared distance, so the ranking is the one scTenifoldKnk's own paper feeds to GSEA, centred on the average gene rather than on zero"` -- and each
 gene set is scored on how concentrated it is at either end of that ranking. Use
 the menu to switch between the `r n_gsea_views` target and cell type
 combinations.
@@ -1277,7 +1448,13 @@ if (has_cell_counts) {
     paste0(
       "; genes: every rank-score network (GENIE3, scRank, hdWGCNA) is offered the same **",
       comma(kept_cc$genes_gene4use[1]), "** of the object's ",
-      comma(kept_cc$genes_total[1]), " genes (`gene4use`: `--n_hvg` ",
+      comma(kept_cc$genes_total[1]), " genes",
+      # genes_mt_rb arrives with DOWNSAMPLE's newer cell_counts.tsv; an older
+      # one ran before those genes were removed on load, and says nothing.
+      if ("genes_mt_rb" %in% names(kept_cc) && !is.na(kept_cc$genes_mt_rb[1]))
+        paste0(" left after removing ", comma(kept_cc$genes_mt_rb[1]),
+               " mitochondrial and ribosomal protein genes on load") else "",
+      " (`gene4use`: `--n_hvg` ",
       run_value("n_hvg"), " variable genes plus the species' transcription factors, ",
       "drug targets and the requested targets), and each identity keeps those with ",
       "counts in its own cells, **",
@@ -1436,6 +1613,417 @@ ggplot(te, aes(x = gene, y = identity, fill = avg_expression)) +
         axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
 ```
 
+## Data quality
+
+```{r dq-setup}
+# Flag thresholds. They are heuristics for where a value starts to explain a
+# skewed result, not pass/fail limits: nothing here removes an identity or a
+# target, and a flag is a reason to read that identity's scores with care.
+# Relative checks compare an identity with the others in this run, since what
+# counts as shallow or dense depends on the dataset and the network method.
+dq_min_cells        <- 200    # fewer cells: noisier networks
+dq_depth_ratio      <- 0.5    # median depth below this x the run median
+dq_mt_rb_excess     <- 0.10   # mito/ribo share this far above the run median
+dq_max_sparsity     <- 0.95   # share of zeros in the gene4use matrix
+dq_depth_rho        <- 0.5    # |Spearman| of a leading PC with log depth
+dq_pc1_ratio        <- 2      # PC1 variance share this x the run median
+dq_batch_dominant   <- 0.8    # one batch holds this share of the cells
+dq_batch_r2         <- 0.2    # share of leading-PC variance explained by batch
+dq_net_ratio        <- c(0.5, 2)  # density / mean |weight| vs the track median
+dq_isolated         <- 0.5    # share of genes with no edges
+dq_min_metacells    <- 50     # hdWGCNA metacells
+dq_min_sft_r2       <- 0.8    # WGCNA's scale-free fit convention
+dq_min_detection    <- 5      # % of cells expressing a target
+dq_noise_var        <- 1      # vst standardised variance at sampling noise
+dq_low_percentile   <- 10     # target strength percentile in its network
+dq_ko_jaccard       <- 0.8    # median overlap of knockout hits between targets
+dq_weak_knockout    <- 5      # effect_pct: share of null knockouts that moved the network less
+
+rel <- function(x) x / median(x, na.rm = TRUE)
+
+# Thousands and millions with a K / M suffix, done by hand: scales' own
+# short-scale labeller fails on some mixed vectors in the scales version the
+# report container carries ("NAs are not allowed in subscripted
+# assignments"), and axis breaks and tile labels both go through this.
+short_number <- function(x) {
+  out <- rep(NA_character_, length(x))
+  ok  <- !is.na(x) & is.finite(x)
+  a   <- abs(x[ok])
+  out[ok] <- ifelse(a >= 1e6, paste0(formatC(x[ok] / 1e6, format = "fg", digits = 2), "M"),
+              ifelse(a >= 1e3, paste0(formatC(x[ok] / 1e3, format = "fg", digits = 2), "K"),
+                     formatC(x[ok], format = "fg", digits = 3)))
+  trimws(gsub("(\\.[0-9]*[1-9])0+([KM]?)$|\\.0*([KM]?)$", "\\1\\2\\3", out))
+}
+
+# Identity names: DOWNSAMPLE's tables carry the column's own values ("CD14+
+# Monocytes"), the networks their file-safe form ("CD14__Monocytes").
+id_label <- if (has_identity_qc) setNames(identity_qc$identity, identity_qc$identity_id) else character()
+label_of <- function(x) ifelse(x %in% names(id_label), id_label[x], x)
+
+flag <- function(identity, area, check, value, threshold, why) {
+  data.frame(identity = identity, area = area, check = check, value = value,
+             threshold = threshold, why = why, stringsAsFactors = FALSE)
+}
+flags <- list()
+
+if (has_identity_qc) {
+  iq <- identity_qc
+  add <- function(sel, ...) if (any(sel %in% TRUE)) flags[[length(flags) + 1]] <<- flag(...)
+  s <- iq$n_cells < dq_min_cells
+  add(s, iq$identity[s %in% TRUE], "Input", "Few cells", comma(iq$n_cells[s %in% TRUE]),
+      paste("<", dq_min_cells), "Networks from few cells have fewer, noisier edges.")
+  s <- rel(iq$median_counts) < dq_depth_ratio
+  add(s, iq$identity[s %in% TRUE], "Input", "Shallow cells",
+      comma(round(iq$median_counts[s %in% TRUE])), paste0("< ", dq_depth_ratio, " x run median"),
+      "Low depth means more zeros, and weaker, less reproducible edges.")
+  s <- iq$median_mt_rb_frac - median(iq$median_mt_rb_frac, na.rm = TRUE) > dq_mt_rb_excess
+  add(s, iq$identity[s %in% TRUE], "Input", "High mito/ribo share",
+      percent(iq$median_mt_rb_frac[s %in% TRUE], 1), paste0("> run median + ", percent(dq_mt_rb_excess)),
+      "Points at stressed or damaged cells, whose expression reflects that state.")
+  s <- iq$sparsity_gene4use > dq_max_sparsity
+  add(s, iq$identity[s %in% TRUE], "Input", "Sparse matrix",
+      percent(iq$sparsity_gene4use[s %in% TRUE], 1), paste(">", percent(dq_max_sparsity)),
+      "Mostly-zero genes give unstable regressions and correlations.")
+  s <- abs(iq$max_pc_depth_rho) >= dq_depth_rho
+  add(s, iq$identity[s %in% TRUE], "Input", "Variation tracks depth",
+      sprintf("PC%d, rho = %.2f", iq$max_pc_depth[s %in% TRUE], iq$max_pc_depth_rho[s %in% TRUE]),
+      paste("|rho| >=", dq_depth_rho),
+      "A leading axis of variation is sequencing depth, so co-expression edges partly are too.")
+  s <- rel(iq$pc1_var_frac) > dq_pc1_ratio
+  add(s, iq$identity[s %in% TRUE], "Input", "One programme dominates",
+      percent(iq$pc1_var_frac[s %in% TRUE], 1), paste0("> ", dq_pc1_ratio, " x run median"),
+      "One programme, or a mixture of cell states, drives most of the co-expression.")
+  if (any(!is.na(iq$n_batches))) {
+    s <- iq$largest_batch_frac > dq_batch_dominant & max(iq$n_batches, na.rm = TRUE) > 1
+    add(s, iq$identity[s %in% TRUE], "Batch", "One batch dominates",
+        percent(iq$largest_batch_frac[s %in% TRUE], 1), paste(">", percent(dq_batch_dominant)),
+        "The identity's network mostly describes one donor or batch.")
+    s <- iq$batch_r2 > dq_batch_r2
+    add(s, iq$identity[s %in% TRUE], "Batch", "Batch drives variation",
+        percent(iq$batch_r2[s %in% TRUE], 1), paste(">", percent(dq_batch_r2)),
+        "Correlation between genes comes partly from batches differing, not from regulation.")
+  }
+}
+
+if (has_network_qc) {
+  nq <- network_qc %>%
+    group_by(track) %>%
+    mutate(density_rel = rel(density), weight_rel = rel(mean_abs_weight)) %>%
+    ungroup()
+  nq_flag <- function(sel, check, value, threshold, why) {
+    sel <- sel %in% TRUE
+    if (any(sel)) flags[[length(flags) + 1]] <<- flag(
+      label_of(nq$identity[sel]), ifelse(nq$track[sel] == "knockout", "Knockout network", "Network"),
+      check, value[sel], threshold, why)
+  }
+  nq_flag(nq$n_edges == 0, "Empty network", rep("0 edges", nrow(nq)), "no edges",
+          "Nothing can be scored or knocked out in it.")
+  nq_flag(nq$density_rel < dq_net_ratio[1] | nq$density_rel > dq_net_ratio[2],
+          "Density unlike the others", sprintf("%.2f x median", nq$density_rel),
+          paste0("outside ", dq_net_ratio[1], "-", dq_net_ratio[2], " x"),
+          "Scores depend on network structure, so every target in this identity can shift together.")
+  nq_flag(nq$weight_rel < dq_net_ratio[1] | nq$weight_rel > dq_net_ratio[2],
+          "Edge weights unlike the others", sprintf("%.2f x median", nq$weight_rel),
+          paste0("outside ", dq_net_ratio[1], "-", dq_net_ratio[2], " x"),
+          "An identity-wide offset in edge strength can lift or sink all of its scores.")
+  nq_flag(nq$isolated_frac > dq_isolated, "Many isolated genes", percent(nq$isolated_frac, 1),
+          paste(">", percent(dq_isolated)), "Most genes have no edges, so the network is thin.")
+  nq_flag(nq$n_metacells < dq_min_metacells, "Few metacells", comma(nq$n_metacells),
+          paste("<", dq_min_metacells), "Correlations over few metacells are noisy.")
+  nq_flag(nq$sft_r2 < dq_min_sft_r2, "Weak scale-free fit", sprintf("R2 = %.2f", nq$sft_r2),
+          paste("<", dq_min_sft_r2), "The network has little of the structure WGCNA assumes.")
+}
+
+if (has_target_expr && "var_standardized" %in% names(target_expr)) {
+  te_f <- target_expr
+  s <- te_f$pct_expressing < dq_min_detection
+  if (any(s)) flags[[length(flags) + 1]] <- flag(
+    te_f$identity[s], "Target", paste(te_f$gene[s], "barely detected"),
+    paste0(round(te_f$pct_expressing[s], 1), "%"), paste0("< ", dq_min_detection, "%"),
+    "Too few cells express it for a network to connect it reliably.")
+  s <- te_f$var_standardized < dq_noise_var & te_f$pct_expressing >= dq_min_detection
+  s <- s %in% TRUE
+  if (any(s)) flags[[length(flags) + 1]] <- flag(
+    te_f$identity[s], "Target", paste(te_f$gene[s], "at noise level"),
+    sprintf("%.2f", te_f$var_standardized[s]), paste("<", dq_noise_var),
+    "Detected, but it varies no more than sampling noise, so its edges carry little.")
+}
+if (has_target_network_qc) {
+  tn <- target_network_qc %>% filter(in_network)
+  s <- tn$strength_percentile < dq_low_percentile
+  if (any(s)) flags[[length(flags) + 1]] <- flag(
+    label_of(tn$identity[s]), ifelse(tn$track[s] == "knockout", "Knockout network", "Network"),
+    paste(tn$gene[s], ifelse(tn$degree[s] == 0, "isolated", "weakly connected")),
+    sprintf("%.0fth pct", tn$strength_percentile[s]), paste0("< ", dq_low_percentile, "th pct"),
+    "The target has almost no edges here, so its score or knockout reflects the rest of the network.")
+}
+
+# Knockouts that moved the network less than nearly every random knockout:
+# their effect_pct on the status table. Whatever such a knockout's gene list
+# says, the network barely noticed the target.
+if (has_sctknk_status && "effect_pct" %in% names(sctknk_status)) {
+  weak <- sctknk_status %>% filter(status == "ok", !is.na(effect_pct), effect_pct < dq_weak_knockout)
+  if (nrow(weak) > 0) flags[[length(flags) + 1]] <- flag(
+    label_of(weak$cell_type), "Knockout", paste(weak$target, "barely moved the network"),
+    sprintf("effect pct %.0f", weak$effect_pct), paste("<", dq_weak_knockout),
+    "Fewer random knockouts moved the network less than this one, so its gene list carries little.")
+}
+
+# Knockouts whose affected genes barely depend on the target: within a cell
+# type, the median overlap (Jaccard) of the affected-gene sets between targets
+# that affected anything. Near 1, every knockout returns the same genes, so the
+# result describes that cell type's network rather than any one target. Pairs
+# of targets that share a gene (a joint knockout and one of its genes) are
+# expected to overlap and are left out, and it takes three targets to say.
+if (exists("sctknk_sig") && nrow(sctknk_sig) > 0) {
+  ko_sets <- sctknk_sig %>%
+    filter(!mapply(function(g, t) g %in% strsplit(t, ";")[[1]], gene, target))
+  ko_overlap <- ko_sets %>%
+    group_by(cell_type) %>%
+    group_modify(function(d, key) {
+      s <- split(d$gene, d$target)
+      if (length(s) < 3) return(data.frame(median_jaccard = NA_real_, n_targets = length(s)))
+      p <- combn(names(s), 2)
+      shared <- apply(p, 2, function(x) length(intersect(strsplit(x[1], ";")[[1]], strsplit(x[2], ";")[[1]])) > 0)
+      p <- p[, !shared, drop = FALSE]
+      if (ncol(p) == 0) return(data.frame(median_jaccard = NA_real_, n_targets = length(s)))
+      j <- apply(p, 2, function(x) length(intersect(s[[x[1]]], s[[x[2]]])) /
+                                   length(union(s[[x[1]]], s[[x[2]]])))
+      data.frame(median_jaccard = median(j), n_targets = length(s))
+    }) %>%
+    ungroup()
+  s <- ko_overlap$median_jaccard >= dq_ko_jaccard
+  s <- s %in% TRUE
+  if (any(s)) flags[[length(flags) + 1]] <- flag(
+    label_of(ko_overlap$cell_type[s]), "Knockout", "Same genes whatever the target",
+    sprintf("Jaccard %.2f over %d targets", ko_overlap$median_jaccard[s], ko_overlap$n_targets[s]),
+    paste(">=", dq_ko_jaccard),
+    "Knockouts of different targets affect the same genes, so they reflect the network, not the target.")
+}
+
+dq_flags <- if (length(flags) > 0) do.call(rbind, flags) else data.frame()
+has_any_dq <- has_identity_qc || has_network_qc || has_target_network_qc
+```
+
+```{r dq-intro, results="asis"}
+if (!has_any_dq) {
+  cat("No data quality tables were supplied with this report.\n")
+} else {
+  cat("Diagnostics for reading the results above, not filters: each check is a reason an ",
+      "identity's network, and every score or knockout from it, might be skewed. The ",
+      "thresholds are rules of thumb, and several compare an identity with the others in ",
+      "this run rather than with a fixed value, since what counts as shallow or dense ",
+      "depends on the dataset and the network method.\n\n", sep = "")
+  cat(if (nrow(dq_flags) == 0) "**No check was flagged.**\n"
+      else paste0("**", nrow(dq_flags), "** check(s) flagged, listed below.\n"))
+}
+```
+
+```{r dq-flags, eval=nrow(dq_flags) > 0}
+datatable(
+  dq_flags %>% rename(Identity = identity, Area = area, Check = check, Value = value,
+                      `Flagged at` = threshold, `Why it matters` = why),
+  rownames = FALSE, filter = "top",
+  options = list(pageLength = 15, dom = "tip", autoWidth = TRUE)
+)
+```
+
+### Input quality per identity
+
+```{r dq-input-note, results="asis"}
+if (has_identity_qc) {
+  cat("Each identity's retained cells, the ones its networks were built from. ",
+      "**Depth** is the median count per cell and **genes** the median detected; ",
+      "**mito/ribo share** is the median share of a cell's counts in the mitochondrial ",
+      "and ribosomal genes removed on load. **Sparsity** is the share of zeros in the ",
+      "matrix the rank-score networks are fitted on. **PC1 variance** is the share of ",
+      "that matrix's variance in its first principal component, and **PC-depth rho** the ",
+      "strongest Spearman correlation between one of its first five components and log ",
+      "depth.",
+      if (any(!is.na(identity_qc$n_batches)))
+        paste0(" **Largest batch** and **batch R2** use `--batch` (", run_value("batch"),
+               "): the share of cells in the biggest batch, and the share of the leading ",
+               "components' variance batch explains.") else
+        " Pass `--batch` to add each identity's batch composition.",
+      " Red marks a flagged value.\n", sep = "")
+} else {
+  cat("No identity QC table was supplied with this report.\n")
+}
+```
+
+```{r dq-input, eval=has_identity_qc, fig.width=10, fig.height=max(3.5, 0.35 * nrow(identity_qc) * 2 + 2)}
+iq_metrics <- c(n_cells = "Cells", median_counts = "Depth (counts)", median_genes = "Genes",
+                median_mt_rb_frac = "Mito/ribo share", sparsity_gene4use = "Sparsity",
+                pc1_var_frac = "PC1 variance", max_pc_depth_rho = "PC-depth rho",
+                largest_batch_frac = "Largest batch", batch_r2 = "Batch R2")
+iq_long <- identity_qc %>%
+  select(identity, any_of(names(iq_metrics))) %>%
+  pivot_longer(-identity, names_to = "metric", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(metric = factor(iq_metrics[metric], levels = iq_metrics),
+         identity = factor(identity, levels = rev(sort(unique(identity)))))
+# Which values are flagged, by metric, from the same thresholds as the table.
+iq_flag_cols <- with(identity_qc, list(
+  `Cells` = n_cells < dq_min_cells,
+  `Depth (counts)` = rel(median_counts) < dq_depth_ratio,
+  `Mito/ribo share` = median_mt_rb_frac - median(median_mt_rb_frac, na.rm = TRUE) > dq_mt_rb_excess,
+  `Sparsity` = sparsity_gene4use > dq_max_sparsity,
+  `PC1 variance` = rel(pc1_var_frac) > dq_pc1_ratio,
+  `PC-depth rho` = abs(max_pc_depth_rho) >= dq_depth_rho,
+  `Largest batch` = largest_batch_frac > dq_batch_dominant,
+  `Batch R2` = batch_r2 > dq_batch_r2))
+iq_long$flagged <- mapply(function(id, m) {
+  f <- iq_flag_cols[[as.character(m)]]
+  isTRUE(f[match(id, identity_qc$identity)])
+}, as.character(iq_long$identity), iq_long$metric)
+
+ggplot(iq_long, aes(x = value, y = identity)) +
+  geom_segment(aes(x = 0, xend = value, yend = identity), colour = "#c3c2b7", linewidth = 0.6) +
+  geom_point(aes(colour = flagged), size = 2.6) +
+  scale_colour_manual(values = c(`FALSE` = "#2a78d6", `TRUE` = "#e34948"),
+                      labels = c(`FALSE` = "within range", `TRUE` = "flagged"), name = NULL) +
+  facet_wrap(~ metric, scales = "free_x", ncol = 4) +
+  scale_x_continuous(n.breaks = 3, labels = short_number,
+                     expand = expansion(mult = c(0.02, 0.15))) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+        panel.grid.major.y = element_blank(), strip.text = element_text(face = "bold"),
+        panel.spacing.x = unit(1.5, "lines"))
+```
+
+### Network structure
+
+```{r dq-network-note, results="asis"}
+if (has_network_qc) {
+  cat("Every network the run built, one row per identity",
+      if (any(network_qc$track == "knockout")) " and track (rank score, and the knockout's wild-type network)" else "",
+      ". Weights are on different scales for each method, so each cell is coloured by how far ",
+      "it sits from that track's median across identities, blue below and red above, and ",
+      "labelled with the value itself. **Density** is the share of possible edges present; ",
+      "**mean |weight|** the average edge strength; **isolated** the share of genes with no ",
+      "edges; **top 1% hub share** how much of the network's total strength its top 1% of ",
+      "genes hold, and **strength Gini** how unequal strength is across genes. An identity ",
+      "whose network is much denser or stronger than the others can have every target's ",
+      "score shifted with it.",
+      if (any(!is.na(network_qc$n_metacells)))
+        " For hdWGCNA, **metacells** is how many metacells the correlations were taken over, and **scale-free R2** the fit at the soft power used." else "",
+      "\n", sep = "")
+} else {
+  cat("No network QC table was supplied with this report.\n")
+}
+```
+
+```{r dq-network, eval=has_network_qc, fig.width=10, fig.height=max(3.5, (0.4 * length(unique(network_qc$identity)) + 1) * length(unique(network_qc$track)) + 1)}
+nq_metrics <- c(n_genes = "Genes", density = "Density", mean_abs_weight = "Mean |weight|",
+                isolated_frac = "Isolated", hub_share_top1pct = "Top 1% hub share",
+                strength_gini = "Strength Gini", n_metacells = "Metacells",
+                sft_r2 = "Scale-free R2")
+nq_long <- network_qc %>%
+  mutate(identity = label_of(identity),
+         track = ifelse(track == "knockout", "Knockout (scTenifoldKnk)",
+                        paste0("Rank score (", method, ")"))) %>%
+  select(identity, track, any_of(names(nq_metrics))) %>%
+  pivot_longer(-c(identity, track), names_to = "metric", values_to = "value") %>%
+  filter(!is.na(value)) %>%
+  mutate(metric = factor(nq_metrics[metric], levels = nq_metrics),
+         identity = factor(identity, levels = rev(sort(unique(identity)))))
+
+# A table-shaped heatmap rather than axes: the tracks' networks differ in
+# size and weight scale, so each cell is coloured by how far the value sits
+# from that track's median across identities (log2 ratio, capped at 4x either
+# way) and labelled with the value itself. Blue is below the median, red above.
+fmt_value <- function(x) {
+  out <- rep("", length(x))
+  ok  <- !is.na(x) & is.finite(x)
+  big <- ok & abs(x) >= 1000
+  out[big] <- short_number(x[big])
+  out[ok & !big] <- formatC(signif(x[ok & !big], 2), format = "g", digits = 2)
+  out
+}
+nq_tile <- nq_long %>%
+  group_by(track, metric) %>%
+  mutate(rel = log2(value / median(value, na.rm = TRUE)),
+         rel = ifelse(is.finite(rel), pmax(pmin(rel, 2), -2), 0)) %>%
+  ungroup()
+ggplot(nq_tile, aes(x = metric, y = identity, fill = rel)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = fmt_value(value)), size = 3.2, colour = "#0b0b0b") +
+  scale_fill_gradient2(low = "#3987e5", mid = "#f0efec", high = "#e66767", midpoint = 0,
+                       limits = c(-2, 2), breaks = c(-2, 0, 2),
+                       labels = c("1/4 x median", "median", "4 x median"),
+                       name = "Relative to\nthe track's\nmedian") +
+  facet_wrap(~ track, ncol = 1, scales = "free_y") +
+  labs(x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(panel.grid = element_blank(), strip.text = element_text(face = "bold", hjust = 0),
+        axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+### Targets in their networks
+
+```{r dq-target-note, results="asis"}
+if (has_target_network_qc) {
+  cat("Where each target gene sits in each identity's rank-score network: the share of the ",
+      "network's genes with less total edge strength than it, so 0 is an isolated gene and ",
+      "100 the strongest hub. Unlike raw strength, this is comparable across identities. ",
+      "The second line is the target's standardised variance (vst) in that identity: around ",
+      "1 is what sampling noise alone gives, so a target near 1 has no structure for a ",
+      "network to connect it to, however well it is detected. A score for a target in the ",
+      "bottom percentiles, or at noise level, mostly reflects the rest of the network.\n", sep = "")
+} else {
+  cat("No target network table was supplied with this report.\n")
+}
+```
+
+```{r dq-target, eval=has_target_network_qc && any(target_network_qc$track == "rank_score"), fig.width=max(5, 1.1 * length(unique(target_network_qc$gene)) + 3), fig.height=max(3, 0.45 * length(unique(target_network_qc$identity)) + 1.5)}
+tv <- if (has_target_expr && "var_standardized" %in% names(target_expr)) {
+  target_expr %>% select(identity, gene, var_standardized)
+} else {
+  data.frame(identity = character(), gene = character(), var_standardized = numeric())
+}
+tq <- target_network_qc %>%
+  filter(track == "rank_score") %>%
+  mutate(identity = label_of(identity)) %>%
+  left_join(tv, by = c("identity", "gene")) %>%
+  mutate(gene = factor(gene, levels = unique(gene)),
+         identity = factor(identity, levels = sort(unique(identity))),
+         label = ifelse(in_network,
+                        paste0(round(strength_percentile), "\n",
+                               ifelse(is.na(var_standardized), "",
+                                      sprintf("%.2f", var_standardized))),
+                        "absent"))
+
+ggplot(tq, aes(x = gene, y = identity, fill = strength_percentile)) +
+  geom_tile(colour = "white", linewidth = 0.6) +
+  geom_text(aes(label = label, colour = strength_percentile > 60),
+            size = 3.1, lineheight = 0.9, show.legend = FALSE) +
+  scale_colour_manual(values = c(`TRUE` = "white", `FALSE` = "#0b0b0b"), na.value = "#0b0b0b") +
+  scale_fill_gradientn(colours = c("#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"),
+                       limits = c(0, 100), na.value = "#f0efec",
+                       name = "Strength\npercentile") +
+  labs(x = "Target gene", y = "Cell type") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
+```
+
+```{r dq-tables, eval=has_any_dq}
+if (has_identity_qc) {
+  datatable(identity_qc %>% select(-identity_id) %>% mutate(across(where(is.double), ~ signif(.x, 3))),
+            rownames = FALSE, caption = "Input quality per identity (identity_qc.tsv).",
+            options = list(dom = "tp", scrollX = TRUE, pageLength = 10))
+}
+```
+
+```{r dq-tables-net, eval=has_network_qc}
+datatable(network_qc %>% mutate(identity = label_of(identity),
+                                across(where(is.double), ~ signif(.x, 3))),
+          rownames = FALSE, caption = "Network structure (network_qc.tsv).",
+          options = list(dom = "tp", scrollX = TRUE, pageLength = 10))
+```
+
+
 ## Pipeline run
 
 ```{r run-summary, results="asis"}
@@ -1482,7 +2070,11 @@ run_fields <- c(
   "--n_hvg"           = "n_hvg",
   "--n_cores"         = "n_cores",
   "--seed"            = "seed",
-  "--sctknk_min_pct"  = "sctknk_min_pct"
+  "--sctknk_min_pct"  = "sctknk_min_pct",
+  "--sctknk_td_k"     = "sctknk_td_k",
+  "--sctknk_null"     = "sctknk_null",
+  "--sctknk_ndim"     = "sctknk_ndim",
+  "--batch"           = "batch"
 )
 datatable(
   data.frame(Field = names(run_fields), Value = vapply(run_fields, run_value, character(1))),

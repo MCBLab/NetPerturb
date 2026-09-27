@@ -19,6 +19,7 @@ process HDWGCNA {
 
   output:
     path "*_weight_hdWGCNA_*.rds", emit: rank_obj, optional: true
+    path "*_hdwgcna_qc.tsv", emit: qc, optional: true
 
   when:
   task.ext.when == null || task.ext.when
@@ -32,5 +33,6 @@ process HDWGCNA {
   stub:
     """
     touch ${scobj.baseName}_weight_hdWGCNA_100.rds
+    printf 'identity\\tn_metacells\\tsoft_power\\tpower_estimate\\tsft_r2\\n${scobj.baseName}\\t100\\t6\\t6\\t0.85\\n' > ${scobj.baseName}_hdwgcna_qc.tsv
     """
 }

@@ -1,0 +1,9 @@
+track	method	identity	gene	in_network	degree	strength	strength_percentile
+rank_score	genie3	sensitive	Brd4	TRUE	410	1.21	91.2
+rank_score	genie3	sensitive	Cstdc5	TRUE	0	0	0
+rank_score	genie3	sensitive	Stfa1	TRUE	388	0.97	74.5
+rank_score	genie3	resistant	Brd4	TRUE	402	1.66	63.0
+rank_score	genie3	resistant	Cstdc5	TRUE	120	0.31	22.8
+rank_score	genie3	resistant	Stfa1	FALSE	NA	NA	NA
+knockout	sctenifoldknk	sensitive	Brd4	TRUE	35	0.88	95.1
+knockout	sctenifoldknk	resistant	Brd4	TRUE	29	0.61	90.3

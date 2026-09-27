@@ -1,7 +1,7 @@
-identity	gene	avg_expression	pct_expressing
-sensitive	Brd4	1.42	63.2
-sensitive	Cstdc5	0.05	2.4
-sensitive	Stfa1	2.31	81.0
-resistant	Brd4	0.97	48.6
-resistant	Cstdc5	0.61	22.0
-resistant	Stfa1	0.12	6.8
+identity	gene	avg_expression	pct_expressing	var_standardized	var_percentile
+sensitive	Brd4	1.42	63.2	1.84	88.1
+sensitive	Cstdc5	0.05	2.4	0.97	31.0
+sensitive	Stfa1	2.31	81.0	3.12	97.4
+resistant	Brd4	0.97	48.6	1.21	64.9
+resistant	Cstdc5	0.61	22.0	0.99	40.2
+resistant	Stfa1	0.12	6.8	1.03	52.7
