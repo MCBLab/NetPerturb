@@ -134,9 +134,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="output/#gsea_all_targetstxt">gsea_all_targets.txt</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="output/#sctenifoldknk_summarytxt">sctenifoldknk_summary.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="output/#sctenifoldknk_statustxt">sctenifoldknk_status.txt</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="output/#plots">plots/</a>
     </li>
         </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="output/#qc">qc/</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="output/#pipeline_info">pipeline_info/</a>
     </li>
@@ -259,7 +265,7 @@
 </div>
 <p>The three warm lines are the <code>--network</code> methods. They are mutually exclusive, so a run takes exactly one of them from the input object to the report. They share downsampling, scoring and reporting, and only diverge at network inference. The blue <code>sctknk</code> line is separate: <code>--sctknk</code> switches it on, and it runs alongside whichever <code>--network</code> line was chosen, or on its own.</p>
 <ol>
-<li><strong>Downsampling and QC (<code>DOWNSAMPLE</code>)</strong>: splits the object by <code>--column</code>, randomly keeps up to <code>--n_cells</code> cells per identity and drops identities below <code>--min_cells</code>. It then checks every target gene against the retained cells and builds <code>gene4use</code>, the gene set the networks are built on: highly variable genes, transcription factors, drug targets and the targets themselves.</li>
+<li><strong>Downsampling and QC (<code>DOWNSAMPLE</code>)</strong>: splits the object by <code>--column</code>, randomly keeps up to <code>--n_cells</code> cells per identity and drops identities below <code>--min_cells</code>. It then checks every target gene against the retained cells and builds <code>gene4use</code>, the gene set the networks are built on: highly variable genes, transcription factors, drug targets and the targets themselves. Before any of this, it removes mitochondrial and ribosomal protein genes from the object, so no network is built on them.</li>
 <li><strong>Network inference (<code>GENIE3</code>, <code>SCRANK</code>, <code>HDWGCNA</code>)</strong>: one regulatory network per identity with the method <code>--network</code> selects.</li>
 <li><strong>Perturbation scoring (<code>RANK_SCORE</code>)</strong>: one task per target line. Each scores the target in every identity with scRank and records its strongest edges.</li>
 <li><strong>Consolidation (<code>MERGE</code>)</strong>: gathers every target's scores and connections into one table each.</li>
@@ -361,5 +367,5 @@ nextflow run MCBLab/NetPerturb \
 
 <!--
 MkDocs version : 1.6.1
-Build Date UTC : 2026-09-25 16:53:14.066409+00:00
+Build Date UTC : 2026-09-27 11:25:33.444187+00:00
 -->

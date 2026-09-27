@@ -134,9 +134,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="../output/#gsea_all_targetstxt">gsea_all_targets.txt</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#sctenifoldknk_summarytxt">sctenifoldknk_summary.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="../output/#sctenifoldknk_statustxt">sctenifoldknk_status.txt</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="../output/#plots">plots/</a>
     </li>
         </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="../output/#qc">qc/</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="../output/#pipeline_info">pipeline_info/</a>
     </li>
@@ -369,6 +375,11 @@ Stfa1;Mpo
 <td>Highly variable genes added to <code>gene4use</code>, the gene set of the scoring-track networks.</td>
 </tr>
 <tr>
+<td><code>--batch</code></td>
+<td>none</td>
+<td>Metadata column naming each cell's donor, sample or batch. Used only by the report's <em>Data quality</em> section: batch composition of each identity and the variance batch explains.</td>
+</tr>
+<tr>
 <td><code>--seed</code></td>
 <td><code>1</code></td>
 <td>Seed for every random step: cell sampling, GENIE3, hdWGCNA/WGCNA, scTenifoldKnk and fgsea.</td>
@@ -436,6 +447,21 @@ Stfa1;Mpo
 <td><code>--sctknk_min_pct</code></td>
 <td><code>0.05</code></td>
 <td>A gene must be detected in more than this fraction of an identity's cells to enter its knockout network. Targets are always kept. Build cost grows with the square of the gene count.</td>
+</tr>
+<tr>
+<td><code>--sctknk_null</code></td>
+<td><code>50</code></td>
+<td>Random-gene knockouts per identity used as the knockout track's null model; each gene of a target's knockout is tested against what it does under them (<code>z_null</code>, <code>p_null_adj</code>). <code>0</code> leaves scTenifoldKnk's own statistic only.</td>
+</tr>
+<tr>
+<td><code>--sctknk_ndim</code></td>
+<td><code>2</code></td>
+<td>Dimensions of the aligned manifold (scTenifoldKnk's default). More carry more target-specific signal at a higher alignment cost.</td>
+</tr>
+<tr>
+<td><code>--sctknk_td_k</code></td>
+<td><code>3</code></td>
+<td>Rank of the tensor decomposition that builds the wild-type network (scTenifoldKnk's <code>td_K</code>). At 3 every knockout moves the same hub genes; 10 separated targets on a test network; <code>0</code> averages the bootstrap networks instead.</td>
 </tr>
 <tr>
 <td><code>--sctknk_plot</code></td>

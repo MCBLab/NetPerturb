@@ -134,9 +134,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#gsea_all_targetstxt">gsea_all_targets.txt</a>
     </li>
+    <li class="toctree-l3"><a class="reference internal" href="#sctenifoldknk_summarytxt">sctenifoldknk_summary.txt</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#sctenifoldknk_statustxt">sctenifoldknk_status.txt</a>
+    </li>
     <li class="toctree-l3"><a class="reference internal" href="#plots">plots/</a>
     </li>
         </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#qc">qc/</a>
     </li>
     <li class="toctree-l2"><a class="reference internal" href="#pipeline_info">pipeline_info/</a>
     </li>
@@ -285,6 +291,14 @@
 <td>The UMAP, <strong>cells per identity</strong> (input vs. kept, dropped identities flagged, genes each network was built on) and <strong>target expression per identity</strong> (mean log-normalised expression heatmap).</td>
 </tr>
 <tr>
+<td><strong>Genes affected per knockout</strong></td>
+<td><code>--sctknk</code>: a heatmap of how many genes each knockout affected (FDR &lt; 0.05), per identity and target, with knockouts that produced no table marked.</td>
+</tr>
+<tr>
+<td><strong>Data quality</strong></td>
+<td>Diagnostics for reading the results, not filters. A table of flagged checks, each with the reason it can skew a result, then input quality per identity, network structure per identity and track, and where each target sits in each network. See <a href="#qc">QC tables</a>.</td>
+</tr>
+<tr>
 <td><strong>Pipeline run</strong></td>
 <td>Command line, versions, settings, elapsed time and <strong>running time per step</strong> from the execution trace.</td>
 </tr>
@@ -322,7 +336,11 @@
 </tr>
 <tr>
 <td><code>target_expression.tsv</code></td>
-<td>Mean log-normalised expression and percentage of expressing cells for each target gene in each kept identity.</td>
+<td>Mean log-normalised expression and percentage of expressing cells for each target gene in each kept identity, and its <code>vst</code> standardised variance (<code>var_standardized</code>; about 1 is sampling noise) with its percentile among the identity's genes.</td>
+</tr>
+<tr>
+<td><code>identity_qc.tsv</code></td>
+<td>Input quality per kept identity: depth, genes detected, mito/ribo share, sparsity, variance in the leading principal components and their correlation with depth, and with <code>--batch</code> the batch composition. See <a href="#qc">QC tables</a>.</td>
 </tr>
 </tbody>
 </table>
@@ -331,7 +349,7 @@ target      gene   reason                               action
 Hhip        Hhip   zero counts in every retained cell   target not analysed
 Stfa1;Mpo   Mpo    absent from the expression profile   dropped from the target; analysed as Stfa1
 </code></pre>
-<p>In <code>cell_counts.tsv</code>, <code>genes_gene4use</code> is the gene set offered to the scoring-track networks and <code>genes_expressed</code> is how many of those actually have counts in that identity. <code>genes_filtered</code> is the difference. <code>genes_sctknk</code> is the size of that identity's knockout network (see <code>--sctknk_min_pct</code>).</p>
+<p>In <code>cell_counts.tsv</code>, <code>genes_gene4use</code> is the gene set offered to the scoring-track networks and <code>genes_expressed</code> is how many of those actually have counts in that identity. <code>genes_filtered</code> is the difference. <code>genes_sctknk</code> is the size of that identity's knockout network (see <code>--sctknk_min_pct</code>). <code>genes_total</code> counts the object's genes after <code>DOWNSAMPLE</code> removed the mitochondrial and ribosomal protein genes on load, and <code>genes_mt_rb</code> is how many it removed.</p>
 <pre><code class="language-text"># cell_counts.tsv
 identity   n_input  n_used  status  genes_total  genes_gene4use  genes_expressed  genes_filtered  genes_sctknk
 sensitive  812      500     kept    18000        3120            2874             246             6412
@@ -384,7 +402,11 @@ resistant  Brd4    G17_Brd4  14.43217  7.09  41.1  1.41e-10  9.83e-08
 </tr>
 <tr>
 <td><code>p.value</code>, <code>p.adj</code></td>
-<td>Chi-square test on <code>FC</code> and its Benjamini-Hochberg FDR.</td>
+<td>Chi-square test on <code>FC</code> and its Benjamini-Hochberg FDR. On its own this only ranks a knockout's genes against each other, and whatever gene is knocked out that ranking is led by the network's hubs.</td>
+</tr>
+<tr>
+<td><code>z_null</code>, <code>p_null</code>, <code>p_null_adj</code></td>
+<td>With <code>--sctknk_null</code> &gt; 0: the gene's centred log distance against a line fitted to that gene's distances over random knockouts of the same network by their out-strength, in MAD units; its two-sided normal tail; the BH adjustment over the tested genes. A gene counts as moved when <code>p_null_adj</code> &lt; 0.05 and <code>z_null</code> &gt; 0. The report, the summary and the enrichment ranking use these when present.</td>
 </tr>
 </tbody>
 </table>
@@ -396,8 +418,137 @@ resistant  Brd4    GOBP_CHROMATIN_REMODELING  1e-50     4e-50     NA       1    
 sensitive  Brd4    GOBP_CHROMATIN_REMODELING  1.67e-11  3.33e-11  0.863    0.773  3.043  30    G5_Brd4;G1_Brd4
 </code></pre>
 <p>Genes are ranked by <code>log2(FC)</code>, so <code>NES</code> is signed. <strong>Positive</strong> means the set sits among the genes the knockout moved furthest. <strong>Negative</strong> means it sits among genes that stayed still while the rest of the network moved. Neither means up- or down-regulation. <code>size</code> is counted after intersecting the set with the knockout network's genes, so it is smaller than the set's nominal size. A <code>pval</code> of <code>1e-50</code> with <code>log2err</code> <code>NA</code> is fgsea's floor: the true value is even smaller.</p>
+<h3 id="sctenifoldknk_summarytxt"><code>sctenifoldknk_summary.txt</code><a class="headerlink" href="#sctenifoldknk_summarytxt" title="Permanent link">&para;</a></h3>
+<p>One row per knockout (identity × target): <code>genes_tested</code>, <code>genes_affected</code> (<code>p_null_adj</code> &lt; 0.05 with <code>z_null</code> &gt; 0 when the null ran, <code>p.adj</code> &lt; 0.05 otherwise), <code>share_affected</code> and <code>top_gene</code>, the gene it moved furthest. A knockout that affected nothing has a row with 0; one that was skipped, failed, or timed out on every attempt has no row — see the status table.</p>
+<h3 id="sctenifoldknk_statustxt"><code>sctenifoldknk_status.txt</code><a class="headerlink" href="#sctenifoldknk_statustxt" title="Permanent link">&para;</a></h3>
+<p>One row per identity × target from <code>SCTENIFOLDKNK_KO</code>, written whether or not the knockout ran.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status</code></td>
+<td><code>ok</code>, or why not: <code>no outgoing edges</code> (the target has no edge out of this identity's network, so the knockout is a no-op and is skipped), <code>not expressed</code>, <code>no wild-type network</code>, <code>alignment failed</code>; or <code>weaker than every null knockout</code> / <code>stronger than every null knockout</code> when it ran but its out-strength lies outside the null's range and it is not calibrated (<code>p_null</code>, <code>p_null_adj</code> NA, no hits). Targets kept below <code>--sctknk_min_pct</code> are usually the former.</td>
+</tr>
+<tr>
+<td><code>genes_knocked</code>, <code>out_degree</code>, <code>out_strength</code></td>
+<td>The genes zeroed and how many edges, of what total weight, that removed.</td>
+</tr>
+<tr>
+<td><code>out_strength_pct</code>, <code>effect_pct</code></td>
+<td>Share of the null knockouts weaker than this target, and share that moved the network less than this knockout (its median distance). A knockout with a low <code>effect_pct</code> moved the network less than most random genes would.</td>
+</tr>
+<tr>
+<td><code>n_null</code>, <code>n_tested</code>, <code>hits_raw</code>, <code>hits_null</code></td>
+<td>Null knockouts used; genes tested; hits under <code>p.adj</code> and under <code>p_null_adj</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>A pair missing from this table timed out on every attempt and was ignored.</p>
 <h3 id="plots"><code>plots/</code><a class="headerlink" href="#plots" title="Permanent link">&para;</a></h3>
 <p>With <code>--sctknk_plot</code>: <code>&lt;identity&gt;_sctknk_plot_&lt;target&gt;.pdf</code>, scTenifoldKnk's <code>plotKO()</code> drawing of the knocked-out gene(s), the genes it moved (<code>p.adj &lt; 0.05</code>) and the wild-type edges among them. Red edges are positive and blue edges are negative.</p>
+<h2 id="qc">qc/<a class="headerlink" href="#qc" title="Permanent link">&para;</a></h2>
+<p>Written by <code>NETWORK_QC</code> from every network the run built, for the report's <em>Data quality</em> section.</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Contents</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>network_qc.tsv</code></td>
+<td>One row per network (identity × track): genes, edges, density, mean absolute weight, share of isolated genes, share of strength in the top 1% of genes, and the Gini coefficient of strength. For hdWGCNA, also the number of metacells, the soft power used, WGCNA's estimate and the scale-free fit R².</td>
+</tr>
+<tr>
+<td><code>target_network_qc.tsv</code></td>
+<td>One row per network × target gene: whether it is in the network, its degree and strength, and its strength percentile (the share of genes weaker than it; 0 is isolated).</td>
+</tr>
+</tbody>
+</table>
+<p>The checks the report flags, and why each can skew a result:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Flagged when</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Few cells</td>
+<td>&lt; 200 cells</td>
+<td>Networks from few cells are noisier.</td>
+</tr>
+<tr>
+<td>Shallow cells</td>
+<td>depth &lt; 0.5 × run median</td>
+<td>More zeros; weaker, less reproducible edges.</td>
+</tr>
+<tr>
+<td>High mito/ribo share</td>
+<td>&gt; run median + 10 points</td>
+<td>Stressed or damaged cells.</td>
+</tr>
+<tr>
+<td>Sparse matrix</td>
+<td>&gt; 95% zeros</td>
+<td>Unstable regressions and correlations.</td>
+</tr>
+<tr>
+<td>Variation tracks depth</td>
+<td>a leading PC with |rho| ≥ 0.5 against log depth</td>
+<td>Co-expression partly reflects sequencing depth.</td>
+</tr>
+<tr>
+<td>One programme dominates</td>
+<td>PC1 share &gt; 2 × run median</td>
+<td>One programme or a mixture of states drives co-expression.</td>
+</tr>
+<tr>
+<td>One batch dominates / batch drives variation</td>
+<td>one batch &gt; 80% of cells / batch R² &gt; 0.2 (<code>--batch</code>)</td>
+<td>Correlation from donors differing, not regulation.</td>
+</tr>
+<tr>
+<td>Network unlike the others</td>
+<td>density or mean |weight| outside 0.5–2 × the track median</td>
+<td>Every score in that identity can shift together.</td>
+</tr>
+<tr>
+<td>Many isolated genes, empty network</td>
+<td>&gt; 50% isolated / no edges</td>
+<td>The network is thin or empty.</td>
+</tr>
+<tr>
+<td>Few metacells, weak scale-free fit</td>
+<td>&lt; 50 metacells / R² &lt; 0.8 (hdWGCNA)</td>
+<td>Correlations are noisy, or the network lacks the assumed structure.</td>
+</tr>
+<tr>
+<td>Target barely detected, at noise level, weakly connected</td>
+<td>&lt; 5% of cells / <code>var_standardized</code> &lt; 1 / strength percentile &lt; 10</td>
+<td>The score or knockout mostly reflects the rest of the network.</td>
+</tr>
+<tr>
+<td>Knockout barely moved the network</td>
+<td><code>effect_pct</code> &lt; 5</td>
+<td>Nearly every random knockout moved the network more, so the gene list carries little.</td>
+</tr>
+<tr>
+<td>Same knockout genes whatever the target</td>
+<td>median Jaccard of affected genes between targets ≥ 0.8, over three or more targets that share no gene</td>
+<td>Knockouts describe the network, not the target.</td>
+</tr>
+</tbody>
+</table>
+<p>These thresholds are rules of thumb, set at the top of the report's <em>Data quality</em> section.</p>
 <h2 id="pipeline_info">pipeline_info/<a class="headerlink" href="#pipeline_info" title="Permanent link">&para;</a></h2>
 <p>Nextflow's standard run records, time-stamped per run: <code>execution_report_*.html</code> (resources per task), <code>execution_timeline_*.html</code>, <code>execution_trace_*.txt</code> and <code>pipeline_dag_*.html</code>. The report's <em>Pipeline run</em> section summarises the trace.</p>
               
