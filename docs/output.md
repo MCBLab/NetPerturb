@@ -140,7 +140,7 @@ One row per identity × target from `SCTENIFOLDKNK_KO`, written whether or not t
 
 | Column | Meaning |
 |---|---|
-| `status` | `ok`, or why not: `no outgoing edges` (the target has no edge out of this identity's network, so the knockout is a no-op and is skipped), `not expressed`, `no wild-type network`, `alignment failed`. |
+| `status` | `ok`, or why not: `no outgoing edges` (the target has no edge out of this identity's network, so the knockout is a no-op and is skipped), `not expressed`, `no wild-type network`, `alignment failed`; or `weaker than every null knockout` / `stronger than every null knockout` when it ran but its out-strength lies outside the null's range and it is not calibrated (`p_null`, `p_null_adj` NA, no hits). Targets kept below `--sctknk_min_pct` are usually the former. |
 | `genes_knocked`, `out_degree`, `out_strength` | The genes zeroed and how many edges, of what total weight, that removed. |
 | `out_strength_pct`, `effect_pct` | Share of the null knockouts weaker than this target, and share that moved the network less than this knockout (its median distance). A knockout with a low `effect_pct` moved the network less than most random genes would. |
 | `n_null`, `n_tested`, `hits_raw`, `hits_null` | Null knockouts used; genes tested; hits under `p.adj` and under `p_null_adj`. |
@@ -175,7 +175,8 @@ The checks the report flags, and why each can skew a result:
 | Many isolated genes, empty network | > 50% isolated / no edges | The network is thin or empty. |
 | Few metacells, weak scale-free fit | < 50 metacells / R² < 0.8 (hdWGCNA) | Correlations are noisy, or the network lacks the assumed structure. |
 | Target barely detected, at noise level, weakly connected | < 5% of cells / `var_standardized` < 1 / strength percentile < 10 | The score or knockout mostly reflects the rest of the network. |
-| Same knockout genes whatever the target | median Jaccard of affected genes between targets ≥ 0.8 | Knockouts describe the network, not the target. |
+| Knockout barely moved the network | `effect_pct` < 5 | Nearly every random knockout moved the network more, so the gene list carries little. |
+| Same knockout genes whatever the target | median Jaccard of affected genes between targets ≥ 0.8, over three or more targets that share no gene | Knockouts describe the network, not the target. |
 
 These thresholds are rules of thumb, set at the top of the report's *Data quality* section.
 

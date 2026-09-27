@@ -236,6 +236,16 @@ if (is.null(dr) || nrow(dr) == 0) {
 # null knockouts that moved the network less than this one (median
 # distance), and out_strength_pct, the same for the edges removed, so a
 # target whose effect is small next to random genes' can be read as such.
+#
+# A target outside the null's range of out-strength is not calibrated. The
+# random genes are drawn among the network's genes with edges, never the
+# targets, and a target kept below --sctknk_min_pct is by construction
+# weaker than any of them: the line is then extrapolated below its support,
+# and on Kang 2018 the three weakest knockouts came back with 50 to 120
+# "hits" where every well-connected target had 0 to 7. Such a pair keeps
+# its rows and its z_null, for the ranking, but p_null and p_null_adj are
+# NA, so it counts no hits, and its status line and the report's tile say
+# that it sits outside the null instead.
 null_calibration <- function(dr, null_model) {
   genes_ok <- identical(sort(null_model$genes), sort(rownames(wt)))
   if (!genes_ok || ncol(null_model$log_distance) < 8) {
@@ -265,9 +275,21 @@ null_calibration <- function(dr, null_model) {
   s <- pmax(apply(res, 2, function(v) stats::mad(v, na.rm = TRUE)), 1e-6)
   z <- (r - pred) / s
   z <- (z - stats::median(z)) / max(stats::mad(z), 1e-6)
-  p <- 2 * stats::pnorm(-abs(z))
+  range_status <- if (out_strength < min(null_model$out_strength)) {
+    "weaker than every null knockout"
+  } else if (out_strength > max(null_model$out_strength)) {
+    "stronger than every null knockout"
+  } else "ok"
+  if (range_status != "ok") {
+    message("'", target, "' in ", cell_type, " is ", range_status, " (out-strength ",
+            signif(out_strength, 3), " against ", signif(min(null_model$out_strength), 3), "-",
+            signif(max(null_model$out_strength), 3), "); not calibrated.")
+    p <- rep(NA_real_, length(z))
+  } else {
+    p <- 2 * stats::pnorm(-abs(z))
+  }
   list(z_null = z, p_null = p, p_null_adj = stats::p.adjust(p, method = "fdr"),
-       n_null = ncol(L),
+       n_null = ncol(L), status = range_status,
        effect_pct = 100 * mean(null_model$median_distance < median(dr$distance)),
        out_strength_pct = 100 * mean(null_model$out_strength < out_strength))
 }
@@ -287,7 +309,8 @@ dr <- dr[, c("cell_type", "target", "gene", "distance", "Z", "FC", "p.value", "p
              if (!is.null(cal)) c("z_null", "p_null", "p_null_adj"))]
 
 write_dr(dr)
-write_status("ok", genes_knocked = paste(present, collapse = ";"), out_degree = out_degree,
+write_status(if (!is.null(cal)) cal$status else "ok",
+             genes_knocked = paste(present, collapse = ";"), out_degree = out_degree,
              out_strength = signif(out_strength, 4),
              out_strength_pct = if (!is.null(cal)) round(cal$out_strength_pct, 1) else NA,
              median_distance = signif(median(dr$distance), 3),

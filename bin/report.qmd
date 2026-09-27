@@ -1067,10 +1067,13 @@ if (has_ko_summary) {
       "cell type returns about the same number for every target, check the Data quality ",
       "section for whether they are also the same genes, which would mean the knockout ",
       "is not telling targets apart there.",
-      if (nrow(skipped) > 0) paste0(" Knockouts that did not run are labelled with the reason: ",
+      if (nrow(skipped) > 0) paste0(" Knockouts that did not run, or could not be calibrated, are labelled with the reason: ",
                                     paste0("**", skipped$n, "** ", skipped$status, collapse = ", "),
                                     ". *No outgoing edges* means the target has no edge out of that cell type's ",
-                                    "network, so knocking it out changes nothing.") else "",
+                                    "network, so knocking it out changes nothing. *Weaker (stronger) than every null ",
+                                    "knockout* means the target's outgoing edges weigh less (more) than any random gene's, ",
+                                    "so the null has nothing to compare it with: its rows and `z_null` are in the table, ",
+                                    "but no gene of it counts as affected.") else "",
       if (sctknk_calibrated && has_sctknk_status)
         " The table below also gives each knockout's `effect_pct`, the share of random knockouts that moved the network less than it did, and `out_strength_pct`, the same for the edges it removed." else "",
       "\n", sep = "")
@@ -1083,8 +1086,9 @@ if (has_ko_summary) {
 ks <- ko_summary %>%
   mutate(target = factor(target, levels = sort(unique(target))),
          cell_type = factor(cell_type, levels = sort(unique(cell_type))),
-         label = ifelse(is.na(genes_tested), gsub(" ", "\n", status),
-                        sprintf("%s\n%.1f%%", comma(genes_affected), 100 * share_affected)))
+         label = ifelse(status != "ok", gsub(" ", "\n", status),
+                        sprintf("%s\n%.1f%%", comma(genes_affected), 100 * share_affected)),
+         genes_affected = ifelse(status != "ok", NA_real_, genes_affected))
 ggplot(ks, aes(x = target, y = cell_type, fill = genes_affected)) +
   geom_tile(colour = "white", linewidth = 0.6) +
   geom_text(aes(label = label,
@@ -1633,6 +1637,7 @@ dq_min_detection    <- 5      # % of cells expressing a target
 dq_noise_var        <- 1      # vst standardised variance at sampling noise
 dq_low_percentile   <- 10     # target strength percentile in its network
 dq_ko_jaccard       <- 0.8    # median overlap of knockout hits between targets
+dq_weak_knockout    <- 5      # effect_pct: share of null knockouts that moved the network less
 
 rel <- function(x) x / median(x, na.rm = TRUE)
 
@@ -1753,10 +1758,23 @@ if (has_target_network_qc) {
     "The target has almost no edges here, so its score or knockout reflects the rest of the network.")
 }
 
+# Knockouts that moved the network less than nearly every random knockout:
+# their effect_pct on the status table. Whatever such a knockout's gene list
+# says, the network barely noticed the target.
+if (has_sctknk_status && "effect_pct" %in% names(sctknk_status)) {
+  weak <- sctknk_status %>% filter(status == "ok", !is.na(effect_pct), effect_pct < dq_weak_knockout)
+  if (nrow(weak) > 0) flags[[length(flags) + 1]] <- flag(
+    label_of(weak$cell_type), "Knockout", paste(weak$target, "barely moved the network"),
+    sprintf("effect pct %.0f", weak$effect_pct), paste("<", dq_weak_knockout),
+    "Fewer random knockouts moved the network less than this one, so its gene list carries little.")
+}
+
 # Knockouts whose affected genes barely depend on the target: within a cell
 # type, the median overlap (Jaccard) of the affected-gene sets between targets
 # that affected anything. Near 1, every knockout returns the same genes, so the
-# result describes that cell type's network rather than any one target.
+# result describes that cell type's network rather than any one target. Pairs
+# of targets that share a gene (a joint knockout and one of its genes) are
+# expected to overlap and are left out, and it takes three targets to say.
 if (exists("sctknk_sig") && nrow(sctknk_sig) > 0) {
   ko_sets <- sctknk_sig %>%
     filter(!mapply(function(g, t) g %in% strsplit(t, ";")[[1]], gene, target))
@@ -1764,8 +1782,11 @@ if (exists("sctknk_sig") && nrow(sctknk_sig) > 0) {
     group_by(cell_type) %>%
     group_modify(function(d, key) {
       s <- split(d$gene, d$target)
-      if (length(s) < 2) return(data.frame(median_jaccard = NA_real_, n_targets = length(s)))
+      if (length(s) < 3) return(data.frame(median_jaccard = NA_real_, n_targets = length(s)))
       p <- combn(names(s), 2)
+      shared <- apply(p, 2, function(x) length(intersect(strsplit(x[1], ";")[[1]], strsplit(x[2], ";")[[1]])) > 0)
+      p <- p[, !shared, drop = FALSE]
+      if (ncol(p) == 0) return(data.frame(median_jaccard = NA_real_, n_targets = length(s)))
       j <- apply(p, 2, function(x) length(intersect(s[[x[1]]], s[[x[2]]])) /
                                    length(union(s[[x[1]]], s[[x[2]]])))
       data.frame(median_jaccard = median(j), n_targets = length(s))
