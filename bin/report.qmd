@@ -730,10 +730,14 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   theme(
     panel.grid = element_blank(),
     axis.text.x = element_text(angle = 45, hjust = 1),
-    strip.text.y = element_blank()
+    strip.text = if (n_bindings > 1) element_text(face = "bold") else element_blank()
   ) +
-  { if (n_bindings > 1) facet_grid(chunk ~ binding, scales = "free_x", space = "free_x")
-    else facet_grid(chunk ~ ., scales = "free_x", space = "free_x") }
+  # One row of panels per chunk of targets, one panel per binding mode
+  # within it. facet_wrap rather than facet_grid because only facet_wrap frees
+  # the x axis per panel; a grid shares it across a row, which drew every
+  # panel over all the targets. The strip names the binding alone.
+  facet_wrap(~ chunk + binding, ncol = n_bindings, scales = "free_x",
+             labeller = function(labels) list(as.character(labels$binding)))
 ```
 
 ## Knockout networks
