@@ -45,6 +45,23 @@ read_optional <- function(path) {
   }
 }
 
+# The heatmaps with one column per target grow with the target list, and a
+# panel of a few hundred genes drawn in one row is wider than a PNG can be
+# (cairo refuses a bitmap over 32,767 px; the render died on a 200-gene
+# panel). So the columns wrap into rows of at most `per_row`, each its own
+# facet, and the figure grows down the page instead: wrap_cols() gives the
+# facet of each column in the order the columns are drawn, wide_fig() the
+# figure size that layout needs.
+wrap_cols <- function(x, per_row = 40) {
+  cols <- if (is.factor(x)) levels(x) else unique(x)
+  factor(ceiling(match(as.character(x), cols) / per_row))
+}
+wide_fig <- function(n_cols, n_rows, per_row = 40, panels = 1) {
+  chunks <- ceiling(n_cols / per_row)
+  list(width  = max(5, 0.55 * min(n_cols, per_row) * panels + 3),
+       height = min(150, max(3, chunks * (0.45 * n_rows + 1.5))))
+}
+
 library(dplyr)
 library(tidyr)
 library(ggplot2)
@@ -699,7 +716,8 @@ shown as missing (gray). An asterisk marks a score in the `r top_label` of every
 score in the run — `r n_top` tile(s), at or above
 `r if (has_scores) signif(top_cut, 4) else NA` on the log10 scale.
 
-```{r heatmap, fig.width=10, fig.height=max(4, 0.4 * n_cell_types)}
+```{r heatmap, fig.width=wide_fig(n_distinct(score_data$target), n_cell_types, panels = n_bindings)$width, fig.height=wide_fig(n_distinct(score_data$target), n_cell_types)$height}
+score_data$chunk <- wrap_cols(score_data$target)
 ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   geom_tile(color = "white", linewidth = 0.6) +
   geom_text(
@@ -711,9 +729,11 @@ ggplot(score_data, aes(x = target, y = cell_type, fill = log_score_kept)) +
   theme_minimal(base_size = 12) +
   theme(
     panel.grid = element_blank(),
-    axis.text.x = element_text(angle = 45, hjust = 1)
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    strip.text.y = element_blank()
   ) +
-  { if (n_bindings > 1) facet_wrap(~binding) }
+  { if (n_bindings > 1) facet_grid(chunk ~ binding, scales = "free_x", space = "free_x")
+    else facet_grid(chunk ~ ., scales = "free_x", space = "free_x") }
 ```
 
 ## Knockout networks
@@ -1082,9 +1102,10 @@ if (has_ko_summary) {
 }
 ```
 
-```{r sctknk-summary, eval=has_ko_summary, fig.width=max(5, 0.9 * length(unique(ko_summary$target)) + 3), fig.height=max(3, 0.45 * length(unique(ko_summary$cell_type)) + 1.5)}
+```{r sctknk-summary, eval=has_ko_summary, fig.width=wide_fig(n_distinct(ko_summary$target), n_distinct(ko_summary$cell_type))$width, fig.height=wide_fig(n_distinct(ko_summary$target), n_distinct(ko_summary$cell_type))$height}
 ks <- ko_summary %>%
   mutate(target = factor(target, levels = sort(unique(target))),
+         chunk = wrap_cols(target),
          cell_type = factor(cell_type, levels = sort(unique(cell_type))),
          label = ifelse(status != "ok", gsub(" ", "\n", status),
                         sprintf("%s\n%.1f%%", comma(genes_affected), 100 * share_affected)),
@@ -1098,8 +1119,9 @@ ggplot(ks, aes(x = target, y = cell_type, fill = genes_affected)) +
   scale_fill_gradientn(colours = c("#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"),
                        na.value = "#f0efec", name = "Genes\naffected") +
   labs(x = "Knocked-out target", y = "Cell type") +
+  facet_wrap(~ chunk, ncol = 1, scales = "free_x") +
   theme_minimal(base_size = 12) +
-  theme(panel.grid = element_blank(),
+  theme(panel.grid = element_blank(), strip.text = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
 ```
 
@@ -1591,11 +1613,12 @@ if (has_target_expr) {
 }
 ```
 
-```{r target-expr, eval=has_target_expr, fig.width=max(5, 1.1 * n_expr_genes + 3), fig.height=max(3, 0.45 * n_expr_ids + 1.5)}
+```{r target-expr, eval=has_target_expr, fig.width=wide_fig(n_expr_genes, n_expr_ids)$width, fig.height=wide_fig(n_expr_genes, n_expr_ids)$height}
 # Genes keep the order the targets were given in; identities are sorted as in
 # the perturbation score heatmap.
 te <- target_expr %>%
   mutate(gene     = factor(gene, levels = unique(gene)),
+         chunk    = wrap_cols(gene),
          identity = factor(identity, levels = sort(unique(identity))),
          label    = sprintf("%.2f\n%.0f%%", avg_expression, pct_expressing))
 
@@ -1608,8 +1631,9 @@ ggplot(te, aes(x = gene, y = identity, fill = avg_expression)) +
   scale_fill_distiller(palette = "YlOrRd", direction = 1,
                        name = "Mean\nlog-normalised\nexpression") +
   labs(x = "Target gene", y = "Cell type") +
+  facet_wrap(~ chunk, ncol = 1, scales = "free_x") +
   theme_minimal(base_size = 12) +
-  theme(panel.grid = element_blank(),
+  theme(panel.grid = element_blank(), strip.text = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
 ```
 
@@ -1976,7 +2000,7 @@ if (has_target_network_qc) {
 }
 ```
 
-```{r dq-target, eval=has_target_network_qc && any(target_network_qc$track == "rank_score"), fig.width=max(5, 1.1 * length(unique(target_network_qc$gene)) + 3), fig.height=max(3, 0.45 * length(unique(target_network_qc$identity)) + 1.5)}
+```{r dq-target, eval=has_target_network_qc && any(target_network_qc$track == "rank_score"), fig.width=wide_fig(n_distinct(target_network_qc$gene), n_distinct(target_network_qc$identity))$width, fig.height=wide_fig(n_distinct(target_network_qc$gene), n_distinct(target_network_qc$identity))$height}
 tv <- if (has_target_expr && "var_standardized" %in% names(target_expr)) {
   target_expr %>% select(identity, gene, var_standardized)
 } else {
@@ -1987,6 +2011,7 @@ tq <- target_network_qc %>%
   mutate(identity = label_of(identity)) %>%
   left_join(tv, by = c("identity", "gene")) %>%
   mutate(gene = factor(gene, levels = unique(gene)),
+         chunk = wrap_cols(gene),
          identity = factor(identity, levels = sort(unique(identity))),
          label = ifelse(in_network,
                         paste0(round(strength_percentile), "\n",
@@ -2003,8 +2028,9 @@ ggplot(tq, aes(x = gene, y = identity, fill = strength_percentile)) +
                        limits = c(0, 100), na.value = "#f0efec",
                        name = "Strength\npercentile") +
   labs(x = "Target gene", y = "Cell type") +
+  facet_wrap(~ chunk, ncol = 1, scales = "free_x") +
   theme_minimal(base_size = 12) +
-  theme(panel.grid = element_blank(),
+  theme(panel.grid = element_blank(), strip.text = element_blank(),
         axis.text.x = element_text(angle = 45, hjust = 1, face = "italic"))
 ```
 
