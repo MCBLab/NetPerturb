@@ -19,3 +19,6 @@ benchmark_runs/
 work_bench/
 logs_bench/
 nf_home/
+
+# Manuscript drafts (never pushed)
+publication/references/
