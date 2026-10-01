@@ -2150,6 +2150,7 @@ run_fields <- c(
   "--n_cells"         = "n_cells",
   "--min_cells"       = "min_cells",
   "--n_hvg"           = "n_hvg",
+  "--cut_ratio"       = "cut_ratio",
   "--n_cores"         = "n_cores",
   "--seed"            = "seed",
   "--sctknk_min_pct"  = "sctknk_min_pct",

@@ -88,7 +88,7 @@ resistant  Brd4       antagonist  1.61320913209275e-06
 
 ### `top_connections_all_targets.txt`
 
-Each target's strongest edges in each identity's network, up to `--top_connections` per target gene, ranked by absolute weight. The sign is kept: positive edges are activating and negative edges are repressive.
+Each target's strongest edges in each identity's network, up to `--top_connections` per target gene, ranked by absolute weight. The sign is kept: positive edges are activating and negative edges are repressive. Weights are those the score was computed on: within [-1, 1] for every method. For GENIE3 that means only edges above `--cut_ratio` are listed, with importances divided by the identity's largest one.
 
 ```text
 cell_type  target  binding     target_gene  partner  weight   rank

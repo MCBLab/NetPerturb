@@ -14,7 +14,14 @@ column <- args[4]
 binding <- args[5]
 top_n <- args[6]
 assay <- args[7]
-rds_files <- args[8:length(args)]
+# --cut_ratio: the quantile of absolute edge weight below which GENIE3's edges
+# are cut (see below). Unparseable or outside [0, 1) falls back to 0.95, the
+# cut scRank's Constr_net and hdwgcna.R apply to their own networks.
+cut_ratio <- suppressWarnings(as.numeric(args[8]))
+if (is.na(cut_ratio) || cut_ratio < 0 || cut_ratio >= 1) {
+  cut_ratio <- 0.95
+}
+rds_files <- args[9:length(args)]
 
 cell_types <- sub("_weight.*", "", basename(rds_files))
 
@@ -59,6 +66,46 @@ skip_target <- function(...) {
 print(paste("Processing targets:", paste(target_rank, collapse = ", ")))
 
 sc_objs <- lapply(rds_files, readRDS)
+
+# GENIE3's networks are brought to the shape scRank's score was built for --
+# the one Constr_net gives its own networks, and hdwgcna.R its own; those two
+# arrive in it already. Done here rather than in genie3.R, so the networks a
+# run has built stay cached. The top-connections table below reads these
+# networks too, so for GENIE3 it lists only edges that survive the cut, with
+# weights relative to the identity's strongest edge.
+#
+# Cut: GENIE3 gives nearly every gene pair an importance, and scRank counts a
+# gene's degree as its non-zero edges and sums the target's local effect over
+# every neighbour, so in a dense network every gene neighbours every other one.
+# Edges below the --cut_ratio quantile of absolute weight are cut, keeping the
+# strongest 5% by default as Constr_net does. The quantile is taken over the
+# non-zero edges off the diagonal, as hdwgcna.R does: a gene with no counts in
+# an identity has no importance there, and counting its zeros would make the
+# same --cut_ratio cut each identity by a different amount.
+#
+# Scale: importances have no fixed scale -- each identity's depends on its own
+# data -- and scRank's score grows with the square of it: the same networks
+# with every weight at 0.01x score 1e-4x. So an identity whose importances run
+# larger would rank higher for that alone. Each network is divided by its own
+# largest absolute weight, as Constr_net does.
+prepare_genie3 <- function(net) {
+  diag(net) <- 0
+  w <- abs(net)
+  nz <- w[w != 0 & row(w) != col(w)]
+  if (length(nz) == 0) {
+    return(net)
+  }
+  net[w < stats::quantile(nz, cut_ratio, names = FALSE)] <- 0
+  net / max(nz)
+}
+is_genie3 <- grepl("_weight_GENIE3_", basename(rds_files))
+sc_objs[is_genie3] <- lapply(sc_objs[is_genie3], function(net) prepare_genie3(as.matrix(net)))
+if (any(is_genie3)) {
+  message("GENIE3 networks cut below the ", cut_ratio, " quantile of absolute edge ",
+          "weight and divided by their largest weight; edges kept: ",
+          paste0(cell_types[is_genie3], " ", vapply(sc_objs[is_genie3], function(n) sum(n != 0), numeric(1)),
+                 collapse = ", "), ".")
+}
 
 # The container pairs Seurat v4 with SeuratObject v5, so an object saved with a
 # v5 assay is invisible to every Seurat v4 entry point (see the same fix in

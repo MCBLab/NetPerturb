@@ -4,6 +4,7 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 
 | Wave | Theme | Done | PR |
 |---|---|---|---|
+| 30 | GENIE3 networks on scRank's scale and sparsity | Oct 2026 | branch `subset_filter` |
 | 29 | Why every knockout returned the same genes | Sep 2026 | branch `fix-ribo-mito` |
 | 28 | A Data quality section, and a knockout summary | Sep 2026 | branch `fix-ribo-mito` |
 | 27 | Mitochondrial and ribosomal genes removed on load | Sep 2026 | branch `fix-ribo-mito` |
@@ -35,6 +36,18 @@ How NetPerturb was built, grouped into waves of work rather than individual comm
 | 1 | Prototype pipeline | Dec 2024 | — |
 
 ---
+
+## Wave 30 — GENIE3 networks on scRank's scale and sparsity
+
+**Oct 2026** · branch `subset_filter`
+
+Wave 11 brought hdWGCNA's networks into scRank's range and left GENIE3 alone, on the grounds that scores are not compared across `--network` choices. That left a problem inside a single run. scRank's `Constr_net` divides every network it builds by its largest absolute weight, and `rank_celltype` was written for that. Its score grows with the square of the weight scale. On a simulated three-identity run, the same networks with every weight multiplied by 0.01 scored 1e-4 times as much, and at 0.001 they scored 1e-6 times as much. The ranking held there only because every identity was scaled alike. GENIE3's importances have no fixed scale; each identity's depends on its own data. So an identity could rank higher only because its importances ran larger. It is also why GENIE3 scores sat near 1e-6.
+
+`rank_score.R` now divides each GENIE3 network by its own largest absolute weight before scoring. It does this on the networks it reads rather than in `genie3.R`, so a run's built networks stay cached and only `RANK_SCORE` reruns. scRank and hdWGCNA networks already arrive within [-1, 1] and are left as they are. GENIE3's `perb_score` values change scale with this, and `top_connections` weights become relative to the identity's strongest edge.
+
+GENIE3 networks are also cut, again in `rank_score.R`. GENIE3 gives nearly every gene pair an importance. scRank counts a gene's degree as its non-zero edges and sums a target's local effect over all its neighbours, so in a dense network every gene neighbours every other one. Edges below the `--cut_ratio` quantile of absolute weight are set to zero, keeping the strongest 5% by default, as `Constr_net` does with its own networks. `--cut_ratio` was hdWGCNA's alone and is now passed to `RANK_SCORE` too. As in `hdwgcna.R`, the quantile is taken over the non-zero edges off the diagonal: an unexpressed gene has no importances, and counting its zeros would cut each identity by a different share. A side effect is that a target whose edges in an identity are all weaker than the cut has none left there, and scores near 0. GENIE3 networks are still unsigned.
+
+The same check confirmed that building scRank networks one identity per task is safe. `Constr_net` integrates the bootstrap networks of one cell type at a time, and `.integrat_net` only ever sees that cell type's list. Built per split object, the networks and scores came out identical to a single call over the whole object.
 
 ## Wave 29 — Why every knockout returned the same genes
 

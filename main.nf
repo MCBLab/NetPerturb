@@ -224,7 +224,7 @@ workflow {
                 .unique()
         }
 
-        RANK_SCORE( obj, rank_target_ch, species, column, params.binding, params.top_connections, params.assay, rank_cells )
+        RANK_SCORE( obj, rank_target_ch, species, column, params.binding, params.top_connections, params.assay, params.cut_ratio, rank_cells )
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
@@ -311,6 +311,7 @@ workflow {
             "n_cells"         : params.n_cells,
             "min_cells"       : params.min_cells,
             "n_hvg"           : params.n_hvg,
+            "cut_ratio"       : params.cut_ratio,
             "n_cores"         : params.n_cores,
             "seed"            : params.seed,
             "sctknk_min_pct"  : params.sctknk_min_pct,

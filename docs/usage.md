@@ -41,7 +41,7 @@ nextflow run MCBLab/NetPerturb --sctknk ...
 
 | `--network` | Method | Notes |
 |---|---|---|
-| `genie3` | [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html) random-forest regression | Scales with `--n_hvg`; the slowest for large gene sets. |
+| `genie3` | [GENIE3](https://bioconductor.org/packages/release/bioc/html/GENIE3.html) random-forest regression | Before scoring, each identity's network is sparsified at `--cut_ratio` and divided by its largest weight. Scales with `--n_hvg`; the slowest for large gene sets. |
 | `scrank` | scRank's own `Constr_net` | Seeds itself internally; does not follow `--seed`. |
 | `hdwgcna` | [hdWGCNA](https://smorabit.github.io/hdWGCNA/) on metacells | The TOM is signed from correlations, sparsified at `--cut_ratio` and rescaled to `[-1, 1]`. Identities below `--hdwgcna_min_cells` are skipped. |
 
@@ -115,7 +115,7 @@ The extras skip `DOWNSAMPLE` and every network step. `EXTRA_TARGET_QC` checks th
 | `--network` | — | `genie3`, `scrank` or `hdwgcna`. |
 | `--binding` | `antagonist` | Perturbation mode for scRank scoring: `antagonist` or `agonist`. |
 | `--top_connections` | `15` | Strongest edges recorded per target gene per identity. |
-| `--cut_ratio` | `0.95` | hdWGCNA only: quantile of absolute edge weight below which edges are cut. |
+| `--cut_ratio` | `0.95` | hdWGCNA and GENIE3: quantile of absolute edge weight below which edges are cut; the default keeps the strongest 5%, as scRank's own networks do. |
 | `--hdwgcna_min_cells` | `150` | hdWGCNA only: identities below this are not aggregated into metacells. |
 | `--score_quantile` | `0.75` | Report only: pooled log10 scores below this quantile are left out of the figures. Tables are never cut. |
 
