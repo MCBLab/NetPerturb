@@ -18,6 +18,8 @@ include { MERGE_SCTENIFOLDKNK } from "./modules/local/merge_sctenifoldknk/main.n
 include { GSEA_SCTENIFOLDKNK } from "./modules/local/gsea_sctenifoldknk/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
 include { NETWORK_QC } from "./modules/local/network_qc/main.nf"
+include { EXTRA_TARGET_QC as EXTRA_TARGET_QC_RANK } from "./modules/local/extra_target_qc/main.nf"
+include { EXTRA_TARGET_QC as EXTRA_TARGET_QC_KNOCKOUT } from "./modules/local/extra_target_qc/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -55,6 +57,16 @@ workflow {
         log.warn "--gsea_gmt was given without --sctknk; there is no knockout table to enrich, so no GSEA will run."
     }
 
+    // --extra_target adds targets to a run whose networks are already built,
+    // without building any again. The file is read only by EXTRA_TARGET_QC,
+    // never by DOWNSAMPLE or a network step, so on -resume everything up to
+    // the networks is reused, and so is every RANK_SCORE and knockout of a
+    // --target: only the extras' own tasks run, then the merges and REPORT.
+    // A gene the networks were not built on cannot be added this way, so it
+    // is not run, and the report says so; adding it to --target instead
+    // rebuilds the run around it.
+    extra_target = params.extra_target ? file(params.extra_target, checkIfExists: true) : null
+
     // --batch is optional, but a process input cannot be null, so an unset one
     // is passed as an empty string, which DOWNSAMPLE reads as no batch.
     DOWNSAMPLE( obj, target, column, species, n_cells, params.min_cells, params.assay, params.n_hvg, params.seed, params.sctknk_min_pct, params.batch ?: "" )
@@ -79,6 +91,43 @@ workflow {
     .flatten()
     .set { sc_obj }
 
+    // --cell_subset narrows the run to some of the identities: a
+    // comma-separated list of --column values, matched against the split
+    // objects DOWNSAMPLE wrote. It names each one after its identity with every
+    // character outside [A-Za-z0-9_-] turned into '_', so the requested names
+    // get the same treatment and either spelling matches. Both tracks read the
+    // narrowed set -- the networks --network builds, and so RANK_SCORE's
+    // scores, as well as the knockout track. The filter sits here, on the
+    // split objects, rather than in DOWNSAMPLE, so a run resumed with a
+    // different subset reuses the DOWNSAMPLE it already has, and the networks
+    // of every identity it built before.
+    analysis_obj = sc_obj
+    if( params.cell_subset ) {
+        def raw = params.cell_subset
+        def wanted = ( raw instanceof Collection ? raw.collect { it.toString() } : raw.toString().split(',') as List )
+            .collect { it.trim().replaceAll(/[^A-Za-z0-9_\-]/, '_') }
+            .findAll { it }
+            .unique()
+        if( !wanted ) {
+            error "--cell_subset '${raw}' names no identity."
+        }
+        analysis_obj = sc_obj.filter { it.baseName in wanted }
+
+        // A name with no split object -- misspelt, or an identity DOWNSAMPLE
+        // dropped for --min_cells -- is reported rather than skipped without
+        // a word, and the run stops when none matched: nothing would be built,
+        // and with --network on REPORT would silently never run.
+        sc_obj.map { it.baseName }.collect().subscribe { found ->
+            def missing = wanted - found
+            if( missing.size() == wanted.size() ) {
+                error "No identity matches --cell_subset '${raw}'. DOWNSAMPLE kept: ${found.sort().join(', ')}."
+            }
+            if( missing ) {
+                log.warn "--cell_subset names ${missing.join(', ')}, which DOWNSAMPLE did not keep (misspelt, or below --min_cells); the run covers ${(wanted - missing).join(', ')} only."
+            }
+        }
+    }
+
     // scTenifoldKnk in two steps. The wild-type network does not depend on
     // the target, so SCTENIFOLDKNK_BUILD makes it once per cell type; the
     // knockout on it is target-specific, so SCTENIFOLDKNK_KO runs once per
@@ -86,7 +135,7 @@ workflow {
     // RANK_SCORE -- it goes to its own merge, and from there into REPORT when
     // --network is running too.
     if( sctknk ) {
-        SCTENIFOLDKNK_BUILD( sc_obj, n_cores, params.sctknk_min_pct, params.seed, params.sctknk_td_k )
+        SCTENIFOLDKNK_BUILD( analysis_obj, n_cores, params.sctknk_min_pct, params.seed, params.sctknk_td_k )
 
         // The null model: the same knockout run for --sctknk_null random
         // genes of each cell type's network, once per cell type, which every
@@ -103,6 +152,16 @@ workflow {
         } else {
             sctknk_null_keyed = sctknk_wt_keyed
                 .map { ct, wt -> [ ct, file("${projectDir}/assets/NO_SCTKNK_NULL") ] }
+        }
+
+        // The extras the knockout networks carry join the run's targets; a
+        // ';'-joined one reduced to a --target it equals is dropped upstream,
+        // and an exact repeat here.
+        if( extra_target ) {
+            EXTRA_TARGET_QC_KNOCKOUT( SCTENIFOLDKNK_BUILD.out.wt.collect(), extra_target, target, 'knockout', 'sctenifoldknk' )
+            sctknk_target_ch = sctknk_target_ch
+                .mix( EXTRA_TARGET_QC_KNOCKOUT.out.targets.splitText().map { it.trim() }.filter { it } )
+                .unique()
         }
 
         sctknk_wt_keyed
@@ -134,28 +193,38 @@ workflow {
     if( network ) {
 
         if( network == 'genie3' ) {
-           GENIE3( sc_obj, n_cores, params.seed )
+           GENIE3( analysis_obj, n_cores, params.seed )
 
             GENIE3.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
         else if( network == 'scrank' ) {
-            SCRANK( sc_obj, species, target_qc_file, column, n_cores )
+            SCRANK( analysis_obj, species, target_qc_file, column, n_cores )
 
             SCRANK.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
         else if( network == 'hdwgcna' ) {
-            HDWGCNA( sc_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells, params.seed )
+            HDWGCNA( analysis_obj, column, n_cores, params.cut_ratio, params.hdwgcna_min_cells, params.seed )
 
             HDWGCNA.out.rank_obj
             .collect()
             .set { rank_cells  }
         }
 
-        RANK_SCORE( obj, target_ch, species, column, params.binding, params.top_connections, params.assay, rank_cells )
+        // The same for the rank-score networks: only the extras they carry
+        // are scored.
+        rank_target_ch = target_ch
+        if( extra_target ) {
+            EXTRA_TARGET_QC_RANK( rank_cells, extra_target, target, 'rank_score', network )
+            rank_target_ch = target_ch
+                .mix( EXTRA_TARGET_QC_RANK.out.targets.splitText().map { it.trim() }.filter { it } )
+                .unique()
+        }
+
+        RANK_SCORE( obj, rank_target_ch, species, column, params.binding, params.top_connections, params.assay, rank_cells )
 
         MERGE( RANK_SCORE.out.rank_scores.collect(), RANK_SCORE.out.top_connections.collect() )
 
@@ -171,7 +240,16 @@ workflow {
         if( sctknk ) {
             qc_networks = qc_networks.mix( SCTENIFOLDKNK_BUILD.out.wt.collect() )
         }
-        NETWORK_QC( qc_networks.collect(), target_qc_file, network )
+        // The extras that were run are placed in the networks too. Without
+        // any, NETWORK_QC reads targets_qc.txt itself, as it always has.
+        network_qc_targets = target_qc_file
+        if( extra_target ) {
+            network_qc_targets = target_qc_file
+                .mix( EXTRA_TARGET_QC_RANK.out.targets )
+                .mix( sctknk ? EXTRA_TARGET_QC_KNOCKOUT.out.targets : Channel.empty() )
+                .collectFile( name: "targets_network_qc.txt" )
+        }
+        NETWORK_QC( qc_networks.collect(), network_qc_targets, network )
 
         // REPORT always takes a scTenifoldKnk table path; when it was not
         // requested this is a sentinel empty file report.qmd recognises and
@@ -192,6 +270,14 @@ workflow {
         gsea_table = (sctknk && params.gsea_gmt)
             ? GSEA_SCTENIFOLDKNK.out.gsea_table
             : file("${projectDir}/assets/NO_GSEA_TABLE")
+
+        // Which extra targets each track ran, and which it could not. The
+        // sentinel is a header-only table, read as no --extra_target.
+        extra_target_qc = extra_target
+            ? EXTRA_TARGET_QC_RANK.out.qc
+                .mix( sctknk ? EXTRA_TARGET_QC_KNOCKOUT.out.qc : Channel.empty() )
+                .collectFile( name: "extra_target_qc.tsv", keepHeader: true )
+            : file("${projectDir}/assets/NO_EXTRA_TARGET_QC")
 
         // What the report says about the run itself: when it started, the
         // command line, and the settings that shape the result. Written as a
@@ -231,6 +317,8 @@ workflow {
             "sctknk_null"     : params.sctknk_null,
             "sctknk_ndim"     : params.sctknk_ndim,
             "sctknk_td_k"     : params.sctknk_td_k,
+            "cell_subset"     : params.cell_subset ?: "all",
+            "extra_target"    : params.extra_target ?: "none",
             "batch"           : params.batch
         ]
         run_info_file = Channel
@@ -283,7 +371,8 @@ workflow {
             DOWNSAMPLE.out.identity_qc,
             NETWORK_QC.out.network_qc,
             NETWORK_QC.out.target_network_qc,
-            sctknk_status
+            sctknk_status,
+            extra_target_qc
         )
     }
 }

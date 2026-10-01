@@ -73,6 +73,16 @@ Every gene is checked against the retained cells before any network is built. A 
 
 Symbols must match the object (MGI for mouse, HGNC for human), and `--species` must match both.
 
+### Adding targets to a finished run (`--extra_target`)
+
+Changing `--target` reruns everything from `DOWNSAMPLE` on, because the targets are part of the gene set the networks are built on. To add targets to a run whose networks are already built, keep `--target` as it was and list the new ones in a second file, in the same format, given as `--extra_target`, with `-resume`:
+
+```bash
+nextflow run main.nf <same options as before> --extra_target more_targets.txt -resume
+```
+
+The extras skip `DOWNSAMPLE` and every network step. `EXTRA_TARGET_QC` checks them against the networks each track already has, and only the ones those carry are scored by `RANK_SCORE` and knocked out by `SCTENIFOLDKNK_KO`; every earlier task, including the `--target` scores and knockouts, comes from the cache. An extra no network carries — not among the highly variable genes, transcription factors, drug targets and `--target` genes the rank-score networks were built on, or below `--sctknk_min_pct` in every identity for the knockout track — is not run, and the report's Target QC section and `qc/extra_target_qc_<track>.tsv` say so. To analyse it, move it to `--target` and run from the start.
+
 ## Parameters
 
 ### Required
@@ -95,6 +105,8 @@ Symbols must match the object (MGI for mouse, HGNC for human), and `--species` m
 | `--n_hvg` | `2000` | Highly variable genes added to `gene4use`, the gene set of the scoring-track networks. |
 | `--batch` | none | Metadata column naming each cell's donor, sample or batch. Used only by the report's *Data quality* section: batch composition of each identity and the variance batch explains. |
 | `--seed` | `1` | Seed for every random step: cell sampling, GENIE3, hdWGCNA/WGCNA, scTenifoldKnk and fgsea. |
+| `--cell_subset` | — | Comma-separated `--column` values the run covers, e.g. `HSC,Prog,Mono`; every kept identity by default. Narrows both tracks' networks, scores and knockouts; `DOWNSAMPLE` and its tables still cover every identity. Names matching nothing are warned about; none matching stops the run. |
+| `--extra_target` | — | Targets to add to a run whose networks are already built, in `--target`'s format; see [above](#adding-targets-to-a-finished-run-extra_target). Only those the networks carry are run. |
 
 ### Scoring track
 

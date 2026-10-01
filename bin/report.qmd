@@ -28,6 +28,7 @@ params:
   network_qc_file: ""
   target_network_qc_file: ""
   sctknk_status_file: ""
+  extra_target_qc_file: ""
 ---
 
 ```{r setup, include=FALSE}
@@ -162,6 +163,16 @@ target_qc <- if (!is.null(target_qc_path) && nzchar(target_qc_path) &&
 }
 has_target_qc <- nrow(target_qc) > 0
 
+# --extra_target: targets added to a run whose networks were already built,
+# checked against those networks per track by EXTRA_TARGET_QC. One row per
+# track x extra target x gene, saying whether it was run. Header-only (the
+# sentinel) when the run had no --extra_target.
+extra_target_qc <- read_optional(params$extra_target_qc_file)
+# Every column is text, and the empty reason of a gene that was run would
+# otherwise come back NA.
+extra_target_qc[] <- lapply(extra_target_qc, function(x) ifelse(is.na(x), "", as.character(x)))
+has_extra_target_qc <- nrow(extra_target_qc) > 0
+
 # The UMAP is a QC figure produced upstream by DOWNSAMPLE. A run started before
 # that step existed, or one whose plot could not be drawn, still has to render.
 umap_path <- params$umap_file
@@ -243,6 +254,17 @@ stat_label <- if (sctknk_calibrated) "z_null" else "log2FC"
 # the status table existed.
 sctknk_status <- read_optional(params$sctknk_status_file)
 has_sctknk_status <- nrow(sctknk_status) > 0
+
+# SCTENIFOLDKNK_KO calls a target missing from a cell type's network "not
+# expressed", which is right for a --target: the network keeps every target
+# with a count. An extra target was not among those, so it is missing when it
+# fell below --sctknk_min_pct there, and the status says that instead.
+if (has_sctknk_status && has_extra_target_qc) {
+  extra_ko <- extra_target_qc$target[extra_target_qc$track == "knockout"]
+  extra_ko <- c(extra_ko, sub("^run as ", "", extra_target_qc$action[extra_target_qc$track == "knockout"]))
+  relabel <- sctknk_status$status == "not expressed" & sctknk_status$target %in% extra_ko
+  sctknk_status$status[relabel] <- "not in this network (extra target)"
+}
 
 # p.value is pchisq(FC, df = 1) and p.adj is BH over that, so the FDR cut is a
 # monotone function of FC: filtering on p.adj is the same as taking everything
@@ -605,6 +627,35 @@ datatable(
   rownames = FALSE,
   colnames = c("Requested target", "Gene", "Reason", "Action"),
   options = list(dom = "t", pageLength = nrow(target_qc))
+)
+```
+
+```{r extra-target-note, results="asis", eval=has_extra_target_qc}
+not_run <- extra_target_qc %>% filter(action == "not run") %>% distinct(track, target)
+cat("\n#### Extra targets\n\n",
+    "These targets were added with `--extra_target` to networks this run had ",
+    "already built, so no network was rebuilt for them. A gene the networks ",
+    "were not built on cannot be scored or knocked out this way: a target with ",
+    "no gene in any network of a track was not run in that track, and a ",
+    "combined target lost only the genes no network carries. To analyse a target ",
+    "that was not run, add it to `--target` and run again from the start, so the ",
+    "networks are built with it. *Networks* counts the identities whose network ",
+    "gives the gene an edge (an outgoing one in the knockout track).\n\n", sep = "")
+if (nrow(not_run) > 0) {
+  cat("Not run: ",
+      paste0("**", not_run$target, "** (", ifelse(not_run$track == "knockout",
+             "knockout", "rank score"), ")", collapse = ", "), ".\n", sep = "")
+} else {
+  cat("Every extra target was run in every track.\n")
+}
+```
+
+```{r extra-target-table, eval=has_extra_target_qc}
+datatable(
+  extra_target_qc %>% mutate(track = ifelse(track == "knockout", "knockout", "rank score")),
+  rownames = FALSE,
+  colnames = c("Track", "Extra target", "Gene", "Networks", "Reason", "Action"),
+  options = list(dom = "t", pageLength = nrow(extra_target_qc))
 )
 ```
 
@@ -2090,6 +2141,7 @@ run_fields <- c(
   "Work directory"    = "work_dir",
   "Input object"      = "obj",
   "Targets"           = "target",
+  "--extra_target"    = "extra_target",
   "Identity column"   = "column",
   "Species"           = "species",
   "Assay"             = "assay",
@@ -2104,6 +2156,7 @@ run_fields <- c(
   "--sctknk_td_k"     = "sctknk_td_k",
   "--sctknk_null"     = "sctknk_null",
   "--sctknk_ndim"     = "sctknk_ndim",
+  "--cell_subset"     = "cell_subset",
   "--batch"           = "batch"
 )
 datatable(

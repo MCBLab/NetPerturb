@@ -158,7 +158,8 @@ Written by `NETWORK_QC` from every network the run built, for the report's *Data
 | File | Contents |
 |---|---|
 | `network_qc.tsv` | One row per network (identity × track): genes, edges, density, mean absolute weight, share of isolated genes, share of strength in the top 1% of genes, and the Gini coefficient of strength. For hdWGCNA, also the number of metacells, the soft power used, WGCNA's estimate and the scale-free fit R². |
-| `target_network_qc.tsv` | One row per network × target gene: whether it is in the network, its degree and strength, and its strength percentile (the share of genes weaker than it; 0 is isolated). |
+| `target_network_qc.tsv` | One row per network × target gene: whether it is in the network, its degree and strength, and its strength percentile (the share of genes weaker than it; 0 is isolated). Includes the `--extra_target` targets that were run. |
+| `extra_target_qc_<track>.tsv` | With `--extra_target`, written by `EXTRA_TARGET_QC`, one per track (`rank_score`, `knockout`): one row per extra target × gene, with the number of identities whose network gives the gene an edge, why it was left out if it was, and whether its target was run, run without some genes, or not run. |
 
 The checks the report flags, and why each can skew a result:
 

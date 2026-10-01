@@ -244,6 +244,240 @@ nextflow_pipeline {
         }
     }
 
+    test("--cell_subset narrows both tracks to the named identities") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                cell_subset = "sensitive"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // the scoring track builds the one identity asked for, and still
+            // scores every target over it and reports once
+            assert names.count { it.startsWith("GENIE3") } == 1
+            assert names.count { it.startsWith("RANK_SCORE") } == 3
+            assert names.count { it.startsWith("REPORT") } == 1
+
+            // and so does the knockout track: its null model and the 3
+            // knockouts follow from that network alone
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 1
+            assert names.contains("SCTENIFOLDKNK_BUILD (sensitive)")
+            assert names.count { it.startsWith("SCTENIFOLDKNK_NULL") } == 1
+            assert names.contains("SCTENIFOLDKNK_NULL (sensitive)")
+            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK_KO (") }
+            assert knkTasks.size() == 3
+            assert knkTasks.every { it.startsWith("SCTENIFOLDKNK_KO (sensitive:") }
+            assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // no --extra_target, no check of one
+            assert !names.any { it.startsWith("EXTRA_TARGET_QC") }
+
+            // and nothing was said about a missing identity. nf-test runs
+            // Nextflow quietly, so a WARN never reaches workflow.stdout; the
+            // run's log, kept beside the output directory, is where it lands.
+            assert !path("${outputDir}/../meta/nextflow.log").text.contains("--cell_subset names")
+
+            assert path("${outputDir}/sctknk/sctenifoldknk_all_targets.txt").exists()
+            assert path("${outputDir}/report/netperturb_report.html").exists()
+        }
+    }
+
+    test("a --cell_subset name with no identity is warned about, the rest run") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                // a space after the comma, to show the names are trimmed
+                cell_subset = "resistant, Mono"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // resistant runs in both tracks, Mono matches no split object
+            assert names.count { it.startsWith("GENIE3") } == 1
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 1
+            assert names.contains("SCTENIFOLDKNK_BUILD (resistant)")
+            assert names.count { it.startsWith("SCTENIFOLDKNK_KO (") } == 3
+            assert names.count { it.startsWith("MERGE_SCTENIFOLDKNK") } == 1
+
+            // and the run says which name matched nothing (a WARN, so in the
+            // run's log rather than the quiet stdout nf-test captures)
+            assert path("${outputDir}/../meta/nextflow.log").text.contains(
+                "--cell_subset names Mono, which DOWNSAMPLE did not keep")
+        }
+    }
+
+    test("a --cell_subset matching no identity stops the run") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                cell_subset = "HSC,Mono"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            // rather than tracks that build nothing and a REPORT that never
+            // runs, the run fails and names the identities it had
+            assert workflow.failed
+            assert workflow.stdout.any { it.contains("No identity matches --cell_subset 'HSC,Mono'") }
+            assert workflow.stdout.any { it.contains("DOWNSAMPLE kept: resistant, sensitive") }
+
+            def names = workflow.trace.tasks().collect { it.@name }
+            assert !names.any { it.startsWith("GENIE3") }
+            assert !names.any { it.startsWith("SCTENIFOLDKNK_BUILD") }
+        }
+    }
+
+    test("--extra_target runs the extras the networks carry in both tracks") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                sctknk  = true
+                // Gata1 is new, AbsentGene stands in (in the stub) for a gene
+                // no network carries, and Brd4 is already a --target
+                extra_target = "${projectDir}/tests/fixtures/extra_targets.txt"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // the extras never reach DOWNSAMPLE or a network step: one of
+            // each, as without them
+            assert names.count { it.startsWith("DOWNSAMPLE") } == 1
+            assert names.count { it.startsWith("GENIE3") } == 2
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 2
+            assert names.count { it.startsWith("SCTENIFOLDKNK_NULL") } == 2
+
+            // one check per track
+            assert names.contains("EXTRA_TARGET_QC_RANK (rank_score)")
+            assert names.contains("EXTRA_TARGET_QC_KNOCKOUT (knockout)")
+
+            // Gata1 joins the 3 targets in both tracks; Brd4 runs once and
+            // AbsentGene not at all
+            assert names.count { it.startsWith("RANK_SCORE") } == 4
+            assert names.contains("RANK_SCORE (Gata1)")
+            assert names.count { it == "RANK_SCORE (Brd4)" } == 1
+            assert !names.any { it.contains("AbsentGene") }
+            def knkTasks = names.findAll { it.startsWith("SCTENIFOLDKNK_KO (") }
+            assert knkTasks.size() == 8
+            assert knkTasks.count { it.endsWith(":Gata1)") } == 2
+
+            // the gene that was not run is listed, per track, for the report
+            def qc = path("${outputDir}/qc/extra_target_qc_rank_score.tsv").readLines()
+            assert qc.any { it.contains("AbsentGene") && it.endsWith("not run") }
+            assert path("${outputDir}/qc/extra_target_qc_knockout.tsv").readLines()
+                .any { it.contains("AbsentGene") && it.endsWith("not run") }
+            assert path("${outputDir}/report/netperturb_report.html").exists()
+        }
+    }
+
+    test("--extra_target with --sctknk alone checks only the knockout track") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                sctknk  = true
+                extra_target = "${projectDir}/tests/fixtures/extra_targets.txt"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+            assert names.contains("EXTRA_TARGET_QC_KNOCKOUT (knockout)")
+            assert !names.any { it.startsWith("EXTRA_TARGET_QC_RANK") }
+            assert names.count { it.startsWith("SCTENIFOLDKNK_KO (") } == 8
+            assert !names.any { it.startsWith("REPORT") }
+        }
+    }
+
+    test("an --extra_target file that does not exist stops the run") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                extra_target = "${projectDir}/tests/fixtures/no_such_file.txt"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert !workflow.trace.tasks().any { it.@name.startsWith("DOWNSAMPLE") }
+        }
+    }
+
     test("--sctknk_plot publishes one plotKO() PDF per knockout") {
 
         options "-stub"
