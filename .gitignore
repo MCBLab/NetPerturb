@@ -14,7 +14,13 @@ test.nf
 site
 CLAUDE.md
 logs/
-benchmarks/
+benchmarks/*
+!benchmarks/scmalignantfinder
+benchmarks/scmalignantfinder/*
+!benchmarks/scmalignantfinder/*.R
+!benchmarks/scmalignantfinder/*.py
+!benchmarks/scmalignantfinder/*.sbatch
+!benchmarks/scmalignantfinder/RELATORIO.md
 benchmark_runs/
 work_bench/
 logs_bench/
