@@ -5,7 +5,6 @@ publication/analysis/zeng2025/
 null/
 .nextflow*
 work/
-data/
 results/
 .DS_Store
 testing/
