@@ -3,6 +3,7 @@ null/
 work/
 data/
 results/
+results_*/
 .DS_Store
 testing/
 testing*
