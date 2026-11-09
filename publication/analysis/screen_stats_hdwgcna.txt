@@ -1,0 +1,15 @@
+network method: hdwgcna
+screen: 433 compounds; KPT-330 best repSSMD.LYZ.NS 1.02 at 0.08 uM, rank 68 of 433
+ChEMBL: 181 compounds with a human mechanism target; 123 of them hit at least one of the 206 scored targets (110 targets covered)
+compounds in the correlation: 123 (those with a screen score and >= 1 scored target)
+Spearman(screen LYZ.NS, enterocyte residual) = +0.29 (p = 0.005, n = 88); LYZ.S +0.27
+Spearman(screen LYZ.NS, early Paneth residual) = +0.10 (p = 0.345, n = 100); LYZ.S +0.14
+Spearman(screen LYZ.NS, enteroendocrine residual) = +0.02 (p = 0.822, n = 92); LYZ.S -0.00
+Spearman(screen LYZ.NS, stem II residual) = -0.00 (p = 0.991, n = 106); LYZ.S -0.06
+Spearman(screen LYZ.NS, stem I residual) = -0.01 (p = 0.914, n = 110); LYZ.S -0.06
+Spearman(screen LYZ.NS, stem III residual) = -0.06 (p = 0.587, n = 93); LYZ.S -0.01
+Spearman(screen LYZ.NS, early enterocyte residual) = -0.06 (p = 0.550, n = 95); LYZ.S +0.01
+Spearman(screen LYZ.NS, Paneth residual) = -0.08 (p = 0.383, n = 110); LYZ.S -0.11
+Spearman(screen LYZ.NS, early secretory residual) = -0.17 (p = 0.073, n = 107); LYZ.S -0.15
+KPT-330 in the mapped set: targets Xpo1; screen 1.02 (rank 16 of 123); stem II -0.29 (rank 68), stem III -0.17 (rank 61)
+top 5 by screen score: DCC-2036 (Rebastinib) (2.06; stem II +0.92, III +0.26); Bosutinib (SKI-606) (1.84; stem II +1.12, III +0.88); Trospium chloride (1.70; stem II +0.30, III +0.38); Rolipram (1.50; stem II -0.79, III -0.97); Veliparib (ABT-888) (1.40; stem II -1.05, III +0.39)

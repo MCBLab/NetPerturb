@@ -1,0 +1,110 @@
+\relax 
+\bibstyle{sn-vancouver-num}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\Newlabel{1}{1}
+\Newlabel{2}{2}
+\citation{Dixit2016perturbseq}
+\citation{Kamimoto2023celloracle}
+\citation{Li2024scrank}
+\citation{Osorio2022sctenifoldknk}
+\citation{DiTommaso2017nextflow}
+\citation{Ewels2020nfcore}
+\citation{Hao2023seurat}
+\@writefile{toc}{\contentsline {section}{Background}{2}{section*.2}\protected@file@percent }
+\newlabel{sec:background}{{2}{2}{Background}{section*.2}{}}
+\@writefile{toc}{\contentsline {section}{Implementation}{2}{section*.3}\protected@file@percent }
+\newlabel{sec:implementation}{{2}{2}{Implementation}{section*.3}{}}
+\@writefile{toc}{\contentsline {subsection}{Input and pre-processing}{2}{section*.4}\protected@file@percent }
+\citation{HuynhThu2010genie3}
+\citation{Li2024scrank}
+\citation{Morabito2023hdwgcna}
+\citation{Langfelder2008wgcna}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {Overview of NetPerturb.} A processed Seurat object and a list of target genes enter \texttt  {DOWNSAMPLE}, which balances cell identities and checks the targets. The rank-score track (warm lines; one of GENIE3, scRank or hdWGCNA, chosen with \texttt  {-{}-network}) infers one GRN per identity and scores every identity $\times $ target pair. The knockout track (blue; \texttt  {-{}-sctknk}) builds one wild-type scTenifoldKnk network per identity and runs one virtual knockout per identity $\times $ target, optionally followed by fgsea. Both tracks converge on a single self-contained HTML report.}}{3}{figure.1}\protected@file@percent }
+\newlabel{fig:overview}{{1}{3}{\textbf {Overview of NetPerturb.} A processed Seurat object and a list of target genes enter \texttt {DOWNSAMPLE}, which balances cell identities and checks the targets. The rank-score track (warm lines; one of GENIE3, scRank or hdWGCNA, chosen with \param {network}) infers one GRN per identity and scores every identity $\times $ target pair. The knockout track (blue; \param {sctknk}) builds one wild-type scTenifoldKnk network per identity and runs one virtual knockout per identity $\times $ target, optionally followed by fgsea. Both tracks converge on a single self-contained HTML report}{figure.1}{}}
+\@writefile{toc}{\contentsline {subsection}{Rank-score track}{3}{section*.5}\protected@file@percent }
+\citation{Osorio2022sctenifoldknk}
+\citation{Korotkevich2016fgsea}
+\citation{Liberzon2015msigdb}
+\citation{Kurtzer2017singularity}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Network inference methods available in NetPerturb}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:methods}{{1}{4}{Network inference methods available in NetPerturb}{table.1}{}}
+\@writefile{toc}{\contentsline {subsection}{Virtual knockout track}{4}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Report}{4}{section*.7}\protected@file@percent }
+\citation{Zeng2025bonemarrowmap}
+\citation{BeneytoCalabuig2023aml,Lasry2023aml,Naldini2023aml,vanGalen2019aml}
+\citation{Yu2025scmalignantfinder}
+\citation{Zeng2025bonemarrowmap}
+\@writefile{toc}{\contentsline {subsection}{Reproducibility and deployment}{5}{section*.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{Results}{5}{section*.9}\protected@file@percent }
+\newlabel{sec:results}{{2}{5}{Results}{section*.9}{}}
+\@writefile{toc}{\contentsline {subsection}{Four AML cohorts processed with one command each}{5}{section*.10}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {Four AML cohorts: design, reproducibility and network-size offsets} (cohorts of the \citet  {Zeng2025bonemarrowmap} atlas; GENIE3 networks, antagonist mode, 55 targets). (A) Identities scored per cohort, normal (N) and malignant (M, scMalignantFinder call), coloured by the number of cells the identity's network was built from; grey, not scored. (B) Mean $\log _{10}$ score of each target in one cohort against its mean over the other three; dashed line, identity. (C) Share of the variance of $\log _{10}$ scores explained by the target, by the identity, and left as the target $\times $ identity residual. (D) Identity-wide offset, the identity effect of a target + identity decomposition of $\log _{10}$ scores, against the number of cells in the identity's network; filled, malignant; dashed line, least-squares fit over all cohorts. (E) Spearman correlation over the six pairs of cohorts for the target mean, the identity offset and the target-specific effect (12 identities scored in every cohort), and for stem specificity (Fig.~\ref {fig:stem}B); bars, medians.}}{6}{figure.2}\protected@file@percent }
+\newlabel{fig:cohorts}{{2}{6}{\textbf {Four AML cohorts: design, reproducibility and network-size offsets} (cohorts of the \citet {Zeng2025bonemarrowmap} atlas; GENIE3 networks, antagonist mode, 55 targets). (A) Identities scored per cohort, normal (N) and malignant (M, scMalignantFinder call), coloured by the number of cells the identity's network was built from; grey, not scored. (B) Mean $\log _{10}$ score of each target in one cohort against its mean over the other three; dashed line, identity. (C) Share of the variance of $\log _{10}$ scores explained by the target, by the identity, and left as the target $\times $ identity residual. (D) Identity-wide offset, the identity effect of a target + identity decomposition of $\log _{10}$ scores, against the number of cells in the identity's network; filled, malignant; dashed line, least-squares fit over all cohorts. (E) Spearman correlation over the six pairs of cohorts for the target mean, the identity offset and the target-specific effect (12 identities scored in every cohort), and for stem specificity (Fig.~\ref {fig:stem}B); bars, medians}{figure.2}{}}
+\@writefile{toc}{\contentsline {subsection}{Target-level scores replicate across cohorts}{7}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Identity offsets follow network size}{7}{section*.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Targets that consistently act on stem cells}{7}{section*.13}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \textbf  {Targets that act on stem identities.} The target-specific effect is the residual of the $\log _{10}$ score once target and identity effects are removed, per cohort. (A) Target-specific effect averaged over the identities of each compartment and then over cohorts; stem, HSC/MPP and LMPP; progenitor, cycling, lymphoid, granulocyte--monocyte, megakaryocyte--erythroid, eosinophil/basophil/mast and early erythroid progenitors; mature, all other identities. (B) Stem specificity, the target-specific effect in stem identities minus that in all other identities, per cohort (dots) and averaged over cohorts (diamonds); filled diamonds, same sign in all four cohorts and $P<0.05$ against 10,000 permutations of identity labels within each cohort. In A and B, targets are ordered by stem specificity, single genes above joint targets. (C) Target-specific effect in malignant against normal stem identities, averaged over cohorts (normal stem identities are absent from Beneyto-Calabuig); dashed line, identity. (D) Number of targets whose stem specificity has the same sign in all four cohorts, observed (line) and over 2,000 label permutations (histogram). (E) Stem specificity as defined in B against two alternative definitions: HSC/MPP alone as the stem compartment, and the within-identity rank of the target among the 55 in place of the residual; dark points, IL3RA, KIT and KDM1A.}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:stem}{{3}{8}{\textbf {Targets that act on stem identities.} The target-specific effect is the residual of the $\log _{10}$ score once target and identity effects are removed, per cohort. (A) Target-specific effect averaged over the identities of each compartment and then over cohorts; stem, HSC/MPP and LMPP; progenitor, cycling, lymphoid, granulocyte--monocyte, megakaryocyte--erythroid, eosinophil/basophil/mast and early erythroid progenitors; mature, all other identities. (B) Stem specificity, the target-specific effect in stem identities minus that in all other identities, per cohort (dots) and averaged over cohorts (diamonds); filled diamonds, same sign in all four cohorts and $P<0.05$ against 10,000 permutations of identity labels within each cohort. In A and B, targets are ordered by stem specificity, single genes above joint targets. (C) Target-specific effect in malignant against normal stem identities, averaged over cohorts (normal stem identities are absent from Beneyto-Calabuig); dashed line, identity. (D) Number of targets whose stem specificity has the same sign in all four cohorts, observed (line) and over 2,000 label permutations (histogram). (E) Stem specificity as defined in B against two alternative definitions: HSC/MPP alone as the stem compartment, and the within-identity rank of the target among the 55 in place of the residual; dark points, IL3RA, KIT and KDM1A}{figure.3}{}}
+\citation{Jordan2000cd123}
+\citation{Harris2012kdm1a}
+\@writefile{toc}{\contentsline {subsection}{Malignant and normal stem cells respond to different targets}{9}{section*.14}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Blast markers separate malignant cells from their normal counterparts}{9}{section*.15}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces \textbf  {Malignant identities against their normal counterparts.} Each of the 30 matched pairs is a malignant identity (\emph  {-like}) and the normal identity of the same broad cell type in the same cohort; the difference is taken on the target-specific effect, so identity offsets cancel. (A) Malignant minus normal for each target over the 30 pairs (dots, coloured by cohort) and their mean (diamonds; filled, Wilcoxon signed-rank $P<0.05$); x axis cut at the 0.5th and 99.5th percentiles. Targets are ordered by the mean, single genes above joint targets. (B) Mean malignant-minus-normal difference of the blast markers KIT, FLT3 and CD33 minus that of the other targets, per pair, grouped by compartment. (C) Malignant minus normal for selected targets in the same pairs as B; white, a pair without a score.}}{10}{figure.4}\protected@file@percent }
+\newlabel{fig:malignant}{{4}{10}{\textbf {Malignant identities against their normal counterparts.} Each of the 30 matched pairs is a malignant identity (\emph {-like}) and the normal identity of the same broad cell type in the same cohort; the difference is taken on the target-specific effect, so identity offsets cancel. (A) Malignant minus normal for each target over the 30 pairs (dots, coloured by cohort) and their mean (diamonds; filled, Wilcoxon signed-rank $P<0.05$); x axis cut at the 0.5th and 99.5th percentiles. Targets are ordered by the mean, single genes above joint targets. (B) Mean malignant-minus-normal difference of the blast markers KIT, FLT3 and CD33 minus that of the other targets, per pair, grouped by compartment. (C) Malignant minus normal for selected targets in the same pairs as B; white, a pair without a score}{figure.4}{}}
+\citation{vanGalen2019aml}
+\citation{Pollyea2018venetoclax}
+\@writefile{toc}{\contentsline {subsection}{Joint targets are not the sum of their members}{11}{section*.16}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Single-cohort run on the original labels}{11}{section*.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{Cost}{11}{section*.18}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces \textbf  {Single-cohort run on the original van Galen labels} \citep  {vanGalen2019aml} (GENIE3 networks, antagonist mode, seed 1). (A) $\log _{10}$ perturbation score for all 55 targets, single genes on the left and joint targets on the right, across the 19 identities, with each malignant identity (\emph  {-like}) placed under its normal counterpart. A white dot marks the top identity for each target, and grey a pair without a score (the target has no edge in that identity's network). (B) Difference in $\log _{10}$ score between each malignant identity and its normal counterpart, one point per target scored in both; bars show medians; the blast-marker targets and BCL2 are coloured. (C) Identity main effect from a decomposition of $\log _{10}$ scores into target and identity effects, relative to B cells.}}{12}{figure.5}\protected@file@percent }
+\newlabel{fig:vangalen}{{5}{12}{\textbf {Single-cohort run on the original van Galen labels} \citep {vanGalen2019aml} (GENIE3 networks, antagonist mode, seed 1). (A) $\log _{10}$ perturbation score for all 55 targets, single genes on the left and joint targets on the right, across the 19 identities, with each malignant identity (\emph {-like}) placed under its normal counterpart. A white dot marks the top identity for each target, and grey a pair without a score (the target has no edge in that identity's network). (B) Difference in $\log _{10}$ score between each malignant identity and its normal counterpart, one point per target scored in both; bars show medians; the blast-marker targets and BCL2 are coloured. (C) Identity main effect from a decomposition of $\log _{10}$ scores into target and identity effects, relative to B cells}{figure.5}{}}
+\citation{Jordan2000cd123}
+\citation{Harris2012kdm1a}
+\citation{Pollyea2018venetoclax}
+\@writefile{toc}{\contentsline {section}{Discussion}{13}{section*.19}\protected@file@percent }
+\newlabel{sec:discussion}{{2}{13}{Discussion}{section*.19}{}}
+\@writefile{toc}{\contentsline {section}{Conclusions}{13}{section*.20}\protected@file@percent }
+\newlabel{sec:conclusions}{{2}{13}{Conclusions}{section*.20}{}}
+\@writefile{toc}{\contentsline {section}{Availability and requirements}{13}{section*.21}\protected@file@percent }
+\newlabel{sec:availability}{{2}{13}{Availability and requirements}{section*.21}{}}
+\citation{Zeng2025bonemarrowmap}
+\citation{BeneytoCalabuig2023aml}
+\citation{Lasry2023aml}
+\citation{Naldini2023aml}
+\citation{vanGalen2019aml}
+\bibdata{references/references}
+\bibcite{Dixit2016perturbseq}{{1}{2016}{{Dixit et~al.}}{{}}}
+\@writefile{toc}{\contentsline {section}{Abbreviations}{14}{section*.22}\protected@file@percent }
+\newlabel{sec:abbreviations}{{2}{14}{Abbreviations}{section*.22}{}}
+\@writefile{toc}{\contentsline {subparagraph}{Supplementary information}{14}{section*.23}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Ethics approval and consent to participate}{14}{section*.25}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Consent for publication}{14}{section*.26}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Availability of data and materials}{14}{section*.27}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Competing interests}{14}{section*.28}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Funding}{14}{section*.29}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Authors' contributions}{14}{section*.30}\protected@file@percent }
+\@writefile{toc}{\contentsline {subparagraph}{Acknowledgements}{14}{section*.31}\protected@file@percent }
+\bibcite{Kamimoto2023celloracle}{{2}{2023}{{Kamimoto et~al.}}{{}}}
+\bibcite{Li2024scrank}{{3}{2024}{{Li et~al.}}{{}}}
+\bibcite{Osorio2022sctenifoldknk}{{4}{2022}{{Osorio et~al.}}{{}}}
+\bibcite{DiTommaso2017nextflow}{{5}{2017}{{Di~Tommaso et~al.}}{{}}}
+\bibcite{Ewels2020nfcore}{{6}{2020}{{Ewels et~al.}}{{}}}
+\bibcite{Hao2023seurat}{{7}{2023}{{Hao et~al.}}{{}}}
+\bibcite{HuynhThu2010genie3}{{8}{2010}{{Huynh-Thu et~al.}}{{}}}
+\bibcite{Morabito2023hdwgcna}{{9}{2023}{{Morabito et~al.}}{{}}}
+\bibcite{Langfelder2008wgcna}{{10}{2008}{{Langfelder and Horvath}}{{}}}
+\bibcite{Korotkevich2016fgsea}{{11}{2016}{{Korotkevich et~al.}}{{}}}
+\bibcite{Liberzon2015msigdb}{{12}{2015}{{Liberzon et~al.}}{{}}}
+\bibcite{Kurtzer2017singularity}{{13}{2017}{{Kurtzer et~al.}}{{}}}
+\bibcite{Zeng2025bonemarrowmap}{{14}{2025}{{Zeng et~al.}}{{}}}
+\bibcite{BeneytoCalabuig2023aml}{{15}{2023}{{Beneyto-Calabuig et~al.}}{{}}}
+\bibcite{Lasry2023aml}{{16}{2023}{{Lasry et~al.}}{{}}}
+\bibcite{Naldini2023aml}{{17}{2023}{{Naldini et~al.}}{{}}}
+\bibcite{vanGalen2019aml}{{18}{2019}{{van Galen et~al.}}{{}}}
+\bibcite{Yu2025scmalignantfinder}{{19}{2025}{{Yu et~al.}}{{}}}
+\bibcite{Jordan2000cd123}{{20}{2000}{{Jordan et~al.}}{{}}}
+\bibcite{Harris2012kdm1a}{{21}{2012}{{Harris et~al.}}{{}}}
+\bibcite{Pollyea2018venetoclax}{{22}{2018}{{Pollyea et~al.}}{{}}}
+\gdef \@abspage@last{17}

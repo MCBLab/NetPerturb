@@ -1,0 +1,30 @@
+== Scores: 150 pairs, 25 targets, 6 identities
+floor scores (<1e-10): 9 -- all with target detection 0%
+targets whose top identity is a monocyte: 20/25
+  cascade: 7/10
+  ISG: 10/10
+  lineage: 3/5
+cell-type main effects vs B cells (log10): CD14__Monocytes=0.84; CD4_T_cells=0.06; CD8_T_cells=-0.23; FCGR3A__Monocytes=0.87; NK_cells=-0.04
+residual ISG: monocytes +0.26, other -0.13 (diff 0.39 log10)
+residual lineage: monocytes -0.33, other +0.28 (diff -0.61 log10)
+residual cascade: monocytes -0.09, other +0.05 (diff -0.14 log10)
+ISG residual monocyte vs other: Wilcoxon p = 0.0085
+Spearman(log score, target expression), non-floor pairs: rho = 0.49 (n = 141)
+lm(log score ~ target + expr + monocyte): monocyte term 0.77 log10 (p = 6e-09)
+non-floor scores with target detected in <1% of cells: 12 pairs; ranked first in 1 (CD19 FCGR3A__Monocytes)
+top-15 partners that are ISGs: ISG, monocytes: 67.0% (n = 300 edges)
+top-15 partners that are ISGs: ISG, other: 25.5% (n = 585 edges)
+top-15 partners that are ISGs: lineage, monocytes: 1.3% (n = 150 edges)
+top-15 partners that are ISGs: lineage, other: 0.0% (n = 180 edges)
+top-15 partners that are ISGs: cascade, monocytes: 18.8% (n = 372 edges)
+top-15 partners that are ISGs: cascade, other: 3.6% (n = 780 edges)
+KO: 141 combinations, 1858 significant rows (FDR<0.05); ribosomal genes 37% of hits vs 3.2% of tested genes
+KO B_cells: median 3 hits/target, median pairwise Jaccard 1.00, median FC Spearman 0.86
+KO CD14__Monocytes: median 2 hits/target, median pairwise Jaccard 1.00, median FC Spearman 0.90
+KO CD4_T_cells: median 14 hits/target, median pairwise Jaccard 0.79, median FC Spearman 0.87
+KO CD8_T_cells: median 45 hits/target, median pairwise Jaccard 0.17, median FC Spearman 0.74
+KO FCGR3A__Monocytes: median 4 hits/target, median pairwise Jaccard 1.00, median FC Spearman 0.92
+KO NK_cells: median 12 hits/target, median pairwise Jaccard 1.00, median FC Spearman 0.96
+CD14+ monocyte hits, all targets: FTH1, FTL
+compute: 5.0 h total over all tasks; wall-clock 8m10s (resumed run; see report)
+knockout: build-once = 4.5 CPU-task h; one scTenifoldKnk() call per pair (150 builds) ~ 108 h -> 24x less

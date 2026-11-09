@@ -1,7 +1,10 @@
+publication/data/mead2022/
+publication/data/Zeng2025/
+publication/analysis/mead/
+publication/analysis/zeng2025/
 null/
 .nextflow*
 work/
-data/
 results/
 .DS_Store
 testing/
@@ -19,3 +22,6 @@ benchmark_runs/
 work_bench/
 logs_bench/
 nf_home/
+
+# Manuscript drafts (never pushed)
+publication/references/

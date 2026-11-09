@@ -1,0 +1,5 @@
+Step	Tasks	Cached	Failed	Mean	SD	Min	Max	Total
+DOWNSAMPLE	1	1	0	3m 53s	-	3m 53s	3m 53s	3m 53s
+GENIE3	19	19	0	1h 05m	26m 41s	12m 30s	1h 49m	20h 40m
+RANK_SCORE	55	54	0	2m 04s	10.2 s	1m 46s	2m 22s	1h 54m
+MERGE	1	0	0	1.9 s	-	1.9 s	1.9 s	1.9 s

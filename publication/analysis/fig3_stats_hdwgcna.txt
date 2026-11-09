@@ -1,0 +1,16 @@
+network method: hdwgcna
+scores: 1045 identity x target pairs, 30 with no score (no edge to the target)
+a zero side is read as the run's smallest non-zero score, 10^-9.5
+progenitor pairs: 152 both scored, 0 malignant-only (lower bound), 13 normal-only (upper bound), 0 dropped
+bounded pairs are capped at 10x; 13 of 13 bounds hit the cap
+targets with >= 2 usable pairs: 55 of 55 (54 when zero-sided pairs were dropped)
+Targets with a score on both sides of at least two progenitor pairs: 55 of 55
+Malignant progenitors higher in every scored pair (>= 2): MDM2 (204.2x, 3 pairs), GLS (18.4x, 3 pairs), HAVCR2 (15.4x, 3 pairs), NAE1 (5.7x, 3 pairs), AURKA (3.8x, 3 pairs), PSMB5 (2.4x, 3 pairs), BCL2;MDM2 (2.0x, 3 pairs)
+Normal progenitors higher in every scored pair: DHODH (0.0x, 3), HMGCR (0.1x, 3), WEE1 (0.2x, 3), IDH1 (0.3x, 3), BCL2;IDH1 (0.4x, 3), BCL2;MEN1 (0.4x, 3), BCL2 (0.6x, 3), BCL2;IDH2 (0.6x, 3), CDK9 (0.8x, 3), CDK8;BCL2 (0.8x, 3)
+Spearman(matched-pair selectivity, compartment specificity) over 54 targets: 0.68
+BCL2: pair selectivity -0.24 log10 on 3 pair(s), compartment specificity +0.07 over 3 of the 3 malignant progenitors
+Both above 0.3 log10 (2x): CD33 (pair 4.7x, compartment 80.0x); MDM2 (pair 204.2x, compartment 45.0x); GLS (pair 18.4x, compartment 25.0x); HAVCR2 (pair 15.4x, compartment 21.1x); NAE1 (pair 5.7x, compartment 15.2x); CDK19 (pair 14.3x, compartment 12.9x); IL3RA (pair 2.2x, compartment 11.8x); CDK8;CDK19 (pair 10.5x, compartment 7.7x); KIT (pair 8.0x, compartment 5.6x); FLT3 (pair 2.2x, compartment 3.8x); FLT3;MEN1 (pair 2.4x, compartment 3.5x); CHEK1 (pair 6.7x, compartment 3.4x); PSMB5 (pair 2.4x, compartment 3.2x)
+Panel C targets: MDM2, GLS, HAVCR2, NAE1, AURKA, PSMB5, BCL2;MDM2
+malignant-only strength: 53 targets wired in >= 4 of the 6 -like identities
+strongest 12: FLT3;DNMT1 (-2.7, 6/6), BCL2;FLT3 (-2.7, 6/6), DNMT1;NAE1 (-2.9, 6/6), FLT3;MEN1 (-3.0, 6/6), FLT3 (-3.0, 6/6), DNMT1;IDH2 (-3.0, 6/6), DNMT1;TP53 (-3.1, 6/6), DNMT1;IDH1 (-3.1, 6/6), BCL2;IDH2 (-3.1, 6/6), DNMT1;HAVCR2 (-3.2, 6/6), DNMT1;XPO1 (-3.2, 6/6), BCL2;DNMT1 (-3.2, 6/6)
+where the selective targets land: FLT3 5/53, PSMB5 13/53, KIT 19/53, DNMT1 22/53, CD33 37/53, IDH1 38/53, BCL2 40/53, HDAC1 43/53

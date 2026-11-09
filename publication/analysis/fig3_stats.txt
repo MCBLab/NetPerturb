@@ -1,0 +1,15 @@
+scores: 1045 identity x target pairs, 296 with no score (no edge to the target)
+a zero side is read as the run's smallest non-zero score, 10^-11.2
+progenitor pairs: 86 both scored, 28 malignant-only (lower bound), 26 normal-only (upper bound), 25 dropped
+bounded pairs are capped at 10x; 53 of 54 bounds hit the cap
+targets with >= 2 usable pairs: 50 of 55 (29 when zero-sided pairs were dropped)
+Targets with a score on both sides of at least two progenitor pairs: 50 of 55
+Malignant progenitors higher in every scored pair (>= 2): DNMT1;IDH2 (10.0x, 3 pairs), BCL2 (10.0x, 3 pairs), DNMT1 (10.0x, 3 pairs), BCL2;DNMT1 (10.0x, 3 pairs), KIT (6.1x, 3 pairs), DNMT1;IDH1 (5.1x, 3 pairs), DNMT1;XPO1 (4.8x, 3 pairs), MTOR (4.5x, 2 pairs), HAVCR2 (4.1x, 2 pairs), BCL2;IDH1 (2.8x, 3 pairs), DNMT1;NAE1 (2.5x, 3 pairs), DNMT1;MEN1 (2.4x, 3 pairs), PSMB5 (1.9x, 3 pairs)
+Normal progenitors higher in every scored pair: EIF4E (0.1x, 2), MAP2K1 (0.1x, 2), NAE1 (0.1x, 2), SYK (0.2x, 2), CDK9 (0.2x, 2), AURKA (0.5x, 3), WEE1 (0.6x, 2), HMGCR (0.9x, 2)
+Spearman(matched-pair selectivity, compartment specificity) over 38 targets: 0.19
+BCL2: pair selectivity +1.00 log10 on 3 pair(s), compartment specificity +0.35 over 3 of the 3 malignant progenitors (no score in normal HSC or Prog)
+Both above 0.3 log10 (2x): KIT (pair 6.1x, compartment 8.0x); HDAC1 (pair 2.2x, compartment 3.6x); BCL2;MDM2 (pair 3.6x, compartment 2.9x); MTOR (pair 4.5x, compartment 2.4x); BCL2 (pair 10.0x, compartment 2.3x); DNMT1;IDH1 (pair 5.1x, compartment 2.2x); CDK19;BCL2 (pair 5.1x, compartment 2.1x)
+Panel C targets: DNMT1;IDH2, BCL2, DNMT1, BCL2;DNMT1, KIT, DNMT1;IDH1, DNMT1;XPO1, MTOR, HAVCR2, BCL2;IDH1
+malignant-only strength: 33 targets wired in >= 4 of the 6 -like identities
+strongest 12: DNMT1;TP53 (-8.0, 6/6), DNMT1;IDH1 (-8.0, 6/6), BCL2;EIF4A1 (-8.1, 6/6), DNMT1;NAE1 (-8.1, 6/6), FLT3;DNMT1 (-8.1, 6/6), DNMT1;IDH2 (-8.1, 6/6), BCL2;MDM2 (-8.2, 6/6), CDK19;BCL2 (-8.2, 6/6), BCL2;IDH1 (-8.2, 6/6), BCL2;DNMT1 (-8.2, 6/6), DNMT1;HDAC1 (-8.2, 6/6), DNMT1;XPO1 (-8.3, 6/6)
+where the selective targets land: DNMT1 14/33, PSMB5 19/33, KIT 20/33, BCL2 22/33, IDH1 28/33

@@ -1,0 +1,21 @@
+################ van Galen: Zeng object (hdWGCNA) vs earlier runs
+GENIE3 (van Galen 2021 run): 21 targets x 19 identities; both scored 231; Spearman 0.17
+hdWGCNA (van Galen 2021 run): 21 targets x 19 identities; both scored 378; Spearman 0.94
+per-target rho across identities, median: GENIE3 (van Galen 2021 run) -0.00; hdWGCNA (van Galen 2021 run) 0.92
+malignant - normal delta, Zeng vs earlier: GENIE3 (van Galen 2021 run) rho = 0.04, sign agrees 22/46; hdWGCNA (van Galen 2021 run) rho = 0.85, sign agrees 95/109
+
+################ Zeng 2025 cross-dataset (hdWGCNA)
+shared identities 7, shared targets 227; no-score rate beneyto 0.43, lasry 0.35, naldini 0.36, vangalen 0.13
+pairwise rho, Target mean: 0.47 0.58 0.35 0.58 0.37 0.51
+pairwise rho, Identity effect: 0.54 0.21 0.29 0.71 0.43 0.89
+pairwise rho, All scored pairs: 0.17 0.26 0.07 0.21 0.14 0.24
+pairwise rho, Target x identity residual: 0.04 0.15 0.00 0.06 0.07 0.02
+top identity agreement over 200 targets: >=3 datasets 39 (null 19, p 0); all 4 6 (null 1, p 0.001)
+same top in all 4: AVPR2 (Monocyte), CASP3 (Early_Erythroid), CTSL (Monocyte), DPP4 (HSC_MPP), HIF1A (Monocyte), TEK (HSC_MPP)
+
+################ BCL2
+beneyto: ProMono 2/227, MEP_MkP 5/227, Late_Erythroid 15/227, EoBasoMast 51/227, GMP 64/227, Monocyte 78/227, Early_Lymphoid 116/227, Early_Erythroid no-score, HSC_MPP 129/227, LMPP 139/227, cDC no-score
+lasry: Early_Erythroid 16/227, GMP 42/227, HSC_MPP 56/227, pDC 63/227, MEP_MkP 71/227, EoBasoMast 96/227, Late_Erythroid 108/227, ProMono 116/227, Monocyte no-score, Early_Lymphoid no-score, LMPP no-score, cDC no-score
+naldini: Early_Lymphoid 4/227, ProMono 13/227, Monocyte 37/227, pDC 39/227, cDC 42/227, GMP 62/227, LMPP 75/227, HSC_MPP 86/227, MEP_MkP 98/227, Early_Erythroid 98/227, EoBasoMast 100/227, ProB_PreB 107/227, Late_Erythroid no-score
+vangalen: GMP 6/227, pDC 14/227, cDC 15/227, Early_Erythroid 32/227, HSC_MPP 73/227, Late_Erythroid 110/227, ProMono 116/227, Monocyte 127/227
+BCL2 top identity among the shared 7: beneyto ProMono, vangalen cDC, naldini Monocyte, lasry Early_Erythroid

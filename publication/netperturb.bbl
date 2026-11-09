@@ -1,0 +1,136 @@
+\begin{thebibliography}{10}
+\providecommand{\doi}[1]{\url{https://doi.org/#1}}
+\bibcommenthead
+
+\bibitem[\protect\citeauthoryear{Dixit et~al.}{2016}]{Dixit2016perturbseq}
+Dixit A, Parnas O, Li B, Chen J, Fulco CP, Jerby-Arnon L, et~al.
+\newblock {Perturb-Seq: Dissecting Molecular Circuits with Scalable Single-Cell RNA Profiling of Pooled Genetic Screens}.
+\newblock Cell. 2016;167(7):1853–1866.e17.
+\newblock \doi{10.1016/j.cell.2016.11.038}.
+
+\bibitem[\protect\citeauthoryear{Kamimoto et~al.}{2023}]{Kamimoto2023celloracle}
+Kamimoto K, Stringa B, Hoffmann CM, Jindal K, Solnica-Krezel L, Morris SA.
+\newblock {Dissecting cell identity via network inference and in silico gene perturbation}.
+\newblock Nature. 2023;614(7949):742–751.
+\newblock \doi{10.1038/s41586-022-05688-9}.
+
+\bibitem[\protect\citeauthoryear{Li et~al.}{2024}]{Li2024scrank}
+Li C, Shao X, Zhang S, Wang Y, Jin K, Yang P, et~al.
+\newblock {scRank infers drug-responsive cell types from untreated scRNA-seq data using a target-perturbed gene regulatory network}.
+\newblock Cell Reports Medicine. 2024;5(6):101568.
+\newblock \doi{10.1016/j.xcrm.2024.101568}.
+
+\bibitem[\protect\citeauthoryear{Osorio et~al.}{2022}]{Osorio2022sctenifoldknk}
+Osorio D, Zhong Y, Li G, Xu Q, Yang Y, Tian Y, et~al.
+\newblock {scTenifoldKnk: An efficient virtual knockout tool for gene function predictions via single-cell gene regulatory network perturbation}.
+\newblock Patterns. 2022;3(3):100434.
+\newblock \doi{10.1016/j.patter.2022.100434}.
+
+\bibitem[\protect\citeauthoryear{Di~Tommaso et~al.}{2017}]{DiTommaso2017nextflow}
+Di~Tommaso P, Chatzou M, Floden EW, Barja PP, Palumbo E, Notredame C.
+\newblock {Nextflow enables reproducible computational workflows}.
+\newblock Nature Biotechnology. 2017;35(4):316–319.
+\newblock \doi{10.1038/nbt.3820}.
+
+\bibitem[\protect\citeauthoryear{Ewels et~al.}{2020}]{Ewels2020nfcore}
+Ewels PA, Peltzer A, Fillinger S, Patel H, Alneberg J, Wilm A, et~al.
+\newblock {The nf-core framework for community-curated bioinformatics pipelines}.
+\newblock Nature Biotechnology. 2020;38(3):276–278.
+\newblock \doi{10.1038/s41587-020-0439-x}.
+
+\bibitem[\protect\citeauthoryear{Hao et~al.}{2023}]{Hao2023seurat}
+Hao Y, Stuart T, Kowalski MH, Choudhary S, Hoffman P, Hartman A, et~al.
+\newblock {Dictionary learning for integrative, multimodal and scalable single-cell analysis}.
+\newblock Nature Biotechnology. 2023;42(2):293–304.
+\newblock \doi{10.1038/s41587-023-01767-y}.
+
+\bibitem[\protect\citeauthoryear{Huynh-Thu et~al.}{2010}]{HuynhThu2010genie3}
+Huynh-Thu VA, Irrthum A, Wehenkel L, Geurts P.
+\newblock {Inferring Regulatory Networks from Expression Data Using Tree-Based Methods}.
+\newblock PLoS ONE. 2010;5(9):e12776.
+\newblock \doi{10.1371/journal.pone.0012776}.
+
+\bibitem[\protect\citeauthoryear{Morabito et~al.}{2023}]{Morabito2023hdwgcna}
+Morabito S, Reese F, Rahimzadeh N, Miyoshi E, Swarup V.
+\newblock {hdWGCNA identifies co-expression networks in high-dimensional transcriptomics data}.
+\newblock Cell Reports Methods. 2023;3(6):100498.
+\newblock \doi{10.1016/j.crmeth.2023.100498}.
+
+\bibitem[\protect\citeauthoryear{Langfelder and Horvath}{2008}]{Langfelder2008wgcna}
+Langfelder P, Horvath S.
+\newblock {WGCNA: an R package for weighted correlation network analysis}.
+\newblock BMC Bioinformatics. 2008;9(1).
+\newblock \doi{10.1186/1471-2105-9-559}.
+
+\bibitem[\protect\citeauthoryear{Korotkevich et~al.}{2016}]{Korotkevich2016fgsea}
+Korotkevich G, Sukhov V, Budin N, Shpak B, Artyomov MN, Sergushichev A.
+\newblock {Fast gene set enrichment analysis}.
+\newblock bioRxiv. 2016;\doi{10.1101/060012}.
+
+\bibitem[\protect\citeauthoryear{Liberzon et~al.}{2015}]{Liberzon2015msigdb}
+Liberzon A, Birger C, Thorvaldsdóttir H, Ghandi M, Mesirov J, Tamayo P.
+\newblock {The Molecular Signatures Database Hallmark Gene Set Collection}.
+\newblock Cell Systems. 2015;1(6):417–425.
+\newblock \doi{10.1016/j.cels.2015.12.004}.
+
+\bibitem[\protect\citeauthoryear{Kurtzer et~al.}{2017}]{Kurtzer2017singularity}
+Kurtzer GM, Sochat V, Bauer MW.
+\newblock {Singularity: Scientific containers for mobility of compute}.
+\newblock PLOS ONE. 2017;12(5):e0177459.
+\newblock \doi{10.1371/journal.pone.0177459}.
+
+\bibitem[\protect\citeauthoryear{Zeng et~al.}{2025}]{Zeng2025bonemarrowmap}
+Zeng AGX, Iacobucci I, Shah S, Mitchell A, Wong G, Bansal S, et~al.
+\newblock {Single-cell Transcriptional Atlas of Human Hematopoiesis Reveals Genetic and Hierarchy-Based Determinants of Aberrant AML Differentiation}.
+\newblock Blood Cancer Discovery. 2025;6(4):307–324.
+\newblock \doi{10.1158/2643-3230.BCD-24-0342}.
+
+\bibitem[\protect\citeauthoryear{Beneyto-Calabuig et~al.}{2023}]{BeneytoCalabuig2023aml}
+Beneyto-Calabuig S, Merbach AK, Kniffka JA, Antes M, Szu-Tu C, Rohde C, et~al.
+\newblock {Clonally resolved single-cell multi-omics identifies routes of cellular differentiation in acute myeloid leukemia}.
+\newblock Cell Stem Cell. 2023;30(5):706--721.e8.
+\newblock \doi{10.1016/j.stem.2023.04.001}.
+
+\bibitem[\protect\citeauthoryear{Lasry et~al.}{2023}]{Lasry2023aml}
+Lasry A, Nadorp B, Fornerod M, Nicolet D, Wu H, Walker CJ, et~al.
+\newblock {An inflammatory state remodels the immune microenvironment and improves risk stratification in acute myeloid leukemia}.
+\newblock Nature Cancer. 2023;4(1):27–42.
+\newblock \doi{10.1038/s43018-022-00480-0}.
+
+\bibitem[\protect\citeauthoryear{Naldini et~al.}{2023}]{Naldini2023aml}
+Naldini MM, Casirati G, Barcella M, Rancoita PMV, Cosentino A, Caserta C, et~al.
+\newblock {Longitudinal single-cell profiling of chemotherapy response in acute myeloid leukemia}.
+\newblock Nature Communications. 2023;14(1):1285.
+\newblock \doi{10.1038/s41467-023-36969-0}.
+
+\bibitem[\protect\citeauthoryear{van Galen et~al.}{2019}]{vanGalen2019aml}
+van Galen P, Hovestadt V, Wadsworth~II MH, Hughes TK, Griffin GK, Battaglia S, et~al.
+\newblock {Single-Cell RNA-Seq Reveals AML Hierarchies Relevant to Disease Progression and Immunity}.
+\newblock Cell. 2019;176(6):1265–1281.e24.
+\newblock \doi{10.1016/j.cell.2019.01.031}.
+
+\bibitem[\protect\citeauthoryear{Yu et~al.}{2025}]{Yu2025scmalignantfinder}
+Yu Q, Li YY, Chen Y.
+\newblock {scMalignantFinder distinguishes malignant cells in single-cell and spatial transcriptomics by leveraging cancer signatures}.
+\newblock Communications Biology. 2025;8:504.
+\newblock \doi{10.1038/s42003-025-07942-y}.
+
+\bibitem[\protect\citeauthoryear{Jordan et~al.}{2000}]{Jordan2000cd123}
+Jordan C, Upchurch D, Szilvassy S, Guzman M, Howard D, Pettigrew A, et~al.
+\newblock {The interleukin-3 receptor alpha chain is a unique marker for human acute myelogenous leukemia stem cells}.
+\newblock Leukemia. 2000;14(10):1777--1784.
+\newblock \doi{10.1038/sj.leu.2401903}.
+
+\bibitem[\protect\citeauthoryear{Harris et~al.}{2012}]{Harris2012kdm1a}
+Harris W, Huang X, Lynch J, Spencer G, Hitchin J, Li Y, et~al.
+\newblock {The Histone Demethylase KDM1A Sustains the Oncogenic Potential of MLL-AF9 Leukemia Stem Cells}.
+\newblock Cancer Cell. 2012;21(4):473--487.
+\newblock \doi{10.1016/j.ccr.2012.03.014}.
+
+\bibitem[\protect\citeauthoryear{Pollyea et~al.}{2018}]{Pollyea2018venetoclax}
+Pollyea DA, Stevens BM, Jones CL, Winters A, Pei S, Minhajuddin M, et~al.
+\newblock {Venetoclax with azacitidine disrupts energy metabolism and targets leukemia stem cells in patients with acute myeloid leukemia}.
+\newblock Nature Medicine. 2018;24(12):1859--1866.
+\newblock \doi{10.1038/s41591-018-0233-1}.
+
+\end{thebibliography}
