@@ -4,6 +4,8 @@ work/
 data/
 results/
 results_*/
+slurm-*.out
+slurm-*.err
 .DS_Store
 testing/
 testing*
