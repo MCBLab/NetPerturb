@@ -1,0 +1,51 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: netperturb.aux
+The style file: sn-vancouver-num.bst
+Reallocated glb_str_ptr (elt_size=4) to 20 items from 10.
+Reallocated global_strs (elt_size=200001) to 20 items from 10.
+Reallocated glb_str_end (elt_size=4) to 20 items from 10.
+Reallocated wiz_functions (elt_size=4) to 6000 items from 3000.
+Database file #1: references/references.bib
+sn-vancouver-num.bst [2024/07/19 v1.1 Vancouver bibliography style]
+You've used 22 entries,
+            3508 wiz_defined-function locations,
+            890 strings with 14134 characters,
+and the built_in function-call counts, 76748 in all, are:
+= -- 9112
+> -- 550
+< -- 0
++ -- 327
+- -- 132
+* -- 7171
+:= -- 8296
+add.period$ -- 109
+call.type$ -- 22
+change.case$ -- 0
+chr.to.int$ -- 0
+cite$ -- 22
+duplicate$ -- 4232
+empty$ -- 7737
+format.name$ -- 178
+if$ -- 17576
+int.to.chr$ -- 0
+int.to.str$ -- 22
+missing$ -- 327
+newline$ -- 136
+num.names$ -- 44
+pop$ -- 496
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 460
+stack$ -- 0
+substring$ -- 18405
+swap$ -- 730
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 1
+type$ -- 0
+warning$ -- 0
+while$ -- 262
+width$ -- 24
+write$ -- 376

@@ -1,0 +1,6 @@
+Step	Tasks	Cached	Failed	Mean	SD	Min	Max	Total
+DOWNSAMPLE	1	1	0	5m 25s	-	5m 25s	5m 25s	5m 25s
+HDWGCNA	19	19	0	1m 19s	18.4 s	49.9 s	1m 50s	25m 04s
+RANK_SCORE	55	55	0	6m 14s	2m 12s	4m 52s	12m 04s	5h 43m
+MERGE	1	1	0	4.6 s	-	4.6 s	4.6 s	4.6 s
+NETWORK_QC	1	0	0	20.3 s	-	20.3 s	20.3 s	20.3 s

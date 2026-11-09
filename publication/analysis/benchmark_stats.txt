@@ -1,0 +1,44 @@
+################ Kang 2018, control PBMCs, agonist
+scores: 150 pairs, 25 targets, 6 identities; no score (zero or < 1e-6 x median): 9; non-floor range 6.8e-07-0.0025
+targets whose top identity is a monocyte: 20/25 (cascade 7/10, ISG 10/10, lineage 3/5)
+identity main effects vs B (log10): CD14__Monocytes=0.84; CD4_T_cells=0.06; CD8_T_cells=-0.23; FCGR3A__Monocytes=0.87; NK_cells=-0.04
+residual ISG: monocytes +0.26, other -0.13 (diff +0.39 log10)
+residual lineage: monocytes -0.33, other +0.28 (diff -0.61 log10)
+residual cascade: monocytes -0.09, other +0.05 (diff -0.14 log10)
+ISG residual monocyte vs other: Wilcoxon p = 0.0085
+Spearman(log score, target expression), non-floor: rho = 0.49 (n = 141)
+lm(log score ~ target + expr + monocyte): monocyte term 0.77 log10 (p = 6e-09)
+non-floor scores with the target detected in <1% of cells: 12 pairs; ranked first in 1 (CD19 FCGR3A__Monocytes)
+top-15 partners that are ISGs, ISG, monocytes: 67.0% (n = 300 edges)
+top-15 partners that are ISGs, ISG, other: 25.5% (n = 585 edges)
+top-15 partners that are ISGs, lineage, monocytes: 1.3% (n = 150 edges)
+top-15 partners that are ISGs, lineage, other: 0.0% (n = 180 edges)
+top-15 partners that are ISGs, cascade, monocytes: 18.8% (n = 372 edges)
+top-15 partners that are ISGs, cascade, other: 3.6% (n = 780 edges)
+
+################ van Galen 2019, AML bone marrow, GENIE3, antagonist
+identities kept: 19 (29752 cells); dropped: pDC (225), ProB (298)
+scores: 1045 pairs, 55 targets (34 single, 21 joint); no score (zero or < 1e-6 x median): 296 (exact zeros: 296); non-floor range 6.9e-12-5.5e-08
+identities with most zero scores: T 31, NK 29, HSC 26, Prog 20; targets with most: AURKB 18, CDK8 14, IL3RA 13, JAK2 13
+top identity per target: GMP-like 6, CTL 6, cDC 6, Prog-like 5, B 5, HSC-like 4, earlyEry 3, ProMono 3, Prog 2, Plasma 2, ProMono-like 2, NK 2, Mono-like 2, GMP 2, HSC 1, Mono 1, T 1, lateEry 1, cDC-like 1
+identity main effects vs B (log10), extremes: CTL=+0.20; Prog-like=+0.18; ProMono-like=+0.14; Prog=-0.22; HSC=-0.27
+(no identity_qc / network_qc tables for this run: its report predates the Data quality section)
+HSC-like      minus normal: median +0.38 log10, malignant higher for 16/22 targets
+Prog-like     minus normal: median +0.36 log10, malignant higher for 19/28 targets
+GMP-like      minus normal: median +0.03 log10, malignant higher for 19/36 targets
+ProMono-like  minus normal: median +0.02 log10, malignant higher for 21/39 targets
+Mono-like     minus normal: median +0.15 log10, malignant higher for 23/34 targets
+cDC-like      minus normal: median -0.16 log10, malignant higher for 13/34 targets
+all pairs pooled: median +0.10, malignant higher for 58% of 193 target x pair comparisons
+FLT3   top-3 identities: GMP-like, B, cDC | malignant minus normal: GMP +0.90, ProMono -0.01
+KIT    top-3 identities: GMP-like, Prog-like, HSC-like | malignant minus normal: HSC +0.78, Prog +1.38, GMP +0.79, ProMono +0.13, Mono +0.47, cDC -0.33
+IL3RA  top-3 identities: B, GMP, earlyEry | malignant minus normal: 
+CD33   top-3 identities: HSC-like, Plasma, B | malignant minus normal: HSC +0.92
+BCL2   top-3 identities: Plasma, HSC-like, CTL | malignant minus normal: GMP +0.47, ProMono +0.02, Mono -0.70, cDC +1.44
+FLT3;DNMT1  top-3: cDC, ProMono-like, GMP-like
+BCL2;FLT3   top-3: GMP, ProMono, ProMono-like
+FLT3;MEN1   top-3: GMP-like, B, Prog
+blast markers: median malignant-minus-normal over the progenitor pairs (HSC, Prog, GMP): 0.90 vs 0.13 for the other targets
+joint targets: 21; Spearman with the stronger member median 0.02, with the weaker 0.01; the pair's top identity is the stronger member's in 2/21 pairs, the weaker's in 0
+joint targets score higher than single genes: median log10 score -8.40 vs -8.78 (non-zero pairs), 2.4x
+pairs whose top identity is neither member's: BCL2;DNMT1, BCL2;MDM2, BCL2;IDH2, BCL2;MEN1, CDK8;CDK19, CDK8;BCL2, FLT3;DNMT1, BCL2;FLT3, BCL2;EIF4A1, DNMT1;MEN1, BCL2;XPO1, BCL2;IDH1, DNMT1;IDH2, DNMT1;HAVCR2, DNMT1;HDAC1, DNMT1;TP53, DNMT1;NAE1, DNMT1;XPO1, DNMT1;IDH1

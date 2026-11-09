@@ -1,0 +1,20 @@
+track	method	identity	n_genes	n_edges	density	mean_abs_weight	isolated_frac	hub_share_top1pct	strength_gini	n_metacells	soft_power	power_estimate	sft_r2	metacells_per_gene
+rank_score	hdwgcna	HSC	4262	505144	0.0278	0.25	0.254	0.112	0.694	989	6		0.736	0.232
+rank_score	hdwgcna	GMP	4262	440304	0.0242	0.25	0.304	0.0888	0.625	351	6		0.325	0.0824
+rank_score	hdwgcna	Mono	4262	490628	0.027	0.25	0.265	0.107	0.764	751	6		0.933	0.176
+rank_score	hdwgcna	Mono-like	4262	491882	0.0271	0.25	0.282	0.139	0.798	759	6		0.926	0.178
+rank_score	hdwgcna	earlyEry	4262	505462	0.0278	0.25	0.255	0.115	0.747	366	6		0.858	0.0859
+rank_score	hdwgcna	ProMono-like	4262	496284	0.0273	0.25	0.401	0.133	0.842	674	6		0.94	0.158
+rank_score	hdwgcna	lateEry	4262	524718	0.0289	0.25	0.257	0.115	0.773	351	6		0.936	0.0824
+rank_score	hdwgcna	T	4262	453156	0.025	0.25	0.294	0.076	0.647					
+rank_score	hdwgcna	ProMono	4262	466500	0.0257	0.25	0.283	0.125	0.672	432	6		0.86	0.101
+rank_score	hdwgcna	Prog	4262	491256	0.0271	0.25	0.264	0.117	0.69	861	6		0.941	0.202
+rank_score	hdwgcna	HSC-like	4262	560288	0.0309	0.25	0.228	0.117	0.748	672	6		0.264	0.158
+rank_score	hdwgcna	GMP-like	4262	539398	0.0297	0.25	0.319	0.121	0.814	528	6		0.956	0.124
+rank_score	hdwgcna	NK	4262	474166	0.0261	0.25	0.278	0.112	0.732	1000	6		0.411	0.235
+rank_score	hdwgcna	cDC-like	4262	547310	0.0301	0.25	0.23	0.105	0.773	646	6		0.902	0.152
+rank_score	hdwgcna	cDC	4262	442384	0.0244	0.25	0.307	0.124	0.767	220	6		0.707	0.0516
+rank_score	hdwgcna	CTL	4262	439118	0.0242	0.25	0.305	0.0952	0.708	695	6		0.268	0.163
+rank_score	hdwgcna	Prog-like	4262	526016	0.029	0.25	0.31	0.143	0.83	615	6		0.9	0.144
+rank_score	hdwgcna	Plasma	4262	478488	0.0263	0.25	0.293	0.122	0.779	354	6		0.816	0.0831
+rank_score	hdwgcna	B	4262	359792	0.0198	0.25	0.37	0.101	0.671	153	6		0.316	0.0359

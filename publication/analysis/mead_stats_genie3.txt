@@ -1,0 +1,13 @@
+network method: genie3
+pairs 1854; targets 206; identities 9; no score 496
+identity offsets (log10, centred): early enterocyte +0.12, stem II +0.11, early Paneth +0.06, stem III +0.03, early secretory +0.02, Paneth +0.01, stem I -0.01, enterocyte -0.09, enteroendocrine -0.25
+Xpo1 percentile among the 206 targets, by identity: stem I 48, stem II 85, stem III 36, early secretory 65, early Paneth 21, Paneth 87, enteroendocrine 91, early enterocyte 90, enterocyte 75; no score in 
+Xpo1 residual (log10, target and identity effects removed): stem I -0.32, stem II +0.26, stem III -0.45, early secretory +0.08, early Paneth -0.70, Paneth +0.23, enteroendocrine +0.40, early enterocyte +0.37, enterocyte +0.14
+stem II vs stem III residuals: 95 targets scored in both; Spearman 0.07; Xpo1 stem II +0.26, stem III -0.45, rank 60 of 95 on their mean
+upper-right quadrant (both > 0): 26 targets; top 10 by mean: Pgr (+1.21 / +1.30), Igf1r (+0.79 / +0.53), Notch1 (+0.58 / +0.49), Dnmt3b (+0.41 / +0.61), Pparg (+0.47 / +0.41), Pde5a (+0.25 / +0.61), Pde3a (+0.38 / +0.47), Abcb1a (+0.23 / +0.59), Pdk1 (+0.25 / +0.57), Prkaa1 (+0.42 / +0.39)
+paper and cell-cycle targets (stem III / stem II): Chek1 +0.37/+0.29, Cdk1 +0.41/-0.02, Wee1 +0.39/-0.18, Plk1 +0.30/-0.11, Map2k1 +0.11/-0.29, Xpo1 -0.45/+0.26, Cdk4 -0.13/-0.09, Cdk6 +0.23/-0.63
+panel B shows 4 paper-tested targets; ranks out of 95 scored in both stem states
+  Map2k1  stem III +0.11 (rank  41), stem II -0.29 (rank  77)
+  Xpo1    stem III -0.45 (rank  91), stem II +0.26 (rank  21)
+  Cdk4    stem III -0.13 (rank  67), stem II -0.09 (rank  61)
+  Cdk6    stem III +0.23 (rank  28), stem II -0.63 (rank  88)

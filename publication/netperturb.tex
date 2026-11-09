@@ -1,200 +1,286 @@
 %% =====================================================================
-%% NetPerturb -- Application Note for Bioinformatics Advances (OUP)
+%% NetPerturb -- Software article for BMC Bioinformatics (Springer Nature)
 %%
-%% FIRST DRAFT TEMPLATE. Everything marked \todo{...} (red) needs your input.
+%% Springer Nature LaTeX template v3.1 (December 2024), sn-jnl.cls,
+%% Vancouver numbered references (sn-vancouver-num.bst), as BMC uses.
+%% Everything marked \todo{...} (red) needs your input.
 %%
-%% Bioinformatics Advances limits for an Application Note (author guidelines):
-%%   * up to 4 pages, including figures, tables and references
-%%   * abstract: at most 200 words
-%%   * at most 3 figures + tables COMBINED  (this draft: Fig 1, Fig 2, Table 1)
-%%   * at most 15 references                 (this draft cites 15)
-%%   * at most 5 keywords
-%%   * required statements: Data availability, Funding, Conflict of interest,
-%%     Author contributions; ORCID for the submitting author; any AI/LLM use
-%%     must be disclosed in the cover letter and Methods/Acknowledgements
+%% BMC Software article structure (check against the current BMC
+%% Bioinformatics submission guidelines before submitting):
+%%   Abstract (Background / Results / Conclusions) -- Keywords --
+%%   Background -- Implementation -- Results -- Discussion -- Conclusions --
+%%   Availability and requirements -- Abbreviations -- Declarations
+%%
+%% Submission: one .tex file (no \input), the .bbl, sn-jnl.cls, the .bst,
+%% and every figure uploaded separately at the top level (no Fig/ folder).
+%% The template asks that coloured text not be used in the final version,
+%% so remove the \todo macro before submitting.
 %%
 %% Build:  latexmk -pdf netperturb.tex
+%% The earlier Bioinformatics Advances version (OUP template) is kept in
+%% archive/bioinformatics_advances/. Numbers come from the analysis/ scripts
+%% named at the top of the Results.
 %% =====================================================================
 
-\documentclass[unnumsec,webpdf,contemporary,large]{oup-authoring-template}
-%\onecolumn % for one column layouts
+% Line numbers for review: add the `lineno` option. It needs vruler.sty,
+% which Overleaf has but this machine's TeX install does not.
+\documentclass[pdflatex,sn-vancouver-num]{sn-jnl}% Vancouver Numbered Reference Style
+
+\usepackage{graphicx}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
 
 \graphicspath{{Fig/}}
-\newcommand{\societylogo}{}
+% sn-jnl only builds a figure page once it is 89% full, which sends these
+% full-page figures to the end; let a page that is 60% figure stand on its own.
+\renewcommand{\floatpagefraction}{.6}
 
 % Draft helpers -- remove before submission
 \newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
-\newcommand{\np}{\textsc{NetPerturb}}
 \newcommand{\param}[1]{\texttt{-{}-#1}}
 
-% line numbers (often requested by reviewers)
-%\usepackage[right]{lineno}
+\raggedbottom
+\unnumbered% BMC section headings are unnumbered
 
 \begin{document}
 
-\journaltitle{Bioinformatics Advances}
-\DOI{DOI added during production}
-\copyrightyear{2026}
-\pubyear{2026}
-\vol{XX}
-\issue{x}
-\access{Published: Date added during production}
-\appnotes{Application Note}
-
-\firstpage{1}
-
-\subtitle{Gene Regulation and Systems Biology} % \todo: confirm journal subject section
-
 \title[NetPerturb]{NetPerturb: a reproducible Nextflow pipeline for in silico perturbation of single-cell gene regulatory networks from a Seurat object}
 
-\author[1,$\ast$]{Diego Marques-Coelho\ORCID{0000-0000-0000-0000}}
-\author[1]{\todo{Second Author}}
-\author[2]{\todo{Third Author}}
+\author*[1]{\fnm{Diego} \sur{Marques-Coelho}}\email{diegomscoelho@gmail.com}
+\author[1]{\fnm{\todo{Second}} \sur{\todo{Author}}}
+\author[2]{\fnm{\todo{Third}} \sur{\todo{Author}}}
 
-\address[1]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
-\address[2]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
-
-\corresp[$\ast$]{Corresponding author. \href{mailto:diegomscoelho@gmail.com}{diegomscoelho@gmail.com}}
-
-\received{Date}{0}{Year}
-\revised{Date}{0}{Year}
-\accepted{Date}{0}{Year}
-
-\editor{Associate Editor: Name}
+\affil*[1]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \city{\todo{City}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
+\affil[2]{\orgdiv{\todo{Department}}, \orgname{\todo{Organization}}, \orgaddress{\street{\todo{Street}}, \city{\todo{City}}, \postcode{\todo{Postcode}}, \state{\todo{State}}, \country{\todo{Country}}}}
 
 %% ---------------------------------------------------------------------
-%% Abstract: <= 200 words, structured, no citations.
+%% Abstract: structured, no citations. \todo: confirm the word limit in
+%% the current BMC Bioinformatics guidelines (historically 350 words).
 %% ---------------------------------------------------------------------
-\abstract{
-\textbf{Motivation:} Predicting how a genetic or pharmacological perturbation affects each cell population in a single-cell RNA-seq (scRNA-seq) dataset is a common question, but in silico perturbation tools based on gene regulatory networks (GRNs) are hard to install, scale poorly to large atlases, and return results that are difficult to compare across methods and to share.\\
-\textbf{Results:} We present NetPerturb, a Nextflow pipeline that starts from a processed Seurat object and a list of target genes and returns a single, self-contained HTML report. NetPerturb balances cell identities by downsampling, checks the targets before any network is built, and infers one GRN per identity with GENIE3, scRank or hdWGCNA. It then ranks identities by a target-perturbation score. In parallel, it can run a virtual knockout with scTenifoldKnk, including joint knockouts of several genes, followed by gene set enrichment of the genes the knockout affects. Every stochastic step is seeded from one parameter and every tool runs in a versioned container, so runs are reproducible across HPC and cloud environments. On unstimulated PBMCs, interferon-stimulated genes scored highest in monocytes, a signal that remains after correcting for a cell-type-wide offset, and building the wild-type network once per identity cut the knockout cost about 24-fold.\\
-\textbf{Availability and implementation:} NetPerturb is freely available under the \todo{MIT} licence at \url{https://github.com/MCBLab/NetPerturb}, with documentation, test profiles and container recipes. \todo{Zenodo DOI of the release.}\\
-\textbf{Contact:} \href{mailto:diegomscoelho@gmail.com}{diegomscoelho@gmail.com}\\
-\textbf{Supplementary information:} Supplementary data are available at \textit{Bioinformatics Advances} online.}
+\abstract{\textbf{Background:} Predicting how a genetic or pharmacological perturbation affects each cell population in a single-cell RNA-seq (scRNA-seq) dataset is a common question. In silico perturbation tools based on gene regulatory networks (GRNs) can answer it from unperturbed cells, but they are hard to install, scale poorly to large atlases, and return results that are difficult to compare across methods and to share.
 
-\keywords{single-cell RNA-seq, gene regulatory network, in silico perturbation, virtual knockout, Nextflow}
+\textbf{Results:} We present NetPerturb, a Nextflow pipeline that starts from a processed Seurat object and a list of target genes and returns a single, self-contained HTML report. NetPerturb balances cell identities by downsampling, checks the targets before any network is built, and infers one GRN per identity with GENIE3, scRank or hdWGCNA. It then ranks identities by a target-perturbation score. In parallel, it can run a virtual knockout with scTenifoldKnk, including joint knockouts of several genes, followed by gene set enrichment of the genes the knockout affects. Every stochastic step is seeded from one parameter and every tool runs in a versioned container, so runs are reproducible on HPC and cloud. We benchmarked the pipeline on four acute myeloid leukaemia (AML) cohorts (86 cell identities, 55 drug targets). Target-level scores replicated between cohorts (Spearman 0.88--0.92). Identity-wide offsets tracked the number of cells behind each network; once they were removed, stem cells were not more affected overall, but specific targets were. IL3RA (CD123) and KDM1A (LSD1) consistently acted on stem identities, mainly malignant ones, PSMB5, CDK8 and HMGCR acted mainly on normal stem cells, and mitotic kinases spared stem cells in all four cohorts. Relative to the other targets, the blast markers KIT, FLT3 and CD33 scored higher in malignant identities than in their normal counterparts.
+
+\textbf{Conclusions:} NetPerturb makes GRN-based in silico perturbation reproducible and scalable, starting from the object most analysts already have. Its scores are best read within a run, through target-specific effects aggregated over identities and, where possible, over cohorts. NetPerturb is freely available at https://github.com/MCBLab/NetPerturb.}
+
+\keywords{Single-cell RNA-seq, Gene regulatory network, In silico perturbation, Virtual knockout, Nextflow, Acute myeloid leukaemia, Leukaemic stem cells, Drug targets}
 
 \maketitle
 
 %% =====================================================================
-\section{Introduction}
+\section{Background}\label{sec:background}
 %% =====================================================================
 
 Single-cell RNA-seq (scRNA-seq) resolves tissues into cell identities (cell types, clones, or treatment states), and the next question is usually which of those identities depend on a given gene or drug target. Pooled CRISPR screens with single-cell readout answer this experimentally \citep{Dixit2016perturbseq}, but they are costly and cannot be applied to archived or clinical samples. Computational alternatives therefore perturb a gene regulatory network (GRN) inferred from unperturbed cells and read the effect off the network: CellOracle simulates shifts in cell identity \citep{Kamimoto2023celloracle}, scRank ranks cell types by how much a drug target reshapes their network \citep{Li2024scrank}, and scTenifoldKnk performs a virtual knockout and reports the genes whose regulatory context changes \citep{Osorio2022sctenifoldknk}.
 
 In practice, using these methods on a new dataset takes considerable engineering work. Each method expects its own input format and gene universe, and memory grows quickly with the number of cells and genes. Targets that are not expressed in some identities can end a run late in the analysis. Results from different network inference methods are rarely placed side by side, and many steps are stochastic, so the numbers are hard to reproduce. \todo{Add 1--2 sentences on the specific gap your lab hit.}
 
-NetPerturb addresses this with a single Nextflow \citep{DiTommaso2017nextflow} workflow, organised following nf-core practice \citep{Ewels2020nfcore}. Its input is the object most analysts already have, a processed Seurat object \citep{Hao2023seurat}. It parallelises network inference and scoring across identities and targets, and it gathers every result, together with the quality control and provenance needed to interpret it, into one portable report.
+NetPerturb addresses this with a single Nextflow \citep{DiTommaso2017nextflow} workflow, organised following nf-core practice \citep{Ewels2020nfcore}. Its input is the object most analysts already have, a processed Seurat object \citep{Hao2023seurat}. It parallelises network inference and scoring across identities and targets, and it gathers every result, together with the quality control and provenance needed to interpret it, into one portable report. We describe the implementation and then benchmark the rank-score track on four acute myeloid leukaemia (AML) cohorts, asking whether its results replicate between cohorts and how the targets of AML drugs act across the haematopoietic hierarchy.
 
 %% =====================================================================
-\section{Implementation}
+\section{Implementation}\label{sec:implementation}
 %% =====================================================================
 
-\begin{figure*}[!t]%
+\begin{figure}[t]%
 \centering
 \includegraphics[width=\textwidth]{fig1_metro.pdf}
 \caption{\textbf{Overview of NetPerturb.} A processed Seurat object and a list of target genes enter \texttt{DOWNSAMPLE}, which balances cell identities and checks the targets. The rank-score track (warm lines; one of GENIE3, scRank or hdWGCNA, chosen with \param{network}) infers one GRN per identity and scores every identity $\times$ target pair. The knockout track (blue; \param{sctknk}) builds one wild-type scTenifoldKnk network per identity and runs one virtual knockout per identity $\times$ target, optionally followed by fgsea. Both tracks converge on a single self-contained HTML report.}\label{fig:overview}
-\figalttext[Metro-map diagram of the NetPerturb pipeline]{Metro-style diagram in which coloured lines represent the three alternative network inference methods and the parallel scTenifoldKnk knockout track, running from input through downsampling, network inference, scoring, merging and enrichment to the HTML report.}%
-\end{figure*}
+\end{figure}
 
 \subsection{Input and pre-processing}
 
-NetPerturb requires four inputs: a Seurat object (\param{obj}), the metadata column defining cell identities (\param{column}), the species, and a text file of targets (\param{target}), one per line. Genes joined by a semicolon (e.g.\ \texttt{CDK8;CDK19}) are treated as a single combined perturbation. The \texttt{DOWNSAMPLE} step randomly keeps at most \param{n\_cells} cells per identity, so that every identity contributes a comparable number of cells, and drops identities that end up with fewer than \param{min\_cells} cells. It also builds a shared gene universe from the highly variable genes, transcription factors, drug targets and the requested targets. Each target is checked against the retained cells before any network is built. Genes that are absent from the object or have no counts are removed and recorded, a combined target keeps whichever of its genes pass, and the run stops only when no target passes. Problems that would otherwise end a run hours later are therefore caught at the start and listed in the report.
+NetPerturb requires four inputs: a Seurat object (\param{obj}), the metadata column defining cell identities (\param{column}), the species, and a text file of targets (\param{target}), one per line (Fig.~\ref{fig:overview}). Genes joined by a semicolon (e.g.\ \texttt{CDK8;CDK19}) are treated as a single combined perturbation. The \texttt{DOWNSAMPLE} step randomly keeps at most \param{n\_cells} cells per identity, so that every identity contributes a comparable number of cells, and drops identities that end up with fewer than \param{min\_cells} cells. It also builds a shared gene universe from the highly variable genes, transcription factors, drug targets and the requested targets. Each target is checked against the retained cells before any network is built. Genes that are absent from the object or have no counts are removed and recorded, a combined target keeps whichever of its genes pass, and the run stops only when no target passes. Problems that would otherwise end a run hours later are therefore caught at the start and listed in the report.
 
 \subsection{Rank-score track}
 
 For each identity, NetPerturb infers a GRN with one of three interchangeable methods (Table~\ref{tab:methods}). GENIE3 \citep{HuynhThu2010genie3} and scRank's own network builder \citep{Li2024scrank} are used as published. hdWGCNA \citep{Morabito2023hdwgcna}, which builds on WGCNA \citep{Langfelder2008wgcna}, produces an unsigned co-expression network on metacells, so NetPerturb adapts its topological overlap matrix to the input scRank expects in four steps. It restores the sign of each edge from the correlation between the two genes, pads every identity to the same gene set, removes edges below the \param{cut\_ratio} quantile of absolute weight, and rescales the weights to $[-1,1]$. Each identity $\times$ target pair is then scored with scRank, which compares each network before and after removing the target's edges and returns a perturbation score in either antagonist or agonist mode. The strongest \param{top\_connections} edges of each target are also exported. Networks and scores are computed as separate parallel tasks and merged into one table afterwards.
 
-\begin{table}[!t]
-\begin{center}
-\begin{minipage}{\columnwidth}
-\caption{Network inference methods available in NetPerturb.\label{tab:methods}}%
-\small\begin{tabular}{@{}llll@{}}
+\begin{table}[t]
+\caption{Network inference methods available in NetPerturb}\label{tab:methods}%
+\begin{tabular}{@{}llll@{}}
 \toprule
 Method & Network & Output & Track \\
 \midrule
-GENIE3      & Tree-based regression  & Directed weights       & Rank score \\
-scRank      & scRank builder   & Directed weights       & Rank score \\
-hdWGCNA     & Metacell TOM + sign    & Signed, sparsified     & Rank score \\
+GENIE3        & Tree-based regression  & Directed weights     & Rank score \\
+scRank        & scRank builder         & Directed weights     & Rank score \\
+hdWGCNA       & Metacell TOM + sign    & Signed, sparsified   & Rank score \\
 scTenifoldKnk & PCR + tensor denoising & WT vs.\ KO manifold  & Knockout \\
 \botrule
 \end{tabular}
-\begin{tablenotes}%
-\item TOM, topological overlap matrix; PCR, principal component regression; WT, wild type; KO, knockout.
-\end{tablenotes}
-\end{minipage}
-\end{center}
+\footnotetext{TOM, topological overlap matrix; PCR, principal component regression; WT, wild type; KO, knockout.}
 \end{table}
 
 \subsection{Virtual knockout track}
 
-When \param{sctknk} is set, a scTenifoldKnk track \citep{Osorio2022sctenifoldknk} runs alongside the rank-score track, or on its own. The expensive wild-type network does not depend on the target, so NetPerturb builds it once per identity (\texttt{SCTENIFOLDKNK\_BUILD}). Each identity $\times$ target knockout then runs as a separate task on that stored network (\texttt{SCTENIFOLDKNK\_KO}). With a single build per identity, one wild-type network can serve any number of knockouts, and the knockout of a combined target can zero the edges of all its genes at once, which the original single-gene interface does not allow. Differential regulation uses the statistic of scTenifoldKnk v1.0.3, which leaves the knocked-out genes out of the reference mean. \todo{Briefly justify, e.g. ``In our tests, including them inflated the mean so much that almost no gene reached significance (1 vs.\ 12 genes at FDR $<0.05$ on a 5,600-gene network).''} If a GMT file is supplied, genes are ranked by $\log_2$FC and tested with fgsea \citep{Korotkevich2016fgsea} against, for example, MSigDB collections \citep{Liberzon2015msigdb}. Gene sets are read from local files, so the step also runs on compute nodes without internet access.
+When \param{sctknk} is set, a scTenifoldKnk track \citep{Osorio2022sctenifoldknk} runs alongside the rank-score track, or on its own. The expensive wild-type network does not depend on the target, so NetPerturb builds it once per identity (\texttt{SCTENIFOLDKNK\_BUILD}). Each identity $\times$ target knockout then runs as a separate task on that stored network (\texttt{SCTENIFOLDKNK\_KO}). With a single build per identity, one wild-type network can serve any number of knockouts, and the knockout of a combined target can zero the edges of all its genes at once, which the original single-gene interface does not allow. Differential regulation uses the statistic of scTenifoldKnk v1.0.3, which leaves the knocked-out genes out of the reference mean. Because the genes an alignment moves most are the network's hubs whatever the target, each gene is also tested against the same knockout run for random genes of the network (\param{sctknk\_null}), a target with no outgoing edge is skipped as a no-op, and the rank of the tensor decomposition is a parameter (\param{sctknk\_td\_k}). If a GMT file is supplied, genes are ranked by $\log_2$FC and tested with fgsea \citep{Korotkevich2016fgsea} against, for example, MSigDB collections \citep{Liberzon2015msigdb}. Gene sets are read from local files, so the step also runs on compute nodes without internet access.
 
 \subsection{Report}
 
-The \texttt{REPORT} step renders a single self-contained Quarto HTML file (\todo{Supplementary Fig.~S1: report screenshots}). The report contains:
+The \texttt{REPORT} step renders a single self-contained Quarto HTML file (\todo{Additional file 1: report screenshots}). The report contains:
 (i) an overview recording the network method, the targets removed by quality control, the number of cells and genes available to each identity's network, and a UMAP of the retained cells;
 (ii) a heatmap of target expression per identity, so that a low score can be checked against a target that is barely expressed;
 (iii) a searchable table and a heatmap of perturbation scores;
 (iv) interactive knockout networks and a table of differentially regulated genes;
-(v) an enrichment dot plot and table; and
-(vi) provenance, with the command line, software versions, parameters and the running time of each step taken from the Nextflow trace.
+(v) an enrichment dot plot and table;
+(vi) data-quality diagnostics for each identity's input and network; and
+(vii) provenance, with the command line, software versions, parameters and the running time of each step taken from the Nextflow trace.
 
 \subsection{Reproducibility and deployment}
 
 Every tool runs in a versioned Singularity/Docker container \citep{Kurtzer2017singularity}, so no R dependencies need to be installed. A single \param{seed} parameter sets the random seed of every step that uses one: downsampling, GENIE3 (via doRNG), hdWGCNA metacells, scTenifoldKnk and fgsea. scRank's network builder is the one exception, because it sets its own seed internally. Memory and CPU requests are defined per process and can be adjusted in a configuration profile. The pipeline is tested with nf-test at the module and workflow level, and it provides small and dataset-scale test profiles (\texttt{-profile test}).
 
 %% =====================================================================
-\section{Results}
+\section{Results}\label{sec:results}
 %% =====================================================================
-%% Numbers below are produced by analysis/fig2_kang.R -> analysis/kang_stats.txt
+%% Numbers below are produced by analysis/fig2_zeng.R -> analysis/zeng_cohort_stats.txt
+%% (Figs 2-4; per-target table analysis/zeng2025/target_effects.tsv).
+%% Fig. 5, the single-cohort run (Fig/fig2_vangalen_genie3.pdf):
+%% analysis/fig2_vangalen.R genie3 -> analysis/vangalen_stats_genie3.txt
 
-We benchmarked NetPerturb on the unstimulated (control) peripheral blood mononuclear cells of \citet{Kang2017demuxlet}, scoring 25 targets in agonist mode with hdWGCNA networks and running the scTenifoldKnk track with GO gene sets (MSigDB C5). The targets fall into three groups: the type I interferon (IFN) receptor and signalling cascade (IFNAR1, IFNAR2, JAK1, TYK2, STAT1, STAT2, IRF9 and the joint targets IFNAR1;IFNAR2, JAK1;TYK2, STAT1;STAT2); ten interferon-stimulated genes (ISGs); and five lineage genes used as controls (CD19, MS4A1, IL4R, TLR4, CSF1R). With \param{n\_cells}~2,000 and \param{min\_cells}~500, six identities were kept (7,502 cells) and two were dropped automatically (dendritic cells, 258 cells; megakaryocytes, 63 cells). Every target passed QC.
+We benchmarked the rank-score track on four AML cohorts processed in the same way (Figs.~\ref{fig:cohorts}--\ref{fig:malignant}), and earlier on one of them with its authors' own malignant/normal labels (Fig.~\ref{fig:vangalen}). We asked three questions: whether the scores replicate between cohorts, whether stem cells are more affected by the targets of AML drugs than other cells, and which targets distinguish malignant cells from their normal counterparts. The knockout track was not part of this benchmark.
 
-\paragraph{Monocytes rank first, but partly for every target.} Monocytes had the highest score for 20 of 25 targets, including all 10 ISGs (Fig.~\ref{fig:kang}A). This agrees with circulating monocytes carrying the highest baseline ISG expression in these data and being the main IFN-responsive population in PBMCs. However, when log scores are decomposed into target and identity effects, both monocyte populations score about 7-fold higher than the other identities regardless of target (+0.84 and +0.87 $\log_{10}$ relative to B cells). This offset also lifts the lineage controls: FCGR3A$^+$ monocytes rank first for CD19. Only after the offset is removed does the ISG signal become specific. ISGs keep a monocyte excess of 0.39 $\log_{10}$ (Wilcoxon $P=0.009$), whereas the upstream cascade shows none ($-0.14$) and the lineage controls fall below it ($-0.61$) (Fig.~\ref{fig:kang}B). The networks themselves support this: 67\% of the 15 strongest partners of an ISG in monocytes are other ISGs, against 25\% in other identities and 1\% for lineage genes (Fig.~\ref{fig:kang}C). Scores correlate moderately with target expression (Spearman $\rho=0.49$), but the monocyte term remains after adjusting for expression (0.77 $\log_{10}$, $P=6\times10^{-9}$). Targets with no counts in an identity score at the numerical floor ($<10^{-10}$, 9 pairs), as expected for an isolated node. A further 12 pairs whose target is detected in fewer than 1\% of cells still received ordinary scores, and one of them (CD19 in FCGR3A$^+$ monocytes) ranked first. \todo{Validate against the stimulated half of the data: correlate per-identity scores with the number of IFN-$\beta$-induced DE genes per cell type from the stimulated vs.\ control comparison.}
+\subsection{Four AML cohorts processed with one command each}
 
-\paragraph{The knockout track is largely target-independent in this run.} All 141 identity $\times$ target knockouts produced at least one differentially regulated (DR) gene at FDR $<0.05$ (1,858 in total). The hits, however, barely depended on the target. In four of six identities the DR set was identical for most targets (median pairwise Jaccard 1.0; Fig.~\ref{fig:kang}D). In CD14$^+$ monocytes all 25 knockouts returned the same two genes, FTH1 and FTL, and the full FC rankings were highly correlated across targets (median Spearman $\rho=0.74$--$0.96$). Ribosomal protein genes made up 37\% of hits, but only 3.2\% of tested genes. The GO enrichment did not recover interferon signalling: the IFN-related sets that passed FDR $<0.25$ had negative NES, mostly in B cells. We read this as the knockout signal being dominated by genes whose network position differs between the two aligned networks for reasons unrelated to the target. \todo{Diagnose before submission: compare with scTenifoldKnk()'s own statistic (v1.1) on the same networks, a random-gene knockout null, and a larger \param{sctknk\_min\_pct}; decide whether the v1.0.3 reference mean is responsible.}
+\citet{Zeng2025bonemarrowmap} mapped the cells of 21 published AML scRNA-seq studies onto a reference of normal haematopoiesis, giving every cell one of the same broad cell types whatever its study. We took four of these cohorts \citep{BeneytoCalabuig2023aml,Lasry2023aml,Naldini2023aml,vanGalen2019aml} and called every cell malignant or normal with scMalignantFinder \citep{Yu2025scmalignantfinder}. Its pre-trained pan-cancer model did not separate AML blasts from normal cells (58\% agreement with van Galen's labels, AUC 0.59), so we retrained it on the curated labels of the Beneyto-Calabuig, Lasry and Naldini cohorts. On the held-out van Galen cohort the retrained model agreed with the original labels for 81\% of cells (AUC 0.88); for the other three cohorts the call is in-sample. \todo{Confirm that the final calls used this retrained model (3 cohorts, logistic regression).} Each identity combines the atlas's broad cell type with this call, a malignant identity carrying the suffix \emph{-like} (e.g.\ HSC\_MPP-like for malignant cells that resemble haematopoietic stem and multipotent progenitor cells).
 
-\paragraph{Cost.} The whole run took 5.0\,h of compute across all tasks (Fig.~\ref{fig:kang}E). Network inference (hdWGCNA, about 1\,min per identity) and scoring (about 31\,s per target) were small next to the scTenifoldKnk wild-type build (43\,min per identity). Building that network once per identity and reusing it for each of the 150 knockouts (5.5\,s each) took 4.5\,h, whereas one \texttt{scTenifoldKnk()} call per identity $\times$ target pair would have taken an estimated 108\,h, about 24-fold more.
+We ran NetPerturb on each cohort with GENIE3 networks, antagonist mode, \param{n\_cells}~3,000 and \param{min\_cells}~150, and the same 55 targets of drugs used or trialled in AML: 34 single genes (BCL2, FLT3, IDH1, IDH2, MEN1, DNMT1, XPO1, MDM2, KIT, CD33, IL3RA and others) and 21 pairs of them. NetPerturb kept 13 identities in Beneyto-Calabuig, 22 in Lasry, 24 in Naldini and 27 in van Galen, 86 in all (111,592 cells), and dropped another 54 identities below \param{min\_cells} automatically (Fig.~\ref{fig:cohorts}A). The cohorts differ in what they contain. Beneyto-Calabuig keeps only three normal identities, all mature myeloid; van Galen is the only cohort with enough lymphocytes, plasma cells and NK cells to score them; and the malignant identities usually reach the 3,000-cell cap while most normal ones hold a few hundred cells. The shared gene universe held 4,232--4,282 genes per cohort, of which 2,133--3,710 had counts in a given identity. Every target passed quality control in every cohort, and only 13 of the 4,730 identity $\times$ target pairs had no score, all of them for PLK1, HAVCR2, AURKB, AURKA or DHODH.
 
-\begin{figure*}[!t]%
+\begin{figure}[p]%
 \centering
-\includegraphics[width=\textwidth]{fig2_kang.pdf}
-\caption{\textbf{Benchmark on unstimulated PBMCs \citep{Kang2017demuxlet}} (hdWGCNA networks, agonist mode, seed 1). (A) $\log_{10}$ perturbation score for each identity $\times$ target pair. A white dot marks the top identity for each target; a red $\times$ marks a target detected in $<1\%$ of the identity's cells; grey marks scores at the numerical floor ($<10^{-10}$). (B) Residual $\log_{10}$ score after removing the target and identity main effects, by target group; bars show means. (C) Share of each target's 15 strongest network partners (\texttt{top\_connections}) that are ISGs. (D) Pairwise Jaccard index of the scTenifoldKnk DR gene sets (FDR $<0.05$) between targets within each identity; $n$, median DR genes per target. (E) Mean running time per task for each step, from the Nextflow trace.}\label{fig:kang}
-\figalttext[Five-panel benchmark figure on Kang PBMC data]{Panel A is a heatmap of perturbation scores across six cell types and 25 targets, darkest in the two monocyte rows. Panel B shows residual scores by target group, with monocytes above zero only for ISGs. Panel C is a bar chart showing that 67 percent of monocyte ISG network partners are ISGs. Panel D shows knockout gene-set overlap close to 1 in most cell types. Panel E is a bar chart of running time per pipeline step on a log scale, dominated by the scTenifoldKnk network build.}%
-\end{figure*}
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig2_zeng_overview.pdf}
+\caption{\textbf{Four AML cohorts: design, reproducibility and network-size offsets} (cohorts of the \citet{Zeng2025bonemarrowmap} atlas; GENIE3 networks, antagonist mode, 55 targets). (A) Identities scored per cohort, normal (N) and malignant (M, scMalignantFinder call), coloured by the number of cells the identity's network was built from; grey, not scored. (B) Mean $\log_{10}$ score of each target in one cohort against its mean over the other three; dashed line, identity. (C) Share of the variance of $\log_{10}$ scores explained by the target, by the identity, and left as the target $\times$ identity residual. (D) Identity-wide offset, the identity effect of a target + identity decomposition of $\log_{10}$ scores, against the number of cells in the identity's network; filled, malignant; dashed line, least-squares fit over all cohorts. (E) Spearman correlation over the six pairs of cohorts for the target mean, the identity offset and the target-specific effect (12 identities scored in every cohort), and for stem specificity (Fig.~\ref{fig:stem}B); bars, medians.}\label{fig:cohorts}
+\end{figure}
+
+\subsection{Target-level scores replicate across cohorts}
+
+Within a cohort, the target explained 38--54\% of the variance of $\log_{10}$ scores, the identity 3--8\%, and the remaining 41--59\% was specific to the target in that identity (Fig.~\ref{fig:cohorts}C). The target level replicated closely. A target's mean score in one cohort correlated with its mean over the other three with Spearman $\rho$ of 0.92--0.94 (Fig.~\ref{fig:cohorts}B), and pairs of cohorts agreed with $\rho$ 0.88--0.92 (Fig.~\ref{fig:cohorts}E). The same held against an earlier run on van Galen's original labels with an older pipeline version ($\rho=0.84$; Fig.~\ref{fig:vangalen}). Joint targets scored highest: their median score was 5.5-fold that of single genes, and DNMT1;XPO1, FLT3;DNMT1, DNMT1;IDH2 and BCL2;DNMT1 were in the top ten of every cohort. Among single genes, EIF4A1, DNMT1 and IDH2 ranked highest, and DHODH, AURKA and CDK8 were in the bottom ten in every cohort.
+
+The identity level replicated moderately ($\rho$ 0.26--0.73 for identity offsets over the 12 identities scored in every cohort), and the target-specific part of a single identity $\times$ target score, the residual left once target and identity effects are removed, replicated far less ($\rho$ 0.09--0.24; Fig.~\ref{fig:cohorts}E). A single identity $\times$ target score is therefore mostly cohort-specific, and we draw conclusions only from effects aggregated over several identities and over cohorts.
+
+\subsection{Identity offsets follow network size}
+
+Every identity's scores were shifted by an identity-wide offset, which spanned 0.45--0.67 $\log_{10}$ per cohort. The offsets fell as the number of cells behind the identity's network rose, in every cohort ($\rho$ $-0.74$, $-0.86$, $-0.73$ and $-0.55$ for Beneyto-Calabuig, Lasry, Naldini and van Galen; Fig.~\ref{fig:cohorts}D), and as the number of genes in the network rose ($\rho$ $-0.53$ to $-0.81$). This matters in AML, where malignant identities usually reach the \param{n\_cells} cap and their normal counterparts do not (median 1,917 against 407 cells). In a model of the offsets on cohort, compartment and malignancy, malignant identities scored 0.13 $\log_{10}$ below normal ones ($P=1\times10^{-4}$). Adding the number of cells to the model raised the variance it explained from 24\% to 60\% ($-0.26$ $\log_{10}$ per tenfold more cells, $P=10^{-12}$), and the malignant difference vanished ($-0.03$, $P=0.32$). Stem identities (HSC/MPP and LMPP) then scored slightly below progenitor and mature ones (by 0.08, $P=0.02$, and 0.07, $P=0.05$). Stem cells were therefore not more affected by the targets as a whole. The offsets report how large an identity's network is rather than how vulnerable its cells are, so every comparison below uses the target-specific part of each score, from which the offsets are removed.
+
+\begin{figure}[p]%
+\centering
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig3_zeng_stem.pdf}
+\caption{\textbf{Targets that act on stem identities.} The target-specific effect is the residual of the $\log_{10}$ score once target and identity effects are removed, per cohort. (A) Target-specific effect averaged over the identities of each compartment and then over cohorts; stem, HSC/MPP and LMPP; progenitor, cycling, lymphoid, granulocyte--monocyte, megakaryocyte--erythroid, eosinophil/basophil/mast and early erythroid progenitors; mature, all other identities. (B) Stem specificity, the target-specific effect in stem identities minus that in all other identities, per cohort (dots) and averaged over cohorts (diamonds); filled diamonds, same sign in all four cohorts and $P<0.05$ against 10,000 permutations of identity labels within each cohort. In A and B, targets are ordered by stem specificity, single genes above joint targets. (C) Target-specific effect in malignant against normal stem identities, averaged over cohorts (normal stem identities are absent from Beneyto-Calabuig); dashed line, identity. (D) Number of targets whose stem specificity has the same sign in all four cohorts, observed (line) and over 2,000 label permutations (histogram). (E) Stem specificity as defined in B against two alternative definitions: HSC/MPP alone as the stem compartment, and the within-identity rank of the target among the 55 in place of the residual; dark points, IL3RA, KIT and KDM1A.}\label{fig:stem}
+\end{figure}
+
+\subsection{Targets that consistently act on stem cells}
+
+Removing the offsets left the question of which targets act on stem cells more than on the rest of the hierarchy (Fig.~\ref{fig:stem}A). For each target and cohort, we took the target-specific effect averaged over the stem identities minus that averaged over all other identities (Fig.~\ref{fig:stem}B), and tested the mean over cohorts against 10,000 permutations of identity labels within each cohort. Stem specificity was more consistent than chance: 16 targets had the same sign in all four cohorts, 11 towards stem and 5 away from it, against 7.1 expected under permutation ($P=0.003$; Fig.~\ref{fig:stem}D). Six targets acted more on stem identities in all four cohorts with $P<0.05$: IL3RA ($+0.57$ $\log_{10}$, FDR 0.04), KIT ($+0.42$), KDM1A ($+0.34$, FDR 0.04), the joint target CDK8;BCL2 ($+0.24$), PSMB5 ($+0.23$) and CDK8 ($+0.20$). HMGCR, TP53, FLT3, DNMT1;IDH1 and MEN1 were positive in all four cohorts without reaching $P<0.05$. At the other end, the mitotic kinases AURKA ($-0.33$) and PLK1 ($-0.50$) acted less on stem identities in all four cohorts ($P<0.05$), as did CHEK1 ($-0.20$, $P=0.10$); as a group, AURKA, AURKB, PLK1, CHEK1 and WEE1 averaged $-0.27$ ($P=0.07$). The joint target DNMT1;HAVCR2 had the strongest effect away from stem cells ($-0.59$, FDR 0.005). The ranking did not depend on how stem cells or effects were defined. It held when the stem compartment was restricted to HSC/MPP ($\rho=0.89$) and when each target's rank among the 55 within an identity replaced the residual ($\rho=0.94$; Fig.~\ref{fig:stem}E).
+
+\subsection{Malignant and normal stem cells respond to different targets}
+
+Three of the four cohorts hold both malignant and normal stem identities, so the stem-specific targets could be split by the stem cells they act on (Fig.~\ref{fig:stem}C). IL3RA (CD123), a marker of leukaemic stem cells \citep{Jordan2000cd123}, acted on malignant stem identities ($+0.68$) and not on normal ones ($-0.02$), and it was higher in malignant than in normal stem cells in each of the three cohorts. FLT3 behaved the same way ($+0.31$ against $-0.34$; higher in malignant stem cells in all three cohorts), as did DNMT1;IDH1 ($+0.24$ against $-0.12$) and TP53 ($+0.26$ against $0.00$). KDM1A (LSD1), which sustains leukaemic stem cells \citep{Harris2012kdm1a}, leaned the same way ($+0.37$ against $+0.11$), although the paired difference was positive in only one of the three cohorts. PSMB5, CDK8 and HMGCR instead acted mostly on normal HSC/MPP ($+0.43$ to $+0.53$, against $+0.04$ to $+0.11$ in malignant stem cells), and lower in malignant than in normal stem cells in all three cohorts. KIT acted on both ($+0.31$ and $+0.35$). The first group is what a target selective for leukaemic stem cells would look like, while the second predicts haematopoietic toxicity. PLK1 and AURKA spared both kinds of stem cell.
+
+\begin{figure}[p]%
+\centering
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig4_zeng_malignant.pdf}
+\caption{\textbf{Malignant identities against their normal counterparts.} Each of the 30 matched pairs is a malignant identity (\emph{-like}) and the normal identity of the same broad cell type in the same cohort; the difference is taken on the target-specific effect, so identity offsets cancel. (A) Malignant minus normal for each target over the 30 pairs (dots, coloured by cohort) and their mean (diamonds; filled, Wilcoxon signed-rank $P<0.05$); x axis cut at the 0.5th and 99.5th percentiles. Targets are ordered by the mean, single genes above joint targets. (B) Mean malignant-minus-normal difference of the blast markers KIT, FLT3 and CD33 minus that of the other targets, per pair, grouped by compartment. (C) Malignant minus normal for selected targets in the same pairs as B; white, a pair without a score.}\label{fig:malignant}
+\end{figure}
+
+\subsection{Blast markers separate malignant cells from their normal counterparts}
+
+Across the 30 matched pairs of a malignant identity and the normal identity of the same broad cell type (Fig.~\ref{fig:malignant}), the receptors and antigens that mark AML blasts stood out. KIT, FLT3 and CD33, the blast markers singled out in the single-cohort run below, gained more than the other targets in 23 of the 30 pairs (median $+0.27$ $\log_{10}$, signed-rank $P=1.5\times10^{-4}$; Fig.~\ref{fig:malignant}B). The excess was clearest in progenitors (9 of 10 pairs, median $+0.30$) and stem cells (3 of 4, $+0.37$), and weaker in mature identities (11 of 16, $+0.16$). Individually, BCL2 ($+0.34$, higher in 70\% of pairs, $P=0.02$) and FLT3 ($+0.30$, 73\%, $P=0.003$) led (Fig.~\ref{fig:malignant}A), and both, with TP53, were higher in malignant identities on average in every cohort. BCL2, the target of venetoclax, was nonetheless not stem-specific relative to the other identities ($-0.32$; Fig.~\ref{fig:stem}B), although it was higher in malignant than in normal stem cells in all three cohorts with both. At the other end, IDH2 ($-0.33$, $P=0.004$), AURKA ($-0.29$, $P=0.001$), CDK19, CHEK1, EIF4E and NAE1 were lower in malignant identities ($P<0.05$). IDH1/2 inhibitors act on a mutant enzyme whose activity an expression network cannot see, so these targets are not expected to follow malignancy. The pair-level detail (Fig.~\ref{fig:malignant}C) shows how variable single pairs are: no single target passed FDR 0.05 over the 30 pairs (lowest 0.06), and the signal emerges only when pairs, or targets with a shared role such as the blast markers, are pooled.
+
+\subsection{Joint targets are not the sum of their members}
+
+The 21 joint targets did not reproduce either member's profile across identities. Their scores correlated weakly with the stronger member (median Spearman $\rho$ 0.22 over the 84 joint target $\times$ cohort combinations) and less with the weaker one (0.09), and they scored 2.5-fold the higher of the two members. A joint target is perturbed as one knockout of both genes' edges, and what the network then loses is not what it loses for either gene alone, so joint targets should be read as perturbations in their own right. Some of them were among the most consistent results: CDK8;BCL2 acted on stem identities in all four cohorts, and DNMT1;HAVCR2 spared them most.
+
+\begin{figure}[p]%
+\centering
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig2_vangalen_genie3.pdf}
+\caption{\textbf{Single-cohort run on the original van Galen labels} \citep{vanGalen2019aml} (GENIE3 networks, antagonist mode, seed 1). (A) $\log_{10}$ perturbation score for all 55 targets, single genes on the left and joint targets on the right, across the 19 identities, with each malignant identity (\emph{-like}) placed under its normal counterpart. A white dot marks the top identity for each target, and grey a pair without a score (the target has no edge in that identity's network). (B) Difference in $\log_{10}$ score between each malignant identity and its normal counterpart, one point per target scored in both; bars show medians; the blast-marker targets and BCL2 are coloured. (C) Identity main effect from a decomposition of $\log_{10}$ scores into target and identity effects, relative to B cells.}\label{fig:vangalen}
+\end{figure}
+
+\subsection{Single-cohort run on the original labels}
+
+Before the four-cohort runs, we ran the pipeline on the van Galen data with the authors' own malignant/normal labels, in which every malignant cell is labelled with the normal cell type it most resembles (Fig.~\ref{fig:vangalen}). With \param{n\_cells}~2,000, NetPerturb kept 19 identities (29,752 cells) and dropped pDC (225 cells) and ProB (298) automatically. In 296 of the 1,045 identity $\times$ target pairs the target had no edge in that identity's network and scored zero, most often in T and NK cells and for AURKB, CDK8, IL3RA and JAK2; in the four-cohort runs, on the current pipeline, only 13 pairs had no score.
+
+A malignant identity scored higher than its normal counterpart in 58\% of 193 comparisons (median $+0.10$ $\log_{10}$), most clearly at the top of the hierarchy: HSC-like exceeded HSC by 0.38 $\log_{10}$ (16 of 22 targets, signed-rank $P=0.02$) and Prog-like exceeded Prog by 0.36 (19 of 28, $P=0.009$; Fig.~\ref{fig:vangalen}B). The blast markers carried the largest excess: over the three progenitor pairs, KIT, FLT3 and CD33 had a median malignant excess of 0.90 $\log_{10}$, against 0.13 for the other targets ($P=0.006$). BCL2 ranked plasma cells first and HSC-like cells, the population venetoclax acts on \citep{Pollyea2018venetoclax}, second. Identity offsets spanned 0.47 $\log_{10}$ (Fig.~\ref{fig:vangalen}C), and the low offsets of normal HSC and Prog accounted for much of the general malignant excess: once both offsets were removed, the pooled malignant-minus-normal difference was $-0.03$ $\log_{10}$. The four-cohort runs explained these offsets by network size and confirmed that the blast-marker excess is not one of them. \todo{This run predates the mito/ribo removal and the Data quality section (25 Sep). Re-run it on the current pipeline, or move it to an Additional file, before submission.}
+
+\subsection{Cost}
+
+A cohort took 15--43\,h of compute, almost all of it GENIE3: on average 0.4--2.7\,h per identity, and up to 4.7\,h for an identity at the 3,000-cell cap, so the cost grows with the number of cells kept per identity. Scoring then took 4--6\,min per target. Every identity and every target is its own task, so on a cluster a cohort finishes in about the time of its longest task, under 5\,h.
 
 %% =====================================================================
-\section{Conclusion}
+\section{Discussion}\label{sec:discussion}
 %% =====================================================================
 
-NetPerturb takes an analyst from a Seurat object to a shareable report on GRN-based in silico perturbation with a single command. It runs several network inference methods and a virtual knockout under one interface, and its seeding, containers and provenance make each result reproducible. The benchmark also shows how these scores should be read. Perturbation scores carry an identity-wide offset, so they should be compared against control targets from the same run rather than taken at face value; scores for targets detected in very few cells are unreliable; and knockout results that do not change with the target need a null model before they are interpreted. Scores are comparable only within one inference method, and knockout effects describe network structure, not the direction of expression change. \todo{Future work: e.g.\ built-in control targets and a per-identity null, detection filter on targets, AnnData input, nf-core submission.}
+NetPerturb takes an analyst from a Seurat object to a shareable report on GRN-based in silico perturbation with a single command. It runs several network inference methods and a virtual knockout under one interface, and its seeding, containers and provenance make each result reproducible.
+
+The four-cohort benchmark also shows how these scores should be read. Target-level results replicated between cohorts, but single identity $\times$ target scores did not, so conclusions should rest on effects aggregated over identities and, where possible, over cohorts. Scores carry an identity-wide offset that tracks how many cells an identity's network was built from. Identities should therefore be compared through the target-specific part of the score, or against control targets from the same run, and not through raw scores. Scores follow how strongly an identity's network relies on the target, which tracks the target's expression there rather than a drug's clinical sensitivity, and they are comparable only within one inference method.
+
+Read this way, the scores agreed with what is known of AML stem cells. IL3RA \citep{Jordan2000cd123} and KDM1A \citep{Harris2012kdm1a}, two leukaemic stem cell dependencies, acted on malignant stem identities, and mitotic kinases spared stem cells, as expected of a largely quiescent compartment. Targets that acted mainly on normal HSC/MPP, such as PSMB5, CDK8 and HMGCR, are candidates for haematopoietic toxicity. BCL2 shows the limit of a network score: venetoclax eliminates leukaemic stem cells by disrupting their energy metabolism \citep{Pollyea2018venetoclax}, yet BCL2 was not stem-specific here, because the score measures how much a network relies on the gene, not how a drug acts.
+
+The benchmark has limits. The malignant/normal call agreed with curated labels for 81\% of cells on the held-out cohort and is in-sample for the other three. Only GENIE3 networks and one seed were run across cohorts. Targets whose drugs act on a mutant protein, such as IDH1 and IDH2, cannot be read from expression. The knockout track was not evaluated here; it ships with a random-knockout null model for the same reason the offsets above exist.
 
 %% =====================================================================
-%% Back matter -- all required by Bioinformatics Advances
+\section{Conclusions}\label{sec:conclusions}
 %% =====================================================================
 
-\section{Acknowledgements}
-\todo{Acknowledgements.} \todo{AI disclosure: the guidelines require disclosing any AI/LLM use (e.g.\ assistance with code or drafting) here or in Methods, as well as in the cover letter.}
+NetPerturb makes GRN-based in silico perturbation of scRNA-seq data reproducible and scalable, from a processed Seurat object to a single report. Across four AML cohorts, its target-level scores replicated, and once identity-wide offsets were removed they separated targets that act on malignant stem cells, on normal stem cells, or spare them. \todo{Future work: e.g.\ downsampling every identity to the same number of cells, which would remove most of the offset; built-in control targets and a per-identity null; detection filter on targets; AnnData input; nf-core submission.}
 
-\section{Author contributions}
-\todo{CRediT roles, e.g.\ D.M.-C.: Conceptualization, Software, Writing -- original draft. \ldots}
+%% =====================================================================
+\section{Availability and requirements}\label{sec:availability}
+%% =====================================================================
 
-\section{Conflict of interest}
-None declared.
+\begin{itemize}
+\item[] \textbf{Project name:} NetPerturb
+\item[] \textbf{Project home page:} \url{https://github.com/MCBLab/NetPerturb}
+\item[] \textbf{Operating system(s):} Linux and macOS (any system that runs Nextflow), on a workstation, an HPC scheduler or the cloud
+\item[] \textbf{Programming language:} Nextflow (DSL2), R
+\item[] \textbf{Other requirements:} Nextflow $\geq$ 22.10.1 (with Java), and Docker or Singularity
+\item[] \textbf{License:} \todo{MIT -- the repository has no LICENSE file yet}
+\item[] \textbf{Any restrictions to use by non-academics:} \todo{None}
+\end{itemize}
 
-\section{Funding}
-\todo{Funding agencies and grant numbers.}
+%% =====================================================================
+\section{Abbreviations}\label{sec:abbreviations}
+%% =====================================================================
 
-\section{Data availability}
-The source code, container recipes and test data definitions are available at \url{https://github.com/MCBLab/NetPerturb} (release \todo{vX.Y.Z}, archived at Zenodo \todo{DOI}). The benchmark uses the data of \citet{Kang2017demuxlet} (GEO accession GSE96583); the processed Seurat object and the benchmark outputs are available at \todo{Zenodo DOI}.
+AML, acute myeloid leukaemia; AUC, area under the receiver operating characteristic curve; FDR, false discovery rate; GMP, granulocyte--monocyte progenitor; GRN, gene regulatory network; HPC, high-performance computing; HSC/MPP, haematopoietic stem cell/multipotent progenitor; KO, knockout; LMPP, lymphoid-primed multipotent progenitor; MEP, megakaryocyte--erythroid progenitor; PCR, principal component regression; scRNA-seq, single-cell RNA sequencing; TOM, topological overlap matrix; WT, wild type.
+
+%% =====================================================================
+%% Back matter
+%% =====================================================================
+\backmatter
+
+\bmhead{Supplementary information}
+\todo{Additional file 1: screenshots of the NetPerturb HTML report. Additional file 2: per-target effects of the four-cohort benchmark, stem specificity and malignant-minus-normal statistics (\texttt{target\_effects.tsv}). Additional file 3: the HTML reports of the four cohort runs. Additional file 4: archive of the NetPerturb source code at the submitted release.}
+
+\section*{Declarations}
+
+\bmhead{Ethics approval and consent to participate}
+Not applicable. This study reanalyses published, de-identified scRNA-seq data; ethics approval and consent were obtained by the original studies.
+
+\bmhead{Consent for publication}
+Not applicable.
+
+\bmhead{Availability of data and materials}
+The source code, container recipes and test data definitions are available at \url{https://github.com/MCBLab/NetPerturb} (release \todo{vX.Y.Z}, archived at Zenodo \todo{DOI}). The multi-cohort benchmark uses the processed objects of \citet{Zeng2025bonemarrowmap} (Zenodo, \href{https://doi.org/10.5281/zenodo.18528442}{doi:10.5281/zenodo.18528442}) for the cohorts of \citet{BeneytoCalabuig2023aml}, \citet{Lasry2023aml}, \citet{Naldini2023aml} and \citet{vanGalen2019aml} (GEO accession GSE116256), with malignant/normal calls from scMalignantFinder. The re-annotated Seurat objects, the retrained classifier and the benchmark outputs are available at \todo{Zenodo DOI}.
+
+\bmhead{Competing interests}
+The authors declare that they have no competing interests.
+
+\bmhead{Funding}
+\todo{Funding agencies and grant numbers, and the role of the funders.}
+
+\bmhead{Authors' contributions}
+\todo{e.g.\ D.M.-C.: Conceptualization, Software, Writing -- original draft. \ldots\ All authors read and approved the final manuscript.}
+
+\bmhead{Acknowledgements}
+\todo{Acknowledgements.} \todo{AI disclosure: state any use of AI/LLM tools (e.g.\ assistance with code or drafting), as the Springer Nature editorial policies require.}
 
 %% ---------------------------------------------------------------------
-%% References: numbers are capped at 15 for an Application Note.
-%% references/references.bib also holds uncited entries (GEARS, van Galen, Ocasio)
-%% that are not cited yet, in case you want to swap them in.
+%% References: Vancouver numbered (set by the sn-vancouver-num class
+%% option). For submission, upload the generated .bbl with the .tex.
 %% ---------------------------------------------------------------------
-\bibliographystyle{oup-abbrvnat}
 \bibliography{references/references}
 
 \end{document}

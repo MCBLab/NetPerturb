@@ -1,0 +1,521 @@
+Identity	Area	Check	Value	Flagged at	Why it matters
+HSC	Input	High mito/ribo share	38%	&gt; run median + 10%	Points at stressed or damaged cells, whose expression reflects that state.
+B	Input	Sparse matrix	97%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+cDC-like	Input	Sparse matrix	95%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+CTL	Input	Sparse matrix	97%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+HSC	Input	Sparse matrix	96%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+HSC-like	Input	Sparse matrix	96%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+Mono	Input	Sparse matrix	96%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+Mono-like	Input	Sparse matrix	96%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+NK	Input	Sparse matrix	97%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+Plasma	Input	Sparse matrix	95%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+Prog	Input	Sparse matrix	96%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+Prog-like	Input	Sparse matrix	95%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+T	Input	Sparse matrix	97%	&gt; 95%	Mostly-zero genes give unstable regressions and correlations.
+cDC	Input	Variation tracks depth	PC2, rho = -0.56	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+earlyEry	Input	Variation tracks depth	PC1, rho = 0.84	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+GMP	Input	Variation tracks depth	PC1, rho = -0.81	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+GMP-like	Input	Variation tracks depth	PC3, rho = 0.53	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+HSC	Input	Variation tracks depth	PC5, rho = 0.53	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+lateEry	Input	Variation tracks depth	PC1, rho = -0.73	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+Mono	Input	Variation tracks depth	PC5, rho = -0.50	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+Mono-like	Input	Variation tracks depth	PC3, rho = 0.52	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+Prog	Input	Variation tracks depth	PC1, rho = 0.67	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+Prog-like	Input	Variation tracks depth	PC2, rho = -0.53	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+ProMono	Input	Variation tracks depth	PC2, rho = 0.67	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+ProMono-like	Input	Variation tracks depth	PC3, rho = -0.59	|rho| &gt;= 0.5	A leading axis of variation is sequencing depth, so co-expression edges partly are too.
+Plasma	Input	One programme dominates	2%	&gt; 2 x run median	One programme, or a mixture of cell states, drives most of the co-expression.
+HSC	Network	Weak scale-free fit	R2 = 0.74	&lt; 0.8	The network has little of the structure WGCNA assumes.
+GMP	Network	Weak scale-free fit	R2 = 0.32	&lt; 0.8	The network has little of the structure WGCNA assumes.
+HSC-like	Network	Weak scale-free fit	R2 = 0.26	&lt; 0.8	The network has little of the structure WGCNA assumes.
+NK	Network	Weak scale-free fit	R2 = 0.41	&lt; 0.8	The network has little of the structure WGCNA assumes.
+cDC	Network	Weak scale-free fit	R2 = 0.71	&lt; 0.8	The network has little of the structure WGCNA assumes.
+CTL	Network	Weak scale-free fit	R2 = 0.27	&lt; 0.8	The network has little of the structure WGCNA assumes.
+B	Network	Weak scale-free fit	R2 = 0.32	&lt; 0.8	The network has little of the structure WGCNA assumes.
+B	Target	KIT barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	IDH1 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	IDH2 barely detected	3.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	MEN1 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	KDM1A barely detected	2.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	DHODH barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	PSMB5 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	CDK9 barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	PLK1 barely detected	0.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	AURKA barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	AURKB barely detected	0.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	CHEK1 barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	MTOR barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	MAP2K1 barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	HMGCR barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	CD33 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	IL3RA barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	HAVCR2 barely detected	0.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	CDK8 barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	CDK19 barely detected	3.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	MEN1 barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	DHODH barely detected	2.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	CDK9 barely detected	4.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	PLK1 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	AURKB barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	IL3RA barely detected	3.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC	Target	CDK8 barely detected	1.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	MEN1 barely detected	1.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	DHODH barely detected	2.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	PLK1 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	AURKA barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	AURKB barely detected	3.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	WEE1 barely detected	2.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	MTOR barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+cDC-like	Target	CDK8 barely detected	2.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	FLT3 barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	KIT barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	IDH1 barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	MEN1 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	DHODH barely detected	0.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	PSMB5 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	TP53 barely detected	3.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	CDK9 barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	PLK1 barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	AURKA barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	AURKB barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	WEE1 barely detected	1.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	CHEK1 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	MTOR barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	SYK barely detected	1.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	JAK2 barely detected	4.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	MAP2K1 barely detected	3.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	HMGCR barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	CD33 barely detected	0.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	IL3RA barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	HAVCR2 barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	CDK8 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+CTL	Target	CDK19 barely detected	3.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	MEN1 barely detected	4.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	DHODH barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	PLK1 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	AURKB barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	MAP2K1 barely detected	4.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	CD33 barely detected	1.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	IL3RA barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+earlyEry	Target	HAVCR2 barely detected	0.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	MEN1 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	DHODH barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	CDK9 barely detected	4.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	PLK1 barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	AURKA barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	MAP2K1 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	HMGCR barely detected	4.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	IL3RA barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	HAVCR2 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP	Target	CDK8 barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP-like	Target	MEN1 barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP-like	Target	DHODH barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP-like	Target	MAP2K1 barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP-like	Target	HAVCR2 barely detected	1.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+GMP-like	Target	CDK8 barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	IDH1 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	MEN1 barely detected	1.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	DHODH barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	CDK9 barely detected	3.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	PLK1 barely detected	0.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	AURKA barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	AURKB barely detected	0.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	WEE1 barely detected	3.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	CHEK1 barely detected	4.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	MTOR barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	MAP2K1 barely detected	3.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	HMGCR barely detected	3.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	CD33 barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	IL3RA barely detected	3.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	HAVCR2 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC	Target	CDK8 barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	MEN1 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	DHODH barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	PLK1 barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	AURKA barely detected	1.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	AURKB barely detected	0.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	WEE1 barely detected	2.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	MTOR barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	MAP2K1 barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	HMGCR barely detected	3.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	HAVCR2 barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+HSC-like	Target	CDK8 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	BCL2 barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	FLT3 barely detected	3.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	MEN1 barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	DHODH barely detected	4.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	CDK9 barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	CD33 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	IL3RA barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+lateEry	Target	HAVCR2 barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	BCL2 barely detected	3.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	KIT barely detected	0.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	MEN1 barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	DHODH barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	NAE1 barely detected	3.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	PSMB5 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	TP53 barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	CDK9 barely detected	4.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	PLK1 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	AURKA barely detected	2.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	AURKB barely detected	2.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	WEE1 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	CHEK1 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	MTOR barely detected	3.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	IL3RA barely detected	2.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	HAVCR2 barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono	Target	CDK8 barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	BCL2 barely detected	1.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	KIT barely detected	0.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	IDH2 barely detected	3.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	MEN1 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	DHODH barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	NAE1 barely detected	4.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	TP53 barely detected	3.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	PLK1 barely detected	0.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	AURKA barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	AURKB barely detected	0.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	WEE1 barely detected	1.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	CHEK1 barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	MTOR barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	HMGCR barely detected	3.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	IL3RA barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	HAVCR2 barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Mono-like	Target	CDK8 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	FLT3 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	KIT barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	IDH1 barely detected	1.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	MEN1 barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	DHODH barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	PSMB5 barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	TP53 barely detected	3.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	CDK9 barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	PLK1 barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	AURKA barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	AURKB barely detected	0.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	WEE1 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	CHEK1 barely detected	2.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	MTOR barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	SYK barely detected	3.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	MAP2K1 barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	HMGCR barely detected	3.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	CD33 barely detected	0.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	IL3RA barely detected	0.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	HAVCR2 barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	CDK8 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+NK	Target	CDK19 barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	FLT3 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	IDH1 barely detected	2.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	MEN1 barely detected	1.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	DHODH barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	TP53 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	CDK9 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	PLK1 barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	AURKA barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	AURKB barely detected	0.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	WEE1 barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	MTOR barely detected	4.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	SYK barely detected	4.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	MAP2K1 barely detected	4.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	CD33 barely detected	0.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	IL3RA barely detected	0.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	HAVCR2 barely detected	0.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	CDK8 barely detected	2.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Plasma	Target	CDK19 barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	IDH1 barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	MEN1 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	DHODH barely detected	1.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	CDK9 barely detected	3.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	PLK1 barely detected	1.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	AURKA barely detected	2.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	AURKB barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	MTOR barely detected	2.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	MAP2K1 barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	HMGCR barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	CD33 barely detected	4.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	IL3RA barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	HAVCR2 barely detected	1.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog	Target	CDK8 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	MEN1 barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	DHODH barely detected	2.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	PLK1 barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	AURKB barely detected	3.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	MAP2K1 barely detected	4.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	HAVCR2 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+Prog-like	Target	CDK8 barely detected	3.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	KIT barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	MEN1 barely detected	1.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	DHODH barely detected	2.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	IL3RA barely detected	3.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	HAVCR2 barely detected	2.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono	Target	CDK8 barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	KIT barely detected	4.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	MEN1 barely detected	2.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	DHODH barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	PLK1 barely detected	4.7%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	HAVCR2 barely detected	1.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+ProMono-like	Target	CDK8 barely detected	2.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	FLT3 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	KIT barely detected	0.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	IDH1 barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	IDH2 barely detected	4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	MEN1 barely detected	1.3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	DHODH barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	PSMB5 barely detected	2.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	TP53 barely detected	4.1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	CDK9 barely detected	2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	PLK1 barely detected	0.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	AURKA barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	AURKB barely detected	0.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	WEE1 barely detected	1%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	CHEK1 barely detected	1.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	MTOR barely detected	3.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	SYK barely detected	0.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	JAK2 barely detected	2.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	MAP2K1 barely detected	3.6%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	HMGCR barely detected	3%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	CD33 barely detected	0.2%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	IL3RA barely detected	0.8%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	HAVCR2 barely detected	0.9%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	CDK8 barely detected	1.4%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+T	Target	CDK19 barely detected	2.5%	&lt; 5%	Too few cells express it for a network to connect it reliably.
+B	Target	EIF4A1 at noise level	0.71	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	DNMT1 at noise level	0.77	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	XPO1 at noise level	0.75	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	NAE1 at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	MDM2 at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	TP53 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	HDAC1 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	WEE1 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	EIF4E at noise level	0.79	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+B	Target	GLS at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	EIF4A1 at noise level	0.76	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	IDH1 at noise level	0.82	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	KDM1A at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	NAE1 at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	PSMB5 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	TP53 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	HDAC1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	MTOR at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	SYK at noise level	0.78	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	EIF4E at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	CD33 at noise level	0.77	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC	Target	HAVCR2 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	EIF4A1 at noise level	0.85	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	KDM1A at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	NAE1 at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	TP53 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	HDAC1 at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	CDK9 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	SYK at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	JAK2 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	MAP2K1 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	EIF4E at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	CD33 at noise level	0.83	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	IL3RA at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+cDC-like	Target	HAVCR2 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	EIF4A1 at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	IDH2 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	XPO1 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	MDM2 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	HDAC1 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+CTL	Target	GLS at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	EIF4A1 at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	IDH1 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	IDH2 at noise level	0.85	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	DNMT1 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	KDM1A at noise level	0.83	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	PSMB5 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	TP53 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	HDAC1 at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	CDK9 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	MTOR at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	SYK at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	GLS at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	HMGCR at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	CDK8 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+earlyEry	Target	CDK19 at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	EIF4A1 at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	IDH2 at noise level	0.79	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	PSMB5 at noise level	0.76	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	TP53 at noise level	0.85	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	HDAC1 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	AURKB at noise level	0.78	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	MTOR at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	SYK at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	EIF4E at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP	Target	CDK19 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	EIF4A1 at noise level	0.80	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	IDH1 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	IDH2 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	DNMT1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	KDM1A at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	PSMB5 at noise level	0.85	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	HDAC1 at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	CDK9 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	MTOR at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	SYK at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	JAK2 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	EIF4E at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	GLS at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	CD33 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+GMP-like	Target	CDK19 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	EIF4A1 at noise level	0.75	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	IDH2 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	KDM1A at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	XPO1 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	NAE1 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	MDM2 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	SYK at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	EIF4E at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC	Target	GLS at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	EIF4A1 at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	IDH1 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	IDH2 at noise level	0.80	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	KDM1A at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	XPO1 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	PSMB5 at noise level	0.84	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	TP53 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	HDAC1 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	CDK9 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	SYK at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	JAK2 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	EIF4E at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	GLS at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+HSC-like	Target	CD33 at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	EIF4A1 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	IDH1 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	IDH2 at noise level	0.78	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	DNMT1 at noise level	0.71	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	KDM1A at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	XPO1 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	NAE1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	PSMB5 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	HDAC1 at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	AURKB at noise level	0.76	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	WEE1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	CHEK1 at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	MTOR at noise level	0.77	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	JAK2 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	MAP2K1 at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	EIF4E at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+lateEry	Target	GLS at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	EIF4A1 at noise level	0.73	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	IDH1 at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	IDH2 at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	KDM1A at noise level	0.83	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	XPO1 at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	HDAC1 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	SYK at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	MAP2K1 at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	EIF4E at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	GLS at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	CD33 at noise level	0.75	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono	Target	CDK19 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	EIF4A1 at noise level	0.82	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	DNMT1 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	XPO1 at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	PSMB5 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	HDAC1 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	CDK9 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	SYK at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	EIF4E at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	CD33 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Target	CDK19 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	EIF4A1 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	IDH2 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	KDM1A at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	XPO1 at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	NAE1 at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	MDM2 at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	HDAC1 at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	EIF4E at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+NK	Target	GLS at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	KIT at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	IDH2 at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	KDM1A at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	XPO1 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	PSMB5 at noise level	0.94	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	HDAC1 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	EIF4E at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Plasma	Target	GLS at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	EIF4A1 at noise level	0.75	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	DNMT1 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	KDM1A at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	XPO1 at noise level	0.90	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	PSMB5 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	TP53 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	SYK at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	GLS at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog	Target	CDK19 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	EIF4A1 at noise level	0.89	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	IDH2 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	DNMT1 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	KDM1A at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	PSMB5 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	TP53 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	HDAC1 at noise level	0.87	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	CDK9 at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	WEE1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	MTOR at noise level	0.96	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	SYK at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	HMGCR at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Prog-like	Target	CD33 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	EIF4A1 at noise level	0.77	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	IDH2 at noise level	0.86	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	DNMT1 at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	KDM1A at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	PSMB5 at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	HDAC1 at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	CDK9 at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	AURKA at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	AURKB at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	MTOR at noise level	0.85	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	SYK at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	EIF4E at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	GLS at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	CD33 at noise level	0.82	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono	Target	CDK19 at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	EIF4A1 at noise level	0.82	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	KDM1A at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	TP53 at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	HDAC1 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	CDK9 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	AURKB at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	WEE1 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	SYK at noise level	0.81	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	MAP2K1 at noise level	0.99	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	GLS at noise level	0.98	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	HMGCR at noise level	1.00	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	CD33 at noise level	0.83	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+ProMono-like	Target	IL3RA at noise level	0.95	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+T	Target	BCL2 at noise level	0.97	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+T	Target	EIF4A1 at noise level	0.88	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+T	Target	HDAC1 at noise level	0.92	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+T	Target	EIF4E at noise level	0.91	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+T	Target	GLS at noise level	0.93	&lt; 1	Detected, but it varies no more than sampling noise, so its edges carry little.
+Mono-like	Network	XPO1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Mono-like	Network	CDK19 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	WEE1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	MTOR isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	MAP2K1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	IL3RA isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	CDK8 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+ProMono-like	Network	CDK19 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+HSC-like	Network	CDK19 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	EIF4A1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	IDH1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	DHODH isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	MTOR isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	SYK isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	HMGCR isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+GMP-like	Network	CDK8 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Prog-like	Network	MEN1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Prog-like	Network	KDM1A isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Prog-like	Network	HDAC1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Prog-like	Network	MTOR isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Prog-like	Network	MAP2K1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Plasma	Network	HDAC1 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Plasma	Network	EIF4E isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Plasma	Network	GLS isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.
+Plasma	Network	CDK8 isolated	0th pct	&lt; 10th pct	The target has almost no edges here, so its score or knockout reflects the rest of the network.

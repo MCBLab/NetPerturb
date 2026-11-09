@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 820" width="1600" height="820" role="img" font-family="DejaVu Sans, Arial, sans-serif" fill="#0b0b0b" aria-label="Overview of the van Galen 2019 AML bone marrow dataset. Twenty-one annotated populations with their cell counts: a myeloid row from HSC to cDC, an erythroid and a lymphoid branch off the progenitor, and six malignant -like populations sitting under the normal cell type each one resembles.">
+<rect width="1600" height="820" fill="#ffffff"/>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#52514e"/></marker><marker id="arb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2a78d6"/></marker></defs>
+<text x="40" y="44" font-size="25" font-weight="bold">van Galen et al. 2019 &#8212; AML bone marrow</text>
+<text x="40" y="72" font-size="16" fill="#52514e">16 AML patients and 5 healthy donors, 40 bone marrow aspirates (GEO GSE116256). Each malignant population is named after the normal cell type it most resembles.</text>
+<circle cx="230" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="230" y="215" text-anchor="middle" font-size="13" fill="#52514e">1,119</text>
+<text x="230" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">earlyEry</text>
+<circle cx="400" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="400" y="215" text-anchor="middle" font-size="13" fill="#52514e">1,329</text>
+<text x="400" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">lateEry</text>
+<line x1="259" y1="210" x2="369" y2="210" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<path d="M 392 392 C 352 336, 312 258, 264 226" fill="none" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="315" y="152" text-anchor="middle" font-size="14" fill="#9a9892">erythroid</text>
+<circle cx="640" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="640" y="215" text-anchor="middle" font-size="13" fill="#52514e">520</text>
+<text x="640" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">B</text>
+<circle cx="800" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="800" y="215" text-anchor="middle" font-size="13" fill="#52514e">1,146</text>
+<text x="800" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">Plasma</text>
+<circle cx="980" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="980" y="215" text-anchor="middle" font-size="13" fill="#52514e">7,105</text>
+<text x="980" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">T</text>
+<circle cx="1140" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="1140" y="215" text-anchor="middle" font-size="13" fill="#52514e">1,338</text>
+<text x="1140" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">CTL</text>
+<circle cx="1300" cy="210" r="27" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="1300" y="215" text-anchor="middle" font-size="13" fill="#52514e">1,969</text>
+<text x="1300" y="257" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">NK</text>
+<path d="M 448 394 C 490 340, 500 150, 560 150" fill="none" stroke="#52514e" stroke-width="1.5"/>
+<line x1="560" y1="150" x2="1300" y2="150" stroke="#52514e" stroke-width="1.5"/>
+<line x1="640" y1="150" x2="640" y2="180" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="980" y1="150" x2="980" y2="180" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="1300" y1="150" x2="1300" y2="180" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="669" y1="210" x2="769" y2="210" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="1009" y1="210" x2="1109" y2="210" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="1290" y="138" text-anchor="end" font-size="14" fill="#9a9892">lymphoid</text>
+<circle cx="230" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="230" y="425" text-anchor="middle" font-size="13" fill="#52514e">1,709</text>
+<text x="230" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">HSC</text>
+<circle cx="420" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="420" y="425" text-anchor="middle" font-size="13" fill="#52514e">1,709</text>
+<text x="420" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">Prog</text>
+<circle cx="610" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="610" y="425" text-anchor="middle" font-size="13" fill="#52514e">918</text>
+<text x="610" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">GMP</text>
+<circle cx="800" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="800" y="425" text-anchor="middle" font-size="13" fill="#52514e">1,146</text>
+<text x="800" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">ProMono</text>
+<circle cx="990" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="990" y="425" text-anchor="middle" font-size="13" fill="#52514e">2,758</text>
+<text x="990" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">Mono</text>
+<circle cx="1180" cy="420" r="32" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/>
+<text x="1180" y="425" text-anchor="middle" font-size="13" fill="#52514e">849</text>
+<text x="1180" y="377" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#eb6834">cDC</text>
+<line x1="264" y1="420" x2="384" y2="420" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="454" y1="420" x2="574" y2="420" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="644" y1="420" x2="764" y2="420" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="834" y1="420" x2="954" y2="420" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<line x1="1024" y1="420" x2="1144" y2="420" stroke="#52514e" stroke-width="1.5" marker-end="url(#ar)"/>
+<text x="40" y="425" font-size="14" fill="#9a9892">myeloid</text>
+<line x1="230" y1="455" x2="230" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="230" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="230" y="625" text-anchor="middle" font-size="13" fill="#52514e">2,175</text>
+<text x="230" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">HSC-like</text>
+<line x1="420" y1="455" x2="420" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="420" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="420" y="625" text-anchor="middle" font-size="13" fill="#52514e">7,021</text>
+<text x="420" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">Prog-like</text>
+<line x1="610" y1="455" x2="610" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="610" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="610" y="625" text-anchor="middle" font-size="13" fill="#52514e">3,937</text>
+<text x="610" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">GMP-like</text>
+<line x1="800" y1="455" x2="800" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="800" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="800" y="625" text-anchor="middle" font-size="13" fill="#52514e">2,603</text>
+<text x="800" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">ProMono-like</text>
+<line x1="990" y1="455" x2="990" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="990" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="990" y="625" text-anchor="middle" font-size="13" fill="#52514e">2,731</text>
+<text x="990" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">Mono-like</text>
+<line x1="1180" y1="455" x2="1180" y2="584" stroke="#2a78d6" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arb)"/>
+<circle cx="1180" cy="620" r="32" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/>
+<text x="1180" y="625" text-anchor="middle" font-size="13" fill="#52514e">2,218</text>
+<text x="1180" y="672" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#2a78d6">cDC-like</text>
+<text x="1234" y="516" font-size="13.5" fill="#2a78d6">leukaemic</text>
+<text x="1234" y="534" font-size="13.5" fill="#2a78d6">counterpart</text>
+<text x="40" y="625" font-size="14" font-weight="bold" fill="#2a78d6">malignant</text>
+<circle cx="52" cy="730" r="11" fill="#fde8de" stroke="#eb6834" stroke-width="2.5"/><text x="72" y="735" font-size="15">normal population</text>
+<circle cx="262" cy="730" r="11" fill="#dbe8fa" stroke="#2a78d6" stroke-width="2.5"/><text x="282" y="735" font-size="15">malignant (<tspan font-style="italic">-like</tspan>), from the AML patients</text>
+<text x="690" y="735" font-size="15" fill="#52514e">numbers are cells in the object</text>
+<text x="40" y="767" font-size="15" fill="#52514e">21 annotated populations, 44,823 cells. 19 kept and 29,752 cells entered the networks (at most 2,000 per identity); pDC (225 cells) and ProB (298) fell below the 500-cell minimum.</text>
+</svg>
