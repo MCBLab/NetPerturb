@@ -535,4 +535,120 @@ nextflow_pipeline {
         }
     }
 
+    test("an .h5ad --obj with --h5ad is converted once and stands in for it downstream") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj      = "${projectDir}/tests/fixtures/dummy_obj.h5ad"
+                h5ad     = true
+                target   = "${projectDir}/testdata/test_input.txt"
+                column   = "labels"
+                species  = "mouse"
+                n_cells  = 100
+                n_cores  = 1
+                network  = "genie3"
+                sctknk   = true
+                outdir   = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+
+            // one conversion, tagged with the file it read
+            assert names.count { it.startsWith("H5AD_TO_SEURAT") } == 1
+            assert names.contains("H5AD_TO_SEURAT (dummy_obj.h5ad)")
+
+            // and the converted object reaches both tracks: DOWNSAMPLE once,
+            // and RANK_SCORE once per target -- which it only does if the
+            // conversion's output is a value channel, as a plain --obj is
+            assert names.count { it.startsWith("DOWNSAMPLE") } == 1
+            assert names.count { it.startsWith("RANK_SCORE") } == 3
+            assert names.count { it.startsWith("SCTENIFOLDKNK_BUILD") } == 2
+            assert names.count { it.startsWith("REPORT") } == 1
+        }
+    }
+
+    test("a Seurat --obj is read as it is, with no conversion") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def names = workflow.trace.tasks().collect { it.@name }
+            assert !names.any { it.startsWith("H5AD_TO_SEURAT") }
+            assert names.count { it.startsWith("DOWNSAMPLE") } == 1
+        }
+    }
+
+    test("an .h5ad --obj without --h5ad stops before anything runs") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.h5ad"
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+
+            // rather than DOWNSAMPLE failing on readRDS of an HDF5 file
+            assert workflow.stdout.any { it.contains("is an AnnData file. Add --h5ad") }
+            assert workflow.trace.tasks().isEmpty()
+        }
+    }
+
+    test("--h5ad on a Seurat .rds stops before anything runs") {
+
+        options "-stub"
+
+        when {
+            params {
+                obj     = "${projectDir}/tests/fixtures/dummy_obj.rds"
+                h5ad    = true
+                target  = "${projectDir}/testdata/test_input.txt"
+                column  = "labels"
+                species = "mouse"
+                n_cells = 100
+                n_cores = 1
+                network = "genie3"
+                outdir  = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+
+            assert workflow.stdout.any { it.contains("--h5ad was given, but --obj") }
+            assert workflow.trace.tasks().isEmpty()
+        }
+    }
+
 }

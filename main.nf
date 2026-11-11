@@ -18,6 +18,7 @@ include { MERGE_SCTENIFOLDKNK } from "./modules/local/merge_sctenifoldknk/main.n
 include { GSEA_SCTENIFOLDKNK } from "./modules/local/gsea_sctenifoldknk/main.nf"
 include { REPORT } from "./modules/local/report/main.nf"
 include { NETWORK_QC } from "./modules/local/network_qc/main.nf"
+include { H5AD_TO_SEURAT } from "./modules/local/h5ad_to_seurat/main.nf"
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -27,7 +28,29 @@ include { NETWORK_QC } from "./modules/local/network_qc/main.nf"
 
 workflow {
 
+    if( !params.obj ) {
+        error "No input object. Pass --obj with a Seurat object (.rds), or with an AnnData file (.h5ad) and --h5ad."
+    }
     obj = file(params.obj)
+
+    // With --h5ad, --obj is an AnnData file (scanpy, CELLxGENE, ...), which
+    // is converted to a Seurat object once, up front. That object stands in
+    // for --obj from here on, so nothing downstream knows which format came
+    // in. H5AD_TO_SEURAT is handed only plain values, so its output is a
+    // value channel and RANK_SCORE can read it once per target, exactly as
+    // it reads a Seurat --obj. The extension is only checked to catch a
+    // forgotten or misplaced --h5ad before anything runs; the flag alone
+    // decides, so a URL without an extension converts too.
+    def obj_ext = obj.name.toLowerCase()
+    if( params.h5ad ) {
+        if( obj_ext.endsWith('.rds') ) {
+            error "--h5ad was given, but --obj '${obj.name}' is a Seurat object (.rds). Drop --h5ad to read it as it is."
+        }
+        H5AD_TO_SEURAT( obj, params.h5ad_counts ?: 'auto', params.h5ad_gene_column ?: '' )
+        obj = H5AD_TO_SEURAT.out.obj
+    } else if( obj_ext.endsWith('.h5ad') ) {
+        error "--obj '${obj.name}' is an AnnData file. Add --h5ad to convert it to a Seurat object first."
+    }
     column = params.column
     species = params.species
     n_cells = params.n_cells
@@ -233,6 +256,11 @@ workflow {
             "sctknk_td_k"     : params.sctknk_td_k,
             "batch"           : params.batch
         ]
+        // How an .h5ad --obj was read; meaningless for a Seurat one.
+        if( params.h5ad ) {
+            run_info["h5ad_counts"]      = params.h5ad_counts
+            run_info["h5ad_gene_column"] = params.h5ad_gene_column
+        }
         run_info_file = Channel
             .of( run_info.collect { k, v -> "${k}\t${String.valueOf(v).replaceAll(/[\t\r\n]+/, ' ')}" }.join("\n") + "\n" )
             .collectFile( name: "run_info.tsv" )

@@ -88,6 +88,10 @@ nextflow run MCBLab/NetPerturb -c sctknk.config --sctknk ...
 
 The enrichment image is set with `--gsea_container`, which also accepts a local `.sif`.
 
+### Can I use a scanpy / AnnData object?
+
+Yes. Pass the `.h5ad` to `--obj`, add `--h5ad`, and give `--column` an `obs` column. It is converted to a Seurat object before `DOWNSAMPLE` (see [Usage → AnnData file](usage.md#anndata-file-h5ad)). The pipeline still needs raw counts. If the run stops with *"No raw counts found"*, point `--h5ad_counts` at the layer that holds them. If the var index is Ensembl IDs, point `--h5ad_gene_column` at the symbol column.
+
 ### My counts are not in the `RNA` assay.
 
 Pass the assay name with `--assay`, e.g. `--assay originalexp` for objects converted from a `SingleCellExperiment`. It is renamed to `RNA` when loaded, because every network method reads that name.
