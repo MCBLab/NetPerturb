@@ -9,7 +9,7 @@
 
 ## Overview
 
-**MCBLab/NetPerturb** takes a processed Seurat object and a list of target genes, and gives each cell identity (cell type, clone, cluster, condition) its own gene regulatory network. It answers two complementary questions about each target in each identity:
+**MCBLab/NetPerturb** takes a processed Seurat object (or a scanpy/AnnData `.h5ad`) and a list of target genes, and gives each cell identity (cell type, clone, cluster, condition) its own gene regulatory network. It answers two complementary questions about each target in each identity:
 
 <div class="np-cards" markdown>
 <div class="np-card" markdown>

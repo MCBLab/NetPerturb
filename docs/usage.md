@@ -57,6 +57,49 @@ A processed Seurat object saved with `saveRDS()`. The pipeline needs:
 - a **metadata column** with the identities to compare, passed as `--column`.
 - optionally, a UMAP embedding and variable features. Both are reused if present and computed otherwise.
 
+### AnnData file (`--h5ad`)
+
+An `.h5ad` written by scanpy, CELLxGENE or any other AnnData tool can be passed to `--obj` together with `--h5ad`. It is then converted once, by `H5AD_TO_SEURAT`, into the Seurat object every later step reads. The converted object is not published, and `-resume` skips the conversion on relaunch.
+
+```bash
+nextflow run MCBLab/NetPerturb \
+  -profile singularity \
+  --obj /path/to/adata.h5ad \
+  --h5ad \
+  --column leiden \
+  ...
+```
+
+The flag decides, not the file name, so a URL without an extension converts too. As a safeguard, an `.h5ad` given without `--h5ad`, or `--h5ad` given with an `.rds`, stops the run before anything starts.
+
+| AnnData | Becomes | Notes |
+|---|---|---|
+| raw counts | `RNA` counts | Found by `--h5ad_counts` (below). |
+| log-normalised `X` or `raw.X` | `RNA` data | Kept when it covers every gene of the counts, so scanpy's normalisation is used as a Seurat object's would be. Otherwise the counts are log-normalised. A scaled `X` is never used. |
+| `obs` | metadata | `--column` and `--batch` name `obs` columns. Categoricals become factors. |
+| `var` index | gene names | Or the column named by `--h5ad_gene_column`. |
+| `obsm['X_umap']`, `X_tsne`, `X_pca` | `umap`, `tsne`, `pca` reductions | The stored UMAP is reused for the QC figure. Other `obsm` matrices are kept under their own names. |
+
+By default, the counts are taken from the first of `layers['counts']`, `layers['raw_counts']`, `layers['count']`, `layers['umi_counts']`, `raw.X` and `X` that holds non-negative whole numbers. If none does, the run stops and says what was checked. A file with log-normalised values only has no counts to recover.
+
+!!! warning "Counts saved after subsetting"
+    The classic scanpy tutorial saves `layers['counts']` after `X` has been cut down to highly variable genes, so the counts cover only those genes. Any target outside them is dropped by target QC. When `raw.X` holds counts for more genes, it is used instead. Otherwise the conversion warns, giving both gene counts. To analyse every gene, save the counts before subsetting.
+
+When the `var` index is Ensembl IDs, the networks would match no target, transcription factor or drug target, since those are all matched by symbol. If a symbol column such as CELLxGENE's `feature_name` is present, it is used automatically. `--h5ad_gene_column` picks one explicitly. Duplicate symbols are made unique (`GENE`, `GENE.1`), and `_` becomes `-` as Seurat requires.
+
+`--assay` stays at its default for an `.h5ad`: the converted counts are already in `RNA`.
+
+!!! note "Conversion image"
+    `H5AD_TO_SEURAT` runs in `diegomscoelho/netperturb-h5ad:1.0`, built from `container/h5ad/Dockerfile` on top of the scrank image, so the object is written by the same Seurat that reads it. To use a local `.sif` instead, set it in a config passed with `-c`:
+
+    ```groovy
+    process {
+        withName: H5AD_TO_SEURAT {
+            container = '/path/to/netperturb-h5ad-1.0.sif'
+        }
+    }
+    ```
+
 ### Target file (`--target`)
 
 A plain text file with one target per line. Genes joined by `;` form a single combined target: scored as one joint perturbation, and knocked out together as one joint knockout. The largest combination supported is two genes.
@@ -79,7 +122,7 @@ Symbols must match the object (MGI for mouse, HGNC for human), and `--species` m
 
 | Parameter | Description |
 |---|---|
-| `--obj` | Path or URL to the Seurat object (`.rds`). |
+| `--obj` | Path or URL to the Seurat object (`.rds`), or to an AnnData file (`.h5ad`) together with `--h5ad`. |
 | `--column` | Metadata column defining the cell identities to compare. |
 | `--species` | `human` or `mouse`. Selects the transcription factor and drug target lists and the scRank annotation. |
 | `--target` | Target file, as described above. |
@@ -95,6 +138,14 @@ Symbols must match the object (MGI for mouse, HGNC for human), and `--species` m
 | `--n_hvg` | `2000` | Highly variable genes added to `gene4use`, the gene set of the scoring-track networks. |
 | `--batch` | none | Metadata column naming each cell's donor, sample or batch. Used only by the report's *Data quality* section: batch composition of each identity and the variance batch explains. |
 | `--seed` | `1` | Seed for every random step: cell sampling, GENIE3, hdWGCNA/WGCNA, scTenifoldKnk and fgsea. |
+
+### AnnData input
+
+| Parameter | Default | Description |
+|---|---|---|
+| `--h5ad` | `false` | `--obj` is an AnnData `.h5ad`: convert it to a Seurat object first. The two options below are read only with it. |
+| `--h5ad_counts` | `auto` | Where the raw counts are: `X`, `raw` (`adata.raw.X`) or a layer name. `auto` searches as described under [AnnData file](#anndata-file-h5ad). A source named explicitly is used even if it does not look like counts, with a warning. |
+| `--h5ad_gene_column` | none | `var` column holding gene symbols. By default the `var` index is used, unless it is Ensembl IDs and a usual symbol column (`feature_name`, `gene_symbols`, `gene_name`, …) exists. |
 
 ### Scoring track
 
@@ -156,6 +207,7 @@ Requests per task, from `conf/modules.config`:
 
 | Process | Memory | CPUs |
 |---|---|---|
+| `H5AD_TO_SEURAT` (`--h5ad` only) | 64 GB | 1 |
 | `DOWNSAMPLE` | 16 GB | 1 |
 | `GENIE3` | 16 GB | `--n_cores` |
 | `SCRANK` | 64 GB | `--n_cores` |

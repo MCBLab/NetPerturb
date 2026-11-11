@@ -1,0 +1,30 @@
+nextflow_process {
+
+    name "H5AD_TO_SEURAT"
+    script "modules/local/h5ad_to_seurat/main.nf"
+    process "H5AD_TO_SEURAT"
+
+    test("emits one Seurat object named after the .h5ad") {
+
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = file("\${projectDir}/tests/fixtures/dummy_obj.h5ad")
+                input[1] = "auto"
+                input[2] = ""
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // a single file, not a list: DOWNSAMPLE and RANK_SCORE each take
+            // it as their one object
+            assert process.out.obj.size() == 1
+            assert file(process.out.obj[0]).name == "dummy_obj.rds"
+        }
+    }
+}
