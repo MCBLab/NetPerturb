@@ -17,8 +17,9 @@
 
 suppressMessages({ library(data.table); library(ggplot2); library(patchwork) })
 method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "hdwgcna"
-other_method <- setdiff(c("hdwgcna", "genie3"), method)
-method_lab <- c(hdwgcna = "hdWGCNA", genie3 = "GENIE3")
+all_methods <- c("hdwgcna", "genie3", "scrank")
+other_methods <- setdiff(all_methods, method)
+method_lab <- c(hdwgcna = "hdWGCNA", genie3 = "GENIE3", scrank = "scRank")
 qc_dir <- file.path("vangalen", method)
 out <- file(sprintf("vangalen_stats_%s.txt", method), "w")
 say <- function(...) { cat(..., "\n", sep = ""); cat(..., "\n", sep = "", file = out) }
@@ -149,11 +150,12 @@ say(sprintf("joint targets vs single genes: median log10 score %.2f vs %.2f (sco
             10^(median(vg[floor == FALSE & grepl(";", target), lg]) - median(vg[floor == FALSE & !grepl(";", target), lg]))))
 say("joint targets whose top identity is a member's: ", paste(jt[, .(any = any(top_matches)), by = pair][any == TRUE, pair], collapse = ", "))
 
-# ---- the same benchmark under the other network method -------------------
+# ---- the same benchmark under each other network method -------------------
 # Both runs share identities and targets; how far do they agree?
-if (file.exists(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", other_method))) {
-  say("\n---- agreement with the ", method_lab[other_method], " run (same identities and targets)")
-  ov <- read_scores(other_method)
+for (om in other_methods) {
+if (file.exists(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", om))) {
+  say("\n---- agreement with the ", method_lab[om], " run (same identities and targets)")
+  ov <- read_scores(om)
   mm <- merge(vg[, .(cell_type, target, lg, floor, rk)], ov[, .(cell_type, target, lg_o = lg, floor_o = floor, rk_o = rk)], by = c("cell_type", "target"))
   both <- mm[!floor & !floor_o]
   say(sprintf("pairs scored in both: %d of %d; Spearman of log10 scores %.2f", nrow(both), nrow(mm), cor(both$lg, both$lg_o, method = "spearman")))
@@ -164,7 +166,7 @@ if (file.exists(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", oth
   ofit <- lm(lg ~ target + cell_type, data = ov[floor == FALSE]); oce <- coef(ofit)[grep("^cell_type", names(coef(ofit)))]
   oo <- merge(off, data.table(identity = c("B", sub("cell_type", "", names(oce))), offset_o = c(0, unname(oce))), by = "identity")
   say(sprintf("identity offsets: span %.2f here vs %.2f in %s; Spearman between the two runs' offsets %.2f", diff(range(off$offset)), diff(range(oo$offset_o)),
-              method_lab[other_method], cor(oo$offset, oo$offset_o, method = "spearman")))
+              method_lab[om], cor(oo$offset, oo$offset_o, method = "spearman")))
   wo <- dcast(ov, target ~ cell_type, value.var = "lg"); wfo <- dcast(ov, target ~ cell_type, value.var = "floor")
   ddo <- rbindlist(lapply(seq_len(nrow(pairs)), function(i) data.table(
     target = wo$target, pair = pairs$like[i], diff_o = wo[[pairs$like[i]]] - wo[[pairs$normal[i]]],
@@ -173,8 +175,9 @@ if (file.exists(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", oth
   say(sprintf("malignant-minus-normal differences scored in both: %d; same sign in %.0f%%; Spearman %.2f", nrow(dm), 100 * mean(sign(dm$diff) == sign(dm$diff_o)),
               cor(dm$diff, dm$diff_o, method = "spearman")))
   pdo <- ddo[, .(median_o = median(diff_o)), by = pair]
-  say("per-pair medians, here vs ", method_lab[other_method], ": ", paste(merge(pd, pdo, by = "pair")[match(pairs$like, pair), sprintf("%s %+.2f vs %+.2f", pair, median, median_o)], collapse = "; "))
-  say(sprintf("no-score pairs: %d here, %d in %s, %d in both", sum(mm$floor), sum(mm$floor_o), method_lab[other_method], mm[floor & floor_o, .N]))
+  say("per-pair medians, here vs ", method_lab[om], ": ", paste(merge(pd, pdo, by = "pair")[match(pairs$like, pair), sprintf("%s %+.2f vs %+.2f", pair, median, median_o)], collapse = "; "))
+  say(sprintf("no-score pairs: %d here, %d in %s, %d in both", sum(mm$floor), sum(mm$floor_o), method_lab[om], mm[floor & floor_o, .N]))
+}
 }
 
 rt_file <- file.path(qc_dir, "runtime.tsv")

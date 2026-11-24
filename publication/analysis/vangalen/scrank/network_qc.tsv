@@ -1,0 +1,20 @@
+track	method	identity	n_genes	n_edges	density	mean_abs_weight	isolated_frac	hub_share_top1pct	strength_gini	n_metacells	soft_power	power_estimate	sft_r2	metacells_per_gene
+rank_score	scrank	GMP-like	3376	299787	0.0263	0.127	0.584	0.114	0.827					
+rank_score	scrank	T	3376	113945	0.01	0.135	0.697	0.181	0.873					
+rank_score	scrank	ProMono	3376	278079	0.0244	0.127	0.605	0.119	0.823					
+rank_score	scrank	Prog	3376	288996	0.0254	0.126	0.632	0.12	0.832					
+rank_score	scrank	Mono-like	3376	255250	0.0224	0.129	0.599	0.12	0.822					
+rank_score	scrank	ProMono-like	3376	253998	0.0223	0.123	0.597	0.121	0.836					
+rank_score	scrank	Plasma	3376	289836	0.0254	0.138	0.613	0.109	0.814					
+rank_score	scrank	HSC-like	3376	143689	0.0126	0.124	0.687	0.14	0.86					
+rank_score	scrank	GMP	3376	308211	0.0271	0.126	0.627	0.108	0.826					
+rank_score	scrank	NK	3376	157241	0.0138	0.129	0.657	0.182	0.858					
+rank_score	scrank	earlyEry	3376	496160	0.0435	0.144	0.568	0.0805	0.779					
+rank_score	scrank	CTL	3376	145712	0.0128	0.142	0.661	0.164	0.855					
+rank_score	scrank	Prog-like	3376	315577	0.0277	0.122	0.578	0.122	0.823					
+rank_score	scrank	lateEry	3376	462601	0.0406	0.152	0.59	0.0734	0.774					
+rank_score	scrank	HSC	3376	127484	0.0112	0.121	0.687	0.16	0.869					
+rank_score	scrank	B	3376	85430	0.0075	0.153	0.797	0.171	0.887					
+rank_score	scrank	cDC-like	3376	256431	0.0225	0.124	0.599	0.129	0.833					
+rank_score	scrank	cDC	3376	321718	0.0282	0.152	0.634	0.103	0.807					
+rank_score	scrank	Mono	3376	214403	0.0188	0.12	0.627	0.137	0.839					

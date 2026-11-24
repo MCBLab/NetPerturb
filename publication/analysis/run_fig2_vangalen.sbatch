@@ -13,6 +13,8 @@
 
 set -euo pipefail
 
+METHOD="${1:-genie3}"
+
 singularity exec --bind /mnt/beegfs \
   /home/lgdqamorim/scratch/singularity_images/juliaapolonio-scrank-latest.img \
-  Rscript fig2_vangalen.R genie3
+  Rscript fig2_vangalen.R "$METHOD"

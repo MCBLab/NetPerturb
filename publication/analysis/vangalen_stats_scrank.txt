@@ -1,0 +1,69 @@
+################ van Galen 2019, AML bone marrow, scRank, antagonist
+identities kept: 19 (29752 cells); dropped: pDC (225), ProB (298)
+genes: 3376 in the shared universe (gene4use); per identity 2272-2759 expressed
+scores: 1045 pairs, 55 targets (34 single, 21 joint); no score (zero or < 1e-6 x median): 173 (exact zeros: 0); non-floor range 4.4e-13-0.00054; median 4.2e-07
+identities with most no-score pairs: B 28, T 18, HSC-like 18, Mono-like 11, NK 11; targets with most: HAVCR2 14, IL3RA 14, CDK8 11, DHODH 10, CD33 9; malignant (-like) identities hold 48 of 173
+report flags: barely detected (<5% of cells) 264 pairs, at noise level 242, isolated 166; isolated pairs that are no-score: 162/166
+barely-detected pairs that still score: 152; ranked first in 6 (PLK1 Prog-like, DHODH cDC-like, WEE1 cDC-like, AURKB cDC-like, MEN1 cDC-like, CDK8 cDC-like)
+median log10 score, barely detected vs. not (both scored): -8.21 vs -5.57
+identity-level flags: High mito/ribo share 1, Sparse matrix 11, Variation tracks depth 13, Density unlike the others 3, Many isolated genes 19, MEN1 isolated 9, DHODH isolated 10, MTOR isolated 8, JAK2 isolated 4, MAP2K1 isolated 7, HAVCR2 isolated 14, CDK8 isolated 11, BCL2 isolated 5, FLT3 isolated 4, CDK9 isolated 7, CDK19 isolated 4, HMGCR isolated 7, IDH1 isolated 5, IL3RA isolated 13, IDH2 isolated 2, KIT isolated 3, HDAC1 isolated 1, CD33 isolated 8, DNMT1 isolated 2, PSMB5 isolated 2, PLK1 isolated 2, AURKA isolated 2, AURKB isolated 4, CHEK1 isolated 2, NAE1 isolated 2, SYK isolated 1, KDM1A isolated 1, XPO1 isolated 1, TP53 isolated 1, WEE1 isolated 1
+top identity per target: cDC-like 25, GMP-like 18, Prog-like 9, ProMono-like 3
+targets whose top identity is malignant (-like): 55/55
+variance of log10 score explained: target 3%, identity 93% (sequential SS, target first)
+identity main effects vs B (log10), extremes: GMP-like=+2.29; cDC-like=+2.18; Prog-like=+2.11; NK=-4.04; CTL=-4.41; Mono-like=-4.46; span 6.76
+mean offset, malignant identities +0.65 vs their normal counterparts -0.87 vs others -1.31
+Spearman(identity offset, density) = +0.50
+Spearman(identity offset, isolated_frac) = -0.69
+Spearman(identity offset, strength_gini) = -0.33
+Spearman(identity offset, median_counts) = +0.71
+Spearman(identity offset, sparsity_gene4use) = -0.72
+Spearman(identity offset, n_cells) = +0.09
+network density 0.007-0.043; malignant identities 0.0223 vs normal counterparts 0.0225 (mean)
+HSC-like      minus normal: median -0.81 log10, malignant higher for 4/34 targets (Wilcoxon signed-rank p = 2.2e-05)
+Prog-like     minus normal: median +5.96 log10, malignant higher for 49/49 targets (Wilcoxon signed-rank p = 1.1e-09)
+GMP-like      minus normal: median +1.36 log10, malignant higher for 46/46 targets (Wilcoxon signed-rank p = 3.6e-09)
+ProMono-like  minus normal: median +1.31 log10, malignant higher for 47/47 targets (Wilcoxon signed-rank p = 2.5e-09)
+Mono-like     minus normal: median -5.07 log10, malignant higher for 0/41 targets (Wilcoxon signed-rank p = 2.5e-08)
+cDC-like      minus normal: median +6.07 log10, malignant higher for 48/48 targets (Wilcoxon signed-rank p = 1.7e-09)
+all pairs pooled: median +1.38, malignant higher for 73% of 265 target x pair comparisons
+after removing the two identities' offsets: median -0.06, malignant higher for 42%
+FLT3   top-3 identities: GMP-like, Prog-like, ProMono-like | malignant minus normal: HSC -0.79, Prog +7.82, GMP +1.84, ProMono +1.41, Mono -4.31, cDC +5.69
+KIT    top-3 identities: GMP-like, cDC-like, Prog-like | malignant minus normal: Prog +5.57, GMP +1.72, ProMono +0.78, Mono -5.11, cDC +5.85
+IL3RA  top-3 identities: GMP-like, ProMono-like, cDC-like | malignant minus normal: ProMono +1.24
+CD33   top-3 identities: ProMono-like, Prog-like, cDC-like | malignant minus normal: Prog +7.27, GMP +2.30, ProMono +1.75, cDC +6.88
+BCL2   top-3 identities: cDC-like, GMP-like, Prog-like | malignant minus normal: HSC -0.39, Prog +6.08, GMP +1.21, ProMono +0.95, cDC +6.46
+FLT3;MEN1   top-3: cDC-like, GMP-like, Prog-like
+FLT3;DNMT1  top-3: GMP-like, ProMono-like, cDC-like
+BCL2;FLT3   top-3: GMP-like, cDC-like, Prog-like
+blast markers: median malignant-minus-normal over the progenitor pairs (HSC, Prog, GMP): 2.30 (n = 7) vs 1.39 (n = 122) for the other targets; Wilcoxon p = 0.15
+progenitor pairs, targets scored in >= 2 of 3, highest median malignant excess: CD33 +4.79 (2/2), NAE1 +4.31 (2/2), PSMB5 +4.02 (2/2), AURKA +3.83 (2/2), PLK1 +3.73 (2/2), DNMT1;NAE1 +3.69 (2/2), KIT +3.64 (2/2), AURKB +3.61 (2/2), DNMT1 +3.41 (2/2), DNMT1;HAVCR2 +3.41 (2/2)
+  ... and lowest: BCL2;IDH2 +0.94 (2/3), KDM1A +1.11 (2/3), DNMT1;TP53 +1.12 (2/3), CDK8;BCL2 +1.12 (2/3), BCL2;EIF4A1 +1.16 (2/3), SYK +1.20 (2/3)
+  rank of the blast markers among 45: CD33 1, KIT 7, FLT3 15
+joint targets: 21; Spearman with the stronger member median 0.96, with the weaker 0.95; the pair's top identity is the stronger member's in 15/21 pairs, the weaker's in 12
+joint targets vs single genes: median log10 score -5.50 vs -6.00 (scored pairs), 3.2x
+joint targets whose top identity is a member's: DNMT1;MEN1, BCL2;MDM2, CDK19;BCL2, BCL2;DNMT1, DNMT1;XPO1, BCL2;MEN1, DNMT1;HDAC1, DNMT1;IDH2, CDK8;BCL2, DNMT1;TP53, FLT3;MEN1, FLT3;DNMT1, BCL2;EIF4A1, DNMT1;HAVCR2, BCL2;IDH2, BCL2;XPO1, BCL2;FLT3, BCL2;IDH1
+
+---- agreement with the hdWGCNA run (same identities and targets)
+pairs scored in both: 862 of 1045; Spearman of log10 scores 0.22
+per target, Spearman across identities: median 0.06 (IQR -0.06 to 0.38, 54 targets)
+same top identity in both runs: 7/55 targets (KIT GMP-like, SYK ProMono-like, NAE1 Prog-like, BCL2;EIF4A1 cDC-like, BCL2;IDH1 cDC-like, DNMT1;HDAC1 cDC-like, DNMT1;TP53 cDC-like)
+identity offsets: span 6.76 here vs 1.13 in hdWGCNA; Spearman between the two runs' offsets 0.34
+malignant-minus-normal differences scored in both: 257; same sign in 52%; Spearman 0.07
+per-pair medians, here vs hdWGCNA: HSC-like -0.81 vs -0.09; Prog-like +5.96 vs -0.01; GMP-like +1.36 vs +0.23; ProMono-like +1.31 vs -0.16; Mono-like -5.07 vs -0.05; cDC-like +6.07 vs -0.07
+no-score pairs: 173 here, 17 in hdWGCNA, 7 in both
+
+---- agreement with the GENIE3 run (same identities and targets)
+pairs scored in both: 627 of 1045; Spearman of log10 scores 0.04
+per target, Spearman across identities: median -0.03 (IQR -0.28 to 0.14, 53 targets)
+same top identity in both runs: 2/55 targets (KIT GMP-like, DHODH cDC-like)
+identity offsets: span 6.76 here vs 0.62 in GENIE3; Spearman between the two runs' offsets -0.09
+malignant-minus-normal differences scored in both: 132; same sign in 35%; Spearman -0.03
+per-pair medians, here vs GENIE3: HSC-like -0.81 vs +0.24; Prog-like +5.96 vs -0.17; GMP-like +1.36 vs -0.18; ProMono-like +1.31 vs -0.10; Mono-like -5.07 vs -0.36; cDC-like +6.07 vs -0.35
+no-score pairs: 173 here, 301 in GENIE3, 56 in both
+
+---- running time (report, Nextflow trace)
+DOWNSAMPLE     1 tasks, mean 5m 09s (min 5m 09s, max 5m 09s), total 5m 09s
+SCRANK        19 tasks, mean 33m 58s (min 16m 40s, max 59m 58s), total 10h 45m
+NETWORK_QC     1 tasks, mean 11.2 s (min 11.2 s, max 11.2 s), total 11.2 s
+RANK_SCORE    55 tasks, mean 13m 56s (min 8m 10s, max 20m 54s), total 12h 47m
+MERGE          1 tasks, mean 0.6 s (min 0.6 s, max 0.6 s), total 0.6 s

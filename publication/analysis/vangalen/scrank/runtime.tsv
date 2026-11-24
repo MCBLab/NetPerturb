@@ -1,0 +1,6 @@
+Step	Tasks	Cached	Failed	Mean	SD	Min	Max	Total
+DOWNSAMPLE	1	1	0	5m 09s	-	5m 09s	5m 09s	5m 09s
+SCRANK	19	18	0	33m 58s	12m 07s	16m 40s	59m 58s	10h 45m
+NETWORK_QC	1	0	0	11.2 s	-	11.2 s	11.2 s	11.2 s
+RANK_SCORE	55	0	0	13m 56s	2m 54s	8m 10s	20m 54s	12h 47m
+MERGE	1	0	0	0.6 s	-	0.6 s	0.6 s	0.6 s
