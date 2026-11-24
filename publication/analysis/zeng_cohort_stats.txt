@@ -17,7 +17,7 @@ pairwise Spearman, Target mean: 0.88-0.92 (median 0.89)
 pairwise Spearman, Identity offset: 0.26-0.73 (median 0.52)
 pairwise Spearman, Target x identity: 0.09-0.24 (median 0.15)
 pairwise Spearman, Stem specificity: 0.17-0.34 (median 0.26)
-target mean, this van Galen run vs the earlier run on the original labels (Supplementary Fig.): Spearman 0.84 over 55 targets
+target mean, this van Galen run vs the earlier run on the original labels (Supplementary Fig.): Spearman 0.87 over 55 targets
 stem identities per cohort: beneyto HSC_MPP-like+LMPP-like; lasry HSC_MPP+HSC_MPP-like+LMPP-like; naldini HSC_MPP+HSC_MPP-like+LMPP+LMPP-like; vangalen HSC_MPP+HSC_MPP-like+LMPP-like
 
 ################ stem specificity (mean residual, stem minus other identities; 10000 within-cohort label permutations)
