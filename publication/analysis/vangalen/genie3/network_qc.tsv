@@ -1,0 +1,20 @@
+track	method	identity	n_genes	n_edges	density	mean_abs_weight	isolated_frac	hub_share_top1pct	strength_gini	n_metacells	soft_power	power_estimate	sft_r2	metacells_per_gene
+rank_score	genie3	B	2850	1529745	0.188	0.00107	0.326	0.0392	0.461					
+rank_score	genie3	cDC	2428	1702892	0.289	0.000762	0.255	0.0337	0.408					
+rank_score	genie3	GMP	2322	1701182	0.316	0.000708	0.262	0.0361	0.417					
+rank_score	genie3	earlyEry	2114	1692053	0.379	0.000605	0.23	0.0311	0.386					
+rank_score	genie3	lateEry	2113	1727390	0.387	0.000591	0.218	0.0354	0.388					
+rank_score	genie3	Plasma	2112	1253949	0.281	0.000774	0.249	0.0381	0.411					
+rank_score	genie3	ProMono	2113	1411220	0.316	0.000705	0.25	0.0357	0.411					
+rank_score	genie3	Mono	1585	763935	0.304	0.000714	0.247	0.0378	0.421					
+rank_score	genie3	cDC-like	1582	917690	0.367	0.000639	0.202	0.0331	0.375					
+rank_score	genie3	Mono-like	1581	798626	0.32	0.000714	0.223	0.0367	0.4					
+rank_score	genie3	CTL	2108	1090916	0.246	0.000894	0.261	0.0401	0.425					
+rank_score	genie3	T	1582	687777	0.275	0.000814	0.247	0.0418	0.424					
+rank_score	genie3	HSC-like	1582	914895	0.366	0.000667	0.188	0.0322	0.365					
+rank_score	genie3	GMP-like	1583	964118	0.385	0.000612	0.204	0.0356	0.383					
+rank_score	genie3	NK	1690	831567	0.291	0.000795	0.232	0.0387	0.407					
+rank_score	genie3	HSC	1792	988734	0.308	0.000736	0.225	0.0364	0.394					
+rank_score	genie3	Prog	1795	1076755	0.334	0.000681	0.232	0.0343	0.4					
+rank_score	genie3	ProMono-like	1582	933443	0.373	0.000636	0.216	0.0374	0.394					
+rank_score	genie3	Prog-like	1583	950529	0.38	0.000621	0.203	0.0326	0.375					
