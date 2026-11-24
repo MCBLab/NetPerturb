@@ -193,7 +193,6 @@ hv[, `:=`(target_f = factor(target, levels = c(sort(single), sort(joint))), ct_f
 ttl <- sprintf("van Galen 2019 AML (%s networks): perturbation score, antagonist mode", method_lab[method])
 pA <- ggplot(hv, aes(target_f, ct_f)) +
   geom_tile(aes(fill = fill), colour = "white", linewidth = .3) +
-  geom_point(data = hv[barely & !floor], shape = 4, size = .6, colour = "#e34948", stroke = .35) +
   geom_text(data = hv[rk == 1], label = "•", colour = "white", size = 2.2) +
   facet_grid(. ~ group, scales = "free_x", space = "free_x") +
   scale_fill_gradientn(colours = seq_ramp, na.value = "#f0efec", name = expression(log[10]~score), limits = lims(hv$fill), oob = scales::squish) +
@@ -234,15 +233,11 @@ ggsave(sprintf("fig2_vangalen_%s_preview.png", method), fig, width = 7.1, height
 # Panel A on its own, sized for a 16:9 slide, with larger type.
 pA_slide <- pA +
   geom_point(data = hv[rk == 1], colour = "white", size = 2.6) +
-  labs(title = ttl,
-       subtitle = paste0("Rows: 19 cell identities, malignant (-like) under their normal counterpart.\n",
-                         "White dot: the identity ranked first for that target. Grey: the target has no edge in that identity's network.",
-                         if (any(hv$barely)) " Red x: target detected in <5% of the identity's cells." else "")) +
-  theme(text = element_text(size = 14), plot.title = element_text(size = 16, face = "bold"), plot.subtitle = element_text(size = 11.5, colour = ink2),
+  labs(title = ttl) +
+  theme(text = element_text(size = 14), plot.title = element_text(size = 16, face = "bold"),
         axis.text.x = element_text(size = 9.5, angle = 55, hjust = 1), axis.text.y = element_text(size = 12),
         strip.text = element_text(size = 13, face = "bold", colour = ink2),
         legend.title = element_text(size = 12), legend.text = element_text(size = 11), legend.key.size = unit(16, "pt"))
-pA_slide$layers[[2]]$aes_params$size <- 2.2
 ggsave(sprintf("../Fig/fig2A_vangalen_heatmap_%s.png", method), pA_slide, width = 15.3, height = 6.5, dpi = 300, bg = "white")
 ggsave(sprintf("../Fig/fig2A_vangalen_heatmap_%s.pdf", method), pA_slide, width = 15.3, height = 6.5, device = cairo_pdf, bg = "white")
 close(out)
