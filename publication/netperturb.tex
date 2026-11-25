@@ -135,8 +135,8 @@ Every tool runs in a versioned Singularity/Docker container \citep{Kurtzer2017si
 %% =====================================================================
 \section{Results}\label{sec:results}
 %% =====================================================================
-%% Numbers below are produced by analysis/fig2_zeng.R -> analysis/zeng_cohort_stats.txt
-%% (Figs 2-4; per-target table analysis/zeng2025/target_effects.tsv).
+%% Numbers below are produced by analysis/fig2_zeng.R genie3 -> analysis/zeng_cohort_stats_genie3.txt
+%% (Figs 2-4; per-target table analysis/zeng2025/genie3/target_effects.tsv).
 %% Fig. 5, the single-cohort run (Fig/fig2_vangalen_genie3.pdf):
 %% analysis/fig2_vangalen.R genie3 -> analysis/vangalen_stats_genie3.txt
 
@@ -150,7 +150,7 @@ We ran NetPerturb on each cohort with GENIE3 networks, antagonist mode, \param{n
 
 \begin{figure}[p]%
 \centering
-\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig2_zeng_overview.pdf}
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig2_zeng_overview_genie3.pdf}
 \caption{\textbf{Four AML cohorts: design, reproducibility and network-size offsets} (cohorts of the \citet{Zeng2025bonemarrowmap} atlas; GENIE3 networks, antagonist mode, 55 targets). (A) Identities scored per cohort, normal (N) and malignant (M, each cohort's own published call), coloured by the number of cells the identity's network was built from; grey, not scored. (B) Mean $\log_{10}$ score of each target in one cohort against its mean over the other three; dashed line, identity. (C) Share of the variance of $\log_{10}$ scores explained by the target, by the identity, and left as the target $\times$ identity residual. (D) Identity-wide offset, the identity effect of a target + identity decomposition of $\log_{10}$ scores, against the number of cells in the identity's network; filled, malignant; dashed line, least-squares fit over all cohorts. (E) Spearman correlation over the six pairs of cohorts for the target mean, the identity offset and the target-specific effect (12 identities scored in every cohort), and for stem specificity (Fig.~\ref{fig:stem}B); bars, medians.}\label{fig:cohorts}
 \end{figure}
 
@@ -166,7 +166,7 @@ Every identity's scores were shifted by an identity-wide offset, which spanned 0
 
 \begin{figure}[p]%
 \centering
-\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig3_zeng_stem.pdf}
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig3_zeng_stem_genie3.pdf}
 \caption{\textbf{Targets that act on stem identities.} The target-specific effect is the residual of the $\log_{10}$ score once target and identity effects are removed, per cohort. (A) Target-specific effect averaged over the identities of each compartment and then over cohorts; stem, HSC/MPP and LMPP; progenitor, cycling, lymphoid, granulocyte--monocyte, megakaryocyte--erythroid, eosinophil/basophil/mast and early erythroid progenitors; mature, all other identities. (B) Stem specificity, the target-specific effect in stem identities minus that in all other identities, per cohort (dots) and averaged over cohorts (diamonds); filled diamonds, same sign in all four cohorts and $P<0.05$ against 10,000 permutations of identity labels within each cohort. In A and B, targets are ordered by stem specificity, single genes above joint targets. (C) Target-specific effect in malignant against normal stem identities, averaged over cohorts (normal stem identities are absent from Beneyto-Calabuig); dashed line, identity. (D) Number of targets whose stem specificity has the same sign in all four cohorts, observed (line) and over 2,000 label permutations (histogram). (E) Stem specificity as defined in B against two alternative definitions: HSC/MPP alone as the stem compartment, and the within-identity rank of the target among the 55 in place of the residual; dark points, IL3RA, KIT and KDM1A.}\label{fig:stem}
 \end{figure}
 
@@ -180,7 +180,7 @@ Three of the four cohorts hold both malignant and normal stem identities, so the
 
 \begin{figure}[p]%
 \centering
-\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig4_zeng_malignant.pdf}
+\includegraphics[width=\textwidth,height=0.75\textheight,keepaspectratio]{fig4_zeng_malignant_genie3.pdf}
 \caption{\textbf{Malignant identities against their normal counterparts.} Each of the 30 matched pairs is a malignant identity (\emph{-like}) and the normal identity of the same broad cell type in the same cohort; the difference is taken on the target-specific effect, so identity offsets cancel. (A) Malignant minus normal for each target over the 30 pairs (dots, coloured by cohort) and their mean (diamonds; filled, Wilcoxon signed-rank $P<0.05$); x axis cut at the 0.5th and 99.5th percentiles. Targets are ordered by the mean, single genes above joint targets. (B) Mean malignant-minus-normal difference of the blast markers KIT, FLT3 and CD33 minus that of the other targets, per pair, grouped by compartment. (C) Malignant minus normal for selected targets in the same pairs as B; white, a pair without a score.}\label{fig:malignant}
 \end{figure}
 

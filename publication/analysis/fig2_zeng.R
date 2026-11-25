@@ -2,7 +2,7 @@
 # Figures 2-4 of the BMC Bioinformatics manuscript -- multi-cohort benchmark
 # of the rank-score track on four AML cohorts from the Zeng et al. 2025 atlas
 # (BoneMarrowMap broad identity x scMalignantFinder malignant/normal call;
-# GENIE3, antagonist, 55 targets).
+# GENIE3 or scRank networks, antagonist, 55 targets).
 #   fig2_zeng_overview   design, reproducibility, network-size offsets
 #     A identities scored per cohort; B target mean against the other cohorts;
 #     C variance decomposition; D identity offset against cells used;
@@ -12,24 +12,30 @@
 #     C malignant against normal stem compartment; D sign consistency
 #     against a label-permutation null; E robustness of the ranking
 #   fig4_zeng_malignant  malignant identities against their normal counterparts
-#     A per target over the 30 matched pairs; B blast markers minus other
+#     A per target over the matched pairs; B blast markers minus other
 #     targets per pair; C selected targets per pair
 #   fig2_zeng_cohorts    the six-panel summary used by the Bioinformatics
 #                        Advances draft (archive/)
 # The target-specific effect throughout is the residual of log10 score ~
 # target + identity, fitted per cohort.
 #
-# Inputs  : ../data/Zeng2025/<ds>/<ds>[_]perbscore_all_targets.txt
-#           zeng2025/<ds>_{cells,runtime}.tsv (tables pulled from each run's report)
-#           ../data/vangalen2021/genie3/perbscore_all_targets.txt (earlier van Galen run)
-# Outputs : ../Fig/fig{2_zeng_overview,3_zeng_stem,4_zeng_malignant,2_zeng_cohorts}.{pdf,png},
-#           zeng2025/target_effects.tsv, zeng_cohort_stats.txt (numbers quoted in the text)
+# Inputs  : ../data/Zeng2025/<method>/<ds>/perbscore_all_targets.txt
+#           zeng2025/<method>/<ds>/{cell_counts,runtime}.tsv
+#             (pulled from each run's report by vangalen/extract_report_tables.py)
+#           ../data/vangalen2021/<method>/perbscore_all_targets.txt (earlier van Galen run)
+# Outputs : ../Fig/fig{2_zeng_overview,3_zeng_stem,4_zeng_malignant,2_zeng_cohorts}_<method>.{pdf,png},
+#           zeng2025/<method>/target_effects.tsv, zeng_cohort_stats_<method>.txt (numbers quoted in the text)
 #
-# Run from publication/analysis:  Rscript fig2_zeng.R
+# Run from publication/analysis:  Rscript fig2_zeng.R [genie3|scrank]   (default genie3)
 
 suppressMessages({ library(data.table); library(ggplot2); library(patchwork) })
+method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "genie3"
+method_lab <- c(genie3 = "GENIE3", scrank = "scRank")
+stopifnot(method %in% names(method_lab))
+net_step <- toupper(method)   # network-building step in the report's runtime table
+qc_dir <- file.path("zeng2025", method)
 set.seed(1)
-out <- file("zeng_cohort_stats.txt", "w")
+out <- file(sprintf("zeng_cohort_stats_%s.txt", method), "w")
 say <- function(...) { cat(..., "\n", sep = ""); cat(..., "\n", sep = "", file = out) }
 
 # ---- palette (dataviz reference palette, as the other figures) ----------
@@ -56,24 +62,22 @@ base_order <- c(stem, prog, mature)
 compart_of <- function(b) factor(fifelse(b %in% stem, "Stem", fifelse(b %in% prog, "Progenitor", "Mature")),
                                  c("Stem", "Progenitor", "Mature"))
 
-f <- c(beneyto = "beneyto/beneytoperbscore_all_targets.txt", lasry = "lasry/lasryperbscore_all_targets.txt",
-       naldini = "naldini/naldiniperbscore_all_targets.txt", vangalen = "vangalen/vangalen_perbscore_all_targets.txt")
-d <- rbindlist(lapply(dsn, function(k) fread(file.path("../data/Zeng2025", f[k]))[, ds := k]))
+d <- rbindlist(lapply(dsn, function(k) fread(file.path("../data/Zeng2025", method, k, "perbscore_all_targets.txt"))[, ds := k]))
 d[, `:=`(lg = log10(perb_score), floor = no_score(perb_score)), by = ds]
 d[, `:=`(malig = grepl("-like$", cell_type), base = sub("-like$", "", cell_type))][, compart := compart_of(base)]
 stopifnot(all(d$base %in% base_order))
-cc <- rbindlist(lapply(dsn, function(k) fread(sprintf("zeng2025/%s_cells.tsv", k))[, ds := k]))[, cell_type := gsub(" ", "_", Identity)]
+cc <- rbindlist(lapply(dsn, function(k) fread(file.path(qc_dir, k, "cell_counts.tsv"))[, ds := k]))[, cell_type := gsub(" ", "_", Identity)]
 d <- merge(d, cc[, .(ds, cell_type, cells = `Cells used`, genes = `Genes in network`)], by = c("ds", "cell_type"))
 single <- sort(unique(d[!grepl(";", target), target])); joint <- sort(unique(d[grepl(";", target), target]))
 
-say("################ Zeng 2025 atlas, four cohorts, GENIE3, ", paste(unique(d$binding), collapse = "/"))
+say("################ Zeng 2025 atlas, four cohorts, ", method_lab[method], ", ", paste(unique(d$binding), collapse = "/"))
 for (k in dsn) {
   x <- cc[ds == k]; kept <- x[Status == "kept"]
-  rt <- fread(sprintf("zeng2025/%s_runtime.tsv", k))
-  say(sprintf("%s: %d identities kept (%d normal, %d malignant), %s cells; %d dropped (< --min_cells); %d genes offered, %s per network; GENIE3 per identity mean %s, max %s",
+  rt <- fread(file.path(qc_dir, k, "runtime.tsv"))
+  say(sprintf("%s: %d identities kept (%d normal, %d malignant), %s cells; %d dropped (< --min_cells); %d genes offered, %s per network; %s per identity mean %s, max %s",
               ds_lab[k], nrow(kept), sum(!grepl("-like$", kept$cell_type)), sum(grepl("-like$", kept$cell_type)),
               format(sum(kept$`Cells used`), big.mark = ","), sum(x$Status != "kept"), kept$gene4use[1],
-              paste(range(kept$`Genes in network`), collapse = "-"), rt[Step == "GENIE3", Mean], rt[Step == "GENIE3", Max]))
+              paste(range(kept$`Genes in network`), collapse = "-"), method_lab[method], rt[Step == net_step, Mean], rt[Step == net_step, Max]))
 }
 say("total: ", uniqueN(d[, paste(ds, cell_type)]), " identity networks, ", format(sum(cc$`Cells used`), big.mark = ","), " cells, ",
     nrow(d), " scores; 55 targets (", length(single), " single, ", length(joint), " joint) in every cohort")
@@ -111,7 +115,7 @@ agr <- rbind(pw(dcast(dd[, .(m = mean(lg)), by = .(ds, target)], target ~ ds, va
              pw(S, levs[4]))
 agr[, level := factor(level, levs)]
 for (l in levs) say("pairwise Spearman, ", l, ": ", paste(sprintf("%.2f", range(agr[level == l, r])), collapse = "-"), " (median ", sprintf("%.2f", median(agr[level == l, r])), ")")
-old <- fread("../data/vangalen2021/genie3/perbscore_all_targets.txt")[, floor := no_score(perb_score)][floor == FALSE]
+old <- fread(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", method))[, floor := no_score(perb_score)][floor == FALSE]
 vo <- merge(old[, .(o = mean(log10(perb_score))), by = target], dd[ds == "vangalen", .(n = mean(lg)), by = target], by = "target")
 say("target mean, this van Galen run vs the earlier run on the original labels (Supplementary Fig.): Spearman ", sprintf("%.2f", rho(vo$o, vo$n)), " over ", nrow(vo), " targets")
 
@@ -150,6 +154,7 @@ say("robustness: within-identity rank instead of residual, Spearman ", sprintf("
 # ---- malignant minus matched normal identity -----------------------------
 mp <- dcast(dd[, .(ds, target, base, malig, res)], ds + target + base ~ malig, value.var = "res")[!is.na(`TRUE`) & !is.na(`FALSE`)]
 mp[, dl := `TRUE` - `FALSE`]
+n_pairs <- uniqueN(mp[, paste(ds, base)])
 say("\n################ malignant (-like) minus matched normal identity (residual)")
 say("matched pairs: ", uniqueN(mp[, paste(ds, base)]), " (", paste(mp[, .(n = uniqueN(base)), by = ds][, paste(ds, n)], collapse = ", "), ")")
 mw <- mp[, .(mal = mean(dl), mal_pos = mean(dl > 0), n_pairs = .N, p_mal = wilcox.test(dl)$p.value), by = target][, q_mal := p.adjust(p_mal, "BH")]
@@ -175,7 +180,7 @@ for (k in te[stem_class != "" | stem_pos == 4][order(-stem), target])
   say(sprintf("%-12s stem-spec %+.2f | stem malig. %+.2f, stem normal %+.2f | malig.-normal stem %+.2f (%d/%d cohorts > 0)",
               k, te[target == k, stem], te[target == k, map_Stem_M], te[target == k, map_Stem_N],
               te[target == k, stem_mal], te[target == k, stem_mal_pos], te[target == k, stem_mal_n]))
-fwrite(te[order(-stem)], "zeng2025/target_effects.tsv", sep = "\t")
+fwrite(te[order(-stem)], file.path(qc_dir, "target_effects.tsv"), sep = "\t")
 
 # ---- further numbers for the text ---------------------------------------
 say("\n################ further detail")
@@ -273,7 +278,7 @@ pF <- ggplot(mpl, aes(d, target)) +
   geom_vline(xintercept = 0, colour = ink2, linewidth = .3) +
   geom_point(aes(colour = dsl), size = .9, alpha = .85) +
   geom_point(data = mwl, aes(mal, target, fill = sig), shape = 23, size = 1.6, colour = "black", stroke = .3, inherit.aes = FALSE) +
-  scale_fill_manual(values = c(`TRUE` = "#0d366b", `FALSE` = "white"), labels = c(`TRUE` = "P<0.05 over 30 pairs", `FALSE` = "n.s."), name = NULL) +
+  scale_fill_manual(values = c(`TRUE` = "#0d366b", `FALSE` = "white"), labels = c(`TRUE` = sprintf("P<0.05 over %d pairs", n_pairs), `FALSE` = "n.s."), name = NULL) +
   scale_colour_manual(values = setNames(ds_col, ds_lab), name = NULL, guide = "none") +
   facet_grid(g ~ ., scales = "free_y", space = "free_y") +
   labs(x = "malignant minus normal", y = NULL, title = "F  Malignant vs normal") +
@@ -282,12 +287,12 @@ pF <- ggplot(mpl, aes(d, target)) +
 top <- pA + pB + pC + plot_layout(widths = c(1.25, 1, 1))
 bot <- pD + pE + pF + plot_layout(widths = c(.55, 1, 1))
 fig <- top / bot + plot_layout(heights = c(1, 2.6))
-ggsave("../Fig/fig2_zeng_cohorts.pdf", fig, width = 7.2, height = 8.6, device = cairo_pdf)
-ggsave("../Fig/fig2_zeng_cohorts.png", fig, width = 7.2, height = 8.6, dpi = 300, bg = "white")
+ggsave(sprintf("../Fig/fig2_zeng_cohorts_%s.pdf", method), fig, width = 7.2, height = 8.6, device = cairo_pdf)
+ggsave(sprintf("../Fig/fig2_zeng_cohorts_%s.png", method), fig, width = 7.2, height = 8.6, dpi = 300, bg = "white")
 
 save_fig <- function(p, name, w, h) {
-  ggsave(sprintf("../Fig/%s.pdf", name), p, width = w, height = h, device = cairo_pdf)
-  ggsave(sprintf("../Fig/%s.png", name), p, width = w, height = h, dpi = 300, bg = "white")
+  ggsave(sprintf("../Fig/%s_%s.pdf", name, method), p, width = w, height = h, device = cairo_pdf)
+  ggsave(sprintf("../Fig/%s_%s.png", name, method), p, width = w, height = h, dpi = 300, bg = "white")
 }
 retitle <- function(p, t) p + labs(title = t)
 
@@ -379,7 +384,7 @@ p4A <- ggplot(m4, aes(dl, target)) +
   guides(colour = guide_legend(override.aes = list(size = 1.6, alpha = 1), nrow = 2), fill = guide_legend(nrow = 2)) +
   facet_grid(g ~ ., scales = "free_y", space = "free_y") +
   coord_cartesian(xlim = quantile(m4$dl, c(.005, .995))) +
-  labs(x = "malignant minus normal (target-specific effect)", y = NULL, title = "A  Per target, 30 matched pairs") +
+  labs(x = "malignant minus normal (target-specific effect)", y = NULL, title = sprintf("A  Per target, %d matched pairs", n_pairs)) +
   theme_np + theme(axis.text.y = element_text(size = 5.6), strip.text = element_blank(), legend.position = "bottom", legend.box = "vertical",
                    legend.spacing.y = unit(0, "pt"), legend.margin = margin())
 pp[, `:=`(pair = paste0(ds_lab[ds], " · ", gsub("_", " ", base)), compart = factor(compart, c("Stem", "Progenitor", "Mature")))]
