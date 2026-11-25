@@ -13,13 +13,13 @@
 # Outputs : ../Fig/fig2_vangalen_<method>.{pdf,png}, ../Fig/fig2A_vangalen_heatmap_<method>.{pdf,png} (slide),
 #           vangalen_stats_<method>.txt (numbers quoted in the text)
 #
-# Run from publication/analysis:  Rscript fig2_vangalen.R [hdwgcna|genie3]   (default hdwgcna)
+# Run from publication/analysis:  Rscript fig2_vangalen.R [genie3|scrank]   (default genie3)
 
 suppressMessages({ library(data.table); library(ggplot2); library(patchwork) })
-method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "hdwgcna"
-all_methods <- c("hdwgcna", "genie3", "scrank")
+method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "genie3"
+all_methods <- c("genie3", "scrank")
 other_methods <- setdiff(all_methods, method)
-method_lab <- c(hdwgcna = "hdWGCNA", genie3 = "GENIE3", scrank = "scRank")
+method_lab <- c(genie3 = "GENIE3", scrank = "scRank")
 qc_dir <- file.path("vangalen", method)
 out <- file(sprintf("vangalen_stats_%s.txt", method), "w")
 say <- function(...) { cat(..., "\n", sep = ""); cat(..., "\n", sep = "", file = out) }

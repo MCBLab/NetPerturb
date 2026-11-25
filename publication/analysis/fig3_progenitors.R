@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 # Figure 3 -- which targets single out the malignant progenitors (HSC-like,
 # Prog-like, GMP-like) in the van Galen 2019 AML run (antagonist), for the
-# network method given on the command line (default hdwgcna).
+# network method given on the command line (default genie3).
 #   A  per target, log10(-like / normal) in each of the three progenitor pairs,
 #      ranked by the median; targets with a score on both sides of >= 2 pairs
 #   B  that matched-pair selectivity against specificity for the malignant
@@ -9,11 +9,11 @@
 #      mean over the other 16), single genes and joint targets told apart
 #   C  the scores themselves, for the targets at the top of A, in the six
 #      progenitor identities
-# Run from publication/analysis:  Rscript fig3_progenitors.R [hdwgcna|genie3]
+# Run from publication/analysis:  Rscript fig3_progenitors.R [genie3|scrank]
 # Writes ../Fig/fig3_progenitors_<method>{,_slide}.{pdf,png} and fig3_stats_<method>.txt
 
 suppressMessages({ library(data.table); library(ggplot2); library(patchwork); library(ggrepel) })
-method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "hdwgcna"
+method <- commandArgs(trailingOnly = TRUE)[1]; if (is.na(method)) method <- "genie3"
 out <- file(sprintf("fig3_stats_%s.txt", method), "w"); say <- function(...) { cat(..., "\n", sep = ""); cat(..., "\n", sep = "", file = out) }
 
 col_pair <- c(HSC = "#2a78d6", Prog = "#eb6834", GMP = "#1baf7a")   # categorical slots 1-3
