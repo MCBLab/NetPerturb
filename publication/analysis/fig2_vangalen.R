@@ -38,6 +38,22 @@ theme_np <- theme_minimal(base_size = 7.5) +
 # every target the report flags as isolated lands there.
 no_score <- function(x) x == 0 | x < 1e-6 * median(x[x > 0])
 lims <- function(lg) quantile(lg, c(.02, .98), na.rm = TRUE)
+# Quantile-positioned colour scale: with scRank's much wider, identity-
+# dominated range (~9 log10 units, vs ~1.5 for GENIE3), a linear gradient
+# spends most of its contrast on the rows' between-identity gap and leaves
+# same-row, between-target differences (the part the heatmap is meant to
+# show) as near-indistinguishable dark shades. qbreaks() picks break points
+# that divide the data into equal-sized groups; qtrans() then warps the fill
+# axis so each gap between consecutive breaks gets the SAME visual width on
+# the colour bar, regardless of its numeric size -- so the densest value
+# range (most of the cells) gets most of the colour contrast, and the
+# legend's (unevenly spaced) tick labels show the reader where that is.
+qbreaks <- function(lg, n = 8) sort(unique(signif(quantile(lg, seq(.02, .98, length.out = n), na.rm = TRUE), 2)))
+qtrans <- function(brks) {
+  pos <- seq(0, 1, length.out = length(brks))
+  scales::trans_new("quantile_pos", transform = stats::approxfun(brks, pos, rule = 2),
+                     inverse = stats::approxfun(pos, brks, rule = 2))
+}
 read_scores <- function(m) {
   x <- fread(sprintf("../data/vangalen2021/%s/perbscore_all_targets.txt", m))
   x[, `:=`(lg = log10(perb_score), floor = no_score(perb_score))]
@@ -198,7 +214,9 @@ pA <- ggplot(hv, aes(target_f, ct_f)) +
   geom_tile(aes(fill = fill), colour = "white", linewidth = .3) +
   geom_text(data = hv[rk == 1], label = "•", colour = "white", size = 2.2) +
   facet_grid(. ~ group, scales = "free_x", space = "free_x") +
-  scale_fill_gradientn(colours = seq_ramp, na.value = "#f0efec", name = expression(log[10]~score), limits = lims(hv$fill), oob = scales::squish) +
+  scale_fill_gradientn(colours = seq_ramp, na.value = "#f0efec", name = expression(log[10]~score),
+                       trans = qtrans(qbreaks(hv$fill)), breaks = qbreaks(hv$fill),
+                       limits = range(qbreaks(hv$fill)), oob = scales::squish) +
   labs(x = NULL, y = NULL, title = paste("A ", ttl)) + theme_np +
   theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 4.8), panel.grid = element_blank(),
         axis.text.y = element_text(size = 6), strip.text = element_text(face = "bold", colour = ink2), panel.spacing.x = unit(4, "pt"))
