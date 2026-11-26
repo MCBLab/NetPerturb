@@ -23,7 +23,7 @@ stem identities per cohort: beneyto HSC_MPP-like+LMPP-like; lasry HSC_MPP+HSC_MP
 ################ stem specificity (mean residual, stem minus other identities; 10000 within-cohort label permutations)
 FDR < 0.05, towards stem: IL3RA +0.57 (q=0.044), KDM1A +0.34 (q=0.044); away from stem: DNMT1;HAVCR2 -0.59 (q=0.0055)
 positive in 4/4 cohorts and permutation P < 0.05: IL3RA +0.57 (P=0.001), KIT +0.42 (P=0.012), KDM1A +0.34 (P=0.002), CDK8;BCL2 +0.24 (P=0.023), PSMB5 +0.23 (P=0.038), CDK8 +0.20 (P=0.036)
-positive in 4/4, P >= 0.05: HMGCR +0.25 (P=0.06), TP53 +0.18 (P=0.08), DNMT1;IDH1 +0.16 (P=0.12), FLT3 +0.15 (P=0.13), MEN1 +0.07 (P=0.36)
+positive in 4/4 cohorts, P >= 0.05: HMGCR +0.25 (P=0.06), TP53 +0.18 (P=0.08), DNMT1;IDH1 +0.16 (P=0.12), FLT3 +0.15 (P=0.13), MEN1 +0.07 (P=0.36)
 negative in 4/4 cohorts: DNMT1;HAVCR2 -0.59 (P=0.000), PLK1 -0.50 (P=0.048), AURKA -0.33 (P=0.034), CHEK1 -0.20 (P=0.096), DNMT1 -0.11 (P=0.206)
 set mitotic/checkpoint kinases (AURKA,AURKB,PLK1,CHEK1,WEE1): mean stem specificity -0.27, permutation P (two-sided) = 0.0725
 set blast markers (pre-specified in the earlier van Galen run) (KIT,FLT3,CD33): mean stem specificity +0.21, permutation P (two-sided) = 0.0717
@@ -55,7 +55,7 @@ DNMT1;HAVCR2 stem-spec -0.59 | stem malig. -0.50, stem normal -0.47 | malig.-nor
 
 ################ further detail
 variance shares target/identity/residual: beneyto 54/5/41%, lasry 39/5/56%, naldini 46/8/46%, vangalen 38/3/59%
-stem specificity with the same sign in all four cohorts: 16 targets (11 towards, 5 away); 2000 permutations: mean 7.1, P = 0.003
+stem specificity with the same sign in 4/4 cohorts: 16 targets (11 towards, 5 away); 2000 permutations: mean 7.1, P = 0.003
 joint targets: Spearman across identities with the stronger member 0.22, the weaker 0.09 (medians over 84 joint x cohort); score 2.5-fold the higher member
 blast-marker excess by compartment: Progenitor 9/10 pairs, median +0.30; Stem 3/4 pairs, median +0.37; Mature 11/16 pairs, median +0.16
 malignant > normal in the cohort mean of matched pairs, all four cohorts: BCL2, FLT3, TP53

@@ -124,31 +124,48 @@ R <- dcast(dd, ds + cell_type ~ target, value.var = "res")
 lab0 <- compart_of(sub("-like$", "", R$cell_type)) == "Stem"
 say("stem identities per cohort: ", paste(R[lab0, .(x = paste(cell_type, collapse = "+")), by = ds][, paste0(ds, " ", x)], collapse = "; "))
 spec_of <- function(lab) sapply(dsn, function(k) { i <- R$ds == k; X <- as.matrix(R[i, -(1:2)])
-  colMeans(X[lab[i], , drop = FALSE], na.rm = TRUE) - colMeans(X[!lab[i], , drop = FALSE], na.rm = TRUE) })
-S0 <- spec_of(lab0); m0 <- rowMeans(S0)
+  v <- colMeans(X[lab[i], , drop = FALSE], na.rm = TRUE) - colMeans(X[!lab[i], , drop = FALSE], na.rm = TRUE); v[is.nan(v)] <- NA; v })
+# A target with no score in every stem identity of a cohort has no stem
+# specificity there (frequent with scRank, absent with GENIE3). Means and sign
+# counts then run over the cohorts where it is scored, and a target is tested
+# only if it is scored in at least min_coh of the four cohorts.
+min_coh <- 3
+cmean <- function(M) { v <- rowMeans(M, na.rm = TRUE); v[is.nan(v)] <- NA; v }
+S0 <- spec_of(lab0); m0 <- cmean(S0); n0 <- rowSums(!is.na(S0))
+all_scored <- all(n0 == length(dsn))
+# permuted specificities are compared over the same cohorts as the observed
+# one; a permutation that leaves one of them unscored gives NA and is left out
+M0 <- !is.na(S0)
+perm_spec <- function(lab) { P <- spec_of(lab); P[!M0] <- NA; P[rowSums(is.na(P) & M0) > 0, ] <- NA; P }
+allc <- if (all_scored) "4/4 cohorts" else sprintf("every scored cohort (>= %d)", min_coh)
 B <- 10000
-perm <- replicate(B, { lab <- lab0; for (k in dsn) { i <- which(R$ds == k); lab[i] <- sample(lab0[i]) }; rowMeans(spec_of(lab)) })
+perm <- replicate(B, { lab <- lab0; for (k in dsn) { i <- which(R$ds == k); lab[i] <- sample(lab0[i]) }; cmean(perm_spec(lab)) })
 # a permutation that puts only no-score pairs on the stem side gives NA; it is left out
 nB <- rowSums(!is.na(perm))
-te <- data.table(target = names(m0), stem = m0, stem_pos = rowSums(S0 > 0),
+te <- data.table(target = names(m0), stem = m0, stem_n = n0, stem_pos = rowSums(S0 > 0, na.rm = TRUE), stem_neg = rowSums(S0 < 0, na.rm = TRUE),
                  p_stem_up = (rowSums(perm >= m0, na.rm = TRUE) + 1) / (nB + 1), p_stem_dn = (rowSums(perm <= m0, na.rm = TRUE) + 1) / (nB + 1))
+te[stem_n < min_coh, `:=`(p_stem_up = NA, p_stem_dn = NA)]
 te[, `:=`(q_stem_up = p.adjust(p_stem_up, "BH"), q_stem_dn = p.adjust(p_stem_dn, "BH"))]
-te[, stem_class := fifelse(stem_pos == 4 & p_stem_up < .05, "stem", fifelse(stem_pos == 0 & p_stem_dn < .05, "not stem", ""))]
+te[, stem_class := fifelse(stem_n >= min_coh & stem_pos == stem_n & p_stem_up < .05, "stem",
+                    fifelse(stem_n >= min_coh & stem_neg == stem_n & p_stem_dn < .05, "not stem", ""), na = "")]
 say("\n################ stem specificity (mean residual, stem minus other identities; ", B, " within-cohort label permutations)")
+if (!all_scored) say("scored in fewer than 4 cohorts (no score in every stem identity of the others): ",
+                     paste(te[stem_n < 4][order(stem_n), sprintf("%s %d", target, stem_n)], collapse = ", "),
+                     "; not tested (< ", min_coh, " cohorts): ", paste(te[stem_n < min_coh, target], collapse = ", "))
 say("FDR < 0.05, towards stem: ", paste(te[q_stem_up < .05][order(-stem), sprintf("%s %+.2f (q=%.2g)", target, stem, q_stem_up)], collapse = ", "),
     "; away from stem: ", paste(te[q_stem_dn < .05][order(stem), sprintf("%s %+.2f (q=%.2g)", target, stem, q_stem_dn)], collapse = ", "))
-say("positive in 4/4 cohorts and permutation P < 0.05: ", paste(te[stem_class == "stem"][order(-stem), sprintf("%s %+.2f (P=%.3f)", target, stem, p_stem_up)], collapse = ", "))
-say("positive in 4/4, P >= 0.05: ", paste(te[stem_pos == 4 & stem_class == ""][order(-stem), sprintf("%s %+.2f (P=%.2f)", target, stem, p_stem_up)], collapse = ", "))
-say("negative in 4/4 cohorts: ", paste(te[stem_pos == 0][order(stem), sprintf("%s %+.2f (P=%.3f)", target, stem, p_stem_dn)], collapse = ", "))
-set_test <- function(g, nm) { obs <- mean(m0[g]); nul <- colMeans(perm[g, , drop = FALSE], na.rm = TRUE)
+say("positive in ", allc, " and permutation P < 0.05: ", paste(te[stem_class == "stem"][order(-stem), sprintf("%s %+.2f (P=%.3f)", target, stem, p_stem_up)], collapse = ", "))
+say("positive in ", allc, ", P >= 0.05: ", paste(te[stem_n >= min_coh & stem_pos == stem_n & stem_class == ""][order(-stem), sprintf("%s %+.2f (P=%.2f)", target, stem, p_stem_up)], collapse = ", "))
+say("negative in ", allc, ": ", paste(te[stem_n >= min_coh & stem_neg == stem_n][order(stem), sprintf("%s %+.2f (P=%.3f)", target, stem, p_stem_dn)], collapse = ", "))
+set_test <- function(g, nm) { g <- g[n0[g] >= min_coh]; obs <- mean(m0[g]); nul <- colMeans(perm[g, , drop = FALSE], na.rm = TRUE); nul <- nul[is.finite(nul)]
   say(sprintf("set %s (%s): mean stem specificity %+.2f, permutation P (two-sided) = %.3g", nm, paste(g, collapse = ","), obs,
               min(1, 2 * min(mean(nul >= obs), mean(nul <= obs)) + 1 / length(nul)))) }
 set_test(c("AURKA", "AURKB", "PLK1", "CHEK1", "WEE1"), "mitotic/checkpoint kinases")
 set_test(c("KIT", "FLT3", "CD33"), "blast markers (pre-specified in the earlier van Galen run)")
-hs <- dd[, .(s = mean(res[base == "HSC_MPP"]) - mean(res[compart != "Stem"])), by = .(ds, target)][, .(s = mean(s)), by = target]
+hs <- dd[, .(s = mean(res[base == "HSC_MPP"]) - mean(res[compart != "Stem"])), by = .(ds, target)][, .(s = mean(s[is.finite(s)])), by = target]
 say("robustness: stem = HSC/MPP only, Spearman with HSC/MPP+LMPP ", sprintf("%.2f", rho(hs$s, m0[hs$target])))
 dd[, pct := frank(-lg) / .N, by = .(ds, cell_type)]
-rk <- dd[, .(s = mean(pct[compart != "Stem"]) - mean(pct[compart == "Stem"])), by = .(ds, target)][, .(s = mean(s)), by = target]
+rk <- dd[, .(s = mean(pct[compart != "Stem"]) - mean(pct[compart == "Stem"])), by = .(ds, target)][, .(s = mean(s[is.finite(s)])), by = target]
 say("robustness: within-identity rank instead of residual, Spearman ", sprintf("%.2f", rho(rk$s, m0[rk$target])))
 
 # ---- malignant minus matched normal identity -----------------------------
@@ -162,13 +179,17 @@ say("top 6: ", paste(mw[order(-mal)][1:6, sprintf("%s %+.2f (%d%% of pairs, P=%.
 say("bottom 4: ", paste(mw[order(mal)][1:4, sprintf("%s %+.2f (P=%.2g, q=%.2g)", target, mal, p_mal, q_mal)], collapse = ", "))
 bm <- c("KIT", "FLT3", "CD33")
 pp <- mp[, .(d = mean(dl[target %in% bm]) - mean(dl[!target %in% bm])), by = .(ds, base)]
+# a pair where none of the blast markers is scored on both sides has no contrast
+if (any(!is.finite(pp$d))) say("pairs without a scored blast marker on both sides (left out): ",
+                               paste(pp[!is.finite(d), paste(ds, base)], collapse = ", "))
+pp <- pp[is.finite(d)]
 say(sprintf("blast markers (KIT,FLT3,CD33) minus other targets, per pair: median %+.2f, higher in %d/%d pairs, signed-rank P=%.2g",
             median(pp$d), sum(pp$d > 0), nrow(pp), wilcox.test(pp$d)$p.value))
 sm <- mp[base %in% stem][, .(d = mean(dl)), by = .(ds, target)]
 sw <- dcast(sm, target ~ ds, value.var = "d"); sc <- setdiff(names(sw), "target")
-sw[, `:=`(stem_mal = rowMeans(.SD), stem_mal_pos = rowSums(.SD > 0), stem_mal_n = rowSums(!is.na(.SD))), .SDcols = sc]
+sw[, `:=`(stem_mal = rowMeans(.SD), stem_mal_pos = rowSums(.SD > 0, na.rm = TRUE), stem_mal_n = rowSums(!is.na(.SD))), .SDcols = sc]
 say("malignant minus normal stem (", paste(mp[base %in% stem, unique(paste(ds, base))], collapse = ", "), "), higher in every cohort: ",
-    paste(sw[stem_mal_pos == stem_mal_n][order(-stem_mal), sprintf("%s %+.2f", target, stem_mal)], collapse = ", "))
+    paste(sw[stem_mal_n == length(sc) & stem_mal_pos == stem_mal_n][order(-stem_mal), sprintf("%s %+.2f", target, stem_mal)], collapse = ", "))
 te <- merge(merge(te, mw, by = "target"), sw[, .(target, stem_mal, stem_mal_pos, stem_mal_n)], by = "target", all.x = TRUE)
 
 # ---- per-compartment map --------------------------------------------------
@@ -176,7 +197,7 @@ cm <- dd[, .(r = mean(res)), by = .(ds, target, compart, malig)][, .(r = mean(r)
 cm[, col := factor(paste(compart, ifelse(malig, "M", "N")), paste(rep(c("Stem", "Progenitor", "Mature"), each = 2), c("M", "N")))]
 for (cmp in levels(cm$col)) te[, (paste0("map_", gsub(" ", "_", cmp))) := cm[col == cmp][match(te$target, target), r]]
 say("\n################ stem targets: malignant vs normal stem compartment (map, mean over cohorts; normal stem absent in Beneyto)")
-for (k in te[stem_class != "" | stem_pos == 4][order(-stem), target])
+for (k in te[stem_class != "" | (stem_n >= min_coh & stem_pos == stem_n)][order(-stem), target])
   say(sprintf("%-12s stem-spec %+.2f | stem malig. %+.2f, stem normal %+.2f | malig.-normal stem %+.2f (%d/%d cohorts > 0)",
               k, te[target == k, stem], te[target == k, map_Stem_M], te[target == k, map_Stem_N],
               te[target == k, stem_mal], te[target == k, stem_mal_pos], te[target == k, stem_mal_n]))
@@ -186,12 +207,13 @@ fwrite(te[order(-stem)], file.path(qc_dir, "target_effects.tsv"), sep = "\t")
 say("\n################ further detail")
 vd <- dd[, { ss <- anova(lm(lg ~ target + cell_type))[["Sum Sq"]]; .(Target = ss[1] / sum(ss), Identity = ss[2] / sum(ss), Residual = ss[3] / sum(ss)) }, by = ds]
 say("variance shares target/identity/residual: ", paste(vd[, sprintf("%s %.0f/%.0f/%.0f%%", ds, 100 * Target, 100 * Identity, 100 * Residual)], collapse = ", "))
-sign_cons <- function(S) sum(rowSums(S > 0) == 4 | rowSums(S < 0) == 4, na.rm = TRUE)
+same_sign <- function(S, sgn) { n <- rowSums(!is.na(S)); n >= min_coh & rowSums(sgn * S > 0, na.rm = TRUE) == n }
+sign_cons <- function(S) sum(same_sign(S, 1) | same_sign(S, -1))
 B2 <- 2000
-cons_null <- replicate(B2, { lab <- lab0; for (k in dsn) { i <- which(R$ds == k); lab[i] <- sample(lab0[i]) }; sign_cons(spec_of(lab)) })
+cons_null <- replicate(B2, { lab <- lab0; for (k in dsn) { i <- which(R$ds == k); lab[i] <- sample(lab0[i]) }; sign_cons(perm_spec(lab)) })
 cons_obs <- sign_cons(S0)
-say(sprintf("stem specificity with the same sign in all four cohorts: %d targets (%d towards, %d away); %d permutations: mean %.1f, P = %.3g",
-            cons_obs, sum(rowSums(S0 > 0) == 4), sum(rowSums(S0 < 0) == 4), B2, mean(cons_null), (sum(cons_null >= cons_obs) + 1) / (B2 + 1)))
+say(sprintf("stem specificity with the same sign in %s: %d targets (%d towards, %d away); %d permutations: mean %.1f, P = %.3g",
+            allc, cons_obs, sum(same_sign(S0, 1)), sum(same_sign(S0, -1)), B2, mean(cons_null), (sum(cons_null >= cons_obs) + 1) / (B2 + 1)))
 jt <- rbindlist(lapply(dsn, function(k) rbindlist(lapply(joint, function(t) {
   g <- strsplit(t, ";")[[1]]; w <- dcast(dd[ds == k & target %in% c(t, g)], cell_type ~ target, value.var = "lg")
   if (!all(c(t, g) %in% names(w))) return(NULL)
@@ -267,7 +289,8 @@ pE <- ggplot(se, aes(s, target)) +
   geom_point(aes(colour = dsl), size = .9, alpha = .85) +
   geom_point(data = sm_, aes(stem, target, fill = stem_class), shape = 23, size = 1.6, colour = "black", stroke = .3, inherit.aes = FALSE) +
   scale_fill_manual(values = c(stem = "#0d366b", `not stem` = "#b5411b", `.` = "white"), breaks = c("stem", "not stem"),
-                    labels = c("4/4 cohorts towards stem, P<0.05", "4/4 away from stem, P<0.05"), name = NULL) +
+                    labels = if (all_scored) c("4/4 cohorts towards stem, P<0.05", "4/4 away from stem, P<0.05")
+                             else c("all scored cohorts towards stem, P<0.05", "all scored away from stem, P<0.05"), name = NULL) +
   scale_colour_manual(values = setNames(ds_col, ds_lab), guide = "none") +
   facet_grid(g ~ ., scales = "free_y", space = "free_y") +
   labs(x = "stem minus other identities", y = NULL, title = "E  Stem specificity") +
@@ -340,7 +363,7 @@ p3C <- ggplot(sc3, aes(x, y)) +
                            segment.size = .2, max.overlaps = Inf, box.padding = .3, seed = 1) +
   annotate("text", x = -lim3, y = lim3, hjust = 0, vjust = 1, size = 2.1, colour = ink2, label = "malignant stem") +
   annotate("text", x = lim3, y = -lim3, hjust = 1, vjust = 0, size = 2.1, colour = ink2, label = "normal stem") +
-  scale_colour_manual(values = cls_col, breaks = c("stem", "not stem"), labels = c("towards stem, 4/4", "away from stem, 4/4"), name = NULL) +
+  scale_colour_manual(values = cls_col, breaks = c("stem", "not stem"), labels = if (all_scored) c("towards stem, 4/4", "away from stem, 4/4") else c("towards stem, all scored", "away from stem, all scored"), name = NULL) +
   scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 1), labels = c("single gene", "joint"), name = NULL) +
   coord_equal(xlim = c(-lim3, lim3), ylim = c(-lim3, lim3)) +
   labs(x = "effect in normal stem identities", y = "effect in malignant stem identities", title = "C  Malignant or normal stem cells") +
@@ -350,7 +373,7 @@ p3D <- ggplot(data.table(n = cons_null), aes(n)) +
   geom_vline(xintercept = cons_obs, colour = "#0d366b", linewidth = .7) +
   annotate("text", x = cons_obs, y = Inf, hjust = 1.05, vjust = 1.4, size = 2.1, colour = "#0d366b",
            label = sprintf("observed %d", cons_obs)) +
-  labs(x = "targets with the same sign in all 4 cohorts", y = "permutations", title = "D  Consistency beyond chance") + theme_np
+  labs(x = if (all_scored) "targets with the same sign in all 4 cohorts" else "targets with the same sign in every scored cohort", y = "permutations", title = "D  Consistency beyond chance") + theme_np
 rob <- rbind(data.table(target = hs$target, alt = hs$s, main = m0[hs$target], what = sprintf("HSC/MPP only, rho %.2f", rho(hs$s, m0[hs$target]))),
              data.table(target = rk$target, alt = rk$s, main = m0[rk$target], what = sprintf("ranks, rho %.2f", rho(rk$s, m0[rk$target]))))
 p3E <- ggplot(rob, aes(main, alt)) +

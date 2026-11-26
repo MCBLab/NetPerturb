@@ -1,0 +1,63 @@
+################ Zeng 2025 atlas, four cohorts, scRank, antagonist
+Beneyto: 13 identities kept (3 normal, 10 malignant), 20,319 cells; 15 dropped (< --min_cells); 3370 genes offered, 2345-2814 per network; scRank per identity mean 1h 50m, max 2h 56m
+Lasry: 22 identities kept (8 normal, 14 malignant), 25,493 cells; 10 dropped (< --min_cells); 3381 genes offered, 2142-2876 per network; scRank per identity mean 1h 15m, max 2h 26m
+Naldini: 24 identities kept (11 normal, 13 malignant), 28,441 cells; 8 dropped (< --min_cells); 3397 genes offered, 2189-2739 per network; scRank per identity mean 1h 23m, max 2h 41m
+van Galen: 27 identities kept (15 normal, 12 malignant), 14,598 cells; 21 dropped (< --min_cells); 3381 genes offered, 1816-2643 per network; scRank per identity mean 34m 55s, max 1h 25m
+total: 86 identity networks, 88,851 cells, 4730 scores; 55 targets (34 single, 21 joint) in every cohort
+no score (< 1e-6 x median): 685 of 4730 (CDK8 49, MEN1 45, DHODH 41, HAVCR2 39, HMGCR 37, MAP2K1 32, PLK1 31, CDK9 31, MTOR 29, CDK19 23, KIT 23, AURKA 22, JAK2 20, AURKB 19, IL3RA 19, BCL2 18, IDH1 18, CD33 18, CDK8;CDK19 16, CDK8;BCL2 13, MDM2 12, PSMB5 11, BCL2;MEN1 10, FLT3 10, KDM1A 10, EIF4E 8, CHEK1 7, NAE1 7, CDK19;BCL2 7, BCL2;IDH1 7, SYK 7, TP53 7, WEE1 5, BCL2;MDM2 5, FLT3;MEN1 5, GLS 5, BCL2;FLT3 3, HDAC1 3, IDH2 3, BCL2;EIF4A1 2, BCL2;XPO1 2, EIF4A1 2, BCL2;IDH2 2, DNMT1;TP53 1, XPO1 1)
+variance explained by target / identity: beneyto 28%/51%, lasry 3%/93%, naldini 7%/87%, vangalen 8%/90%
+identity effect span (log10): beneyto 2.09, lasry 6.53, naldini 6.00, vangalen 7.77
+identity effect vs cells used, Spearman: beneyto 0.36, lasry 0.49, naldini 0.72, vangalen -0.01; pooled 0.21
+identity effect vs genes in network, Spearman: beneyto 0.59, lasry 0.63, naldini 0.82, vangalen -0.04
+cells used, median malignant vs normal identity: 1917 vs 407
+identity effect ~ cohort + compartment + malignant: compartProgenitor -0.497 (P=0.52); compartMature -0.924 (P=0.23); maligTRUE +0.473 (P=0.37)
+  + log10(cells): log10(cells) +2.806 (P=0.00015); compartProgenitor -0.036 (P=0.96); compartMature -0.902 (P=0.2); maligTRUE -0.472 (P=0.38); R2 0.04 -> 0.20
+identities scored in all four cohorts (12): Early_GMP-like, Early_Lymphoid-like, HSC_MPP-like, LMPP-like, Late_GMP-like, MEP-like, Monocyte, Monocyte-like, Pro-Monocyte, Pro-Monocyte-like, cDC, cDC-like
+pairwise Spearman, Target mean: 0.63-0.85 (median 0.73)
+pairwise Spearman, Identity offset: -0.08-0.51 (median 0.45)
+pairwise Spearman, Target x identity: -0.01-0.16 (median 0.12)
+pairwise Spearman, Stem specificity: 0.04-0.44 (median 0.09)
+target mean, this van Galen run vs the earlier run on the original labels (Supplementary Fig.): Spearman 0.71 over 55 targets
+stem identities per cohort: beneyto HSC_MPP-like+LMPP-like; lasry HSC_MPP+HSC_MPP-like+LMPP-like; naldini HSC_MPP+HSC_MPP-like+LMPP+LMPP-like; vangalen HSC_MPP+HSC_MPP-like+LMPP-like
+
+################ stem specificity (mean residual, stem minus other identities; 10000 within-cohort label permutations)
+scored in fewer than 4 cohorts (no score in every stem identity of the others): PLK1 0, MAP2K1 1, AURKA 2, AURKB 2, DHODH 3, HMGCR 3, MEN1 3, MTOR 3; not tested (< 3 cohorts): AURKA, AURKB, MAP2K1, PLK1
+FDR < 0.05, towards stem: ; away from stem: 
+positive in every scored cohort (>= 3) and permutation P < 0.05: EIF4A1 +0.35 (P=0.005), GLS +0.34 (P=0.023), BCL2;MEN1 +0.33 (P=0.043), BCL2;EIF4A1 +0.32 (P=0.002)
+positive in every scored cohort (>= 3), P >= 0.05: IL3RA +0.43 (P=0.10), CD33 +0.43 (P=0.07), BCL2 +0.32 (P=0.09), CDK8;BCL2 +0.21 (P=0.15), BCL2;IDH1 +0.12 (P=0.32), BCL2;IDH2 +0.11 (P=0.30)
+negative in every scored cohort (>= 3): DNMT1 -0.33 (P=0.022), DNMT1;IDH2 -0.27 (P=0.020), DNMT1;HAVCR2 -0.26 (P=0.009), DNMT1;TP53 -0.23 (P=0.017), BCL2;DNMT1 -0.16 (P=0.125), DNMT1;HDAC1 -0.11 (P=0.136)
+set mitotic/checkpoint kinases (CHEK1,WEE1): mean stem specificity -0.25, permutation P (two-sided) = 0.122
+set blast markers (pre-specified in the earlier van Galen run) (KIT,FLT3,CD33): mean stem specificity +0.12, permutation P (two-sided) = 0.436
+robustness: stem = HSC/MPP only, Spearman with HSC/MPP+LMPP 0.87
+robustness: within-identity rank instead of residual, Spearman 0.85
+
+################ malignant (-like) minus matched normal identity (residual)
+matched pairs: 30 (beneyto 3, lasry 8, naldini 11, vangalen 8)
+top 6: FLT3 +0.49 (72% of pairs, P=0.0023, q=0.12), CDK8 +0.37 (62% of pairs, P=0.74, q=0.87), CD33 +0.28 (65% of pairs, P=0.058, q=0.64), FLT3;MEN1 +0.28 (64% of pairs, P=0.038, q=0.64), DHODH +0.27 (33% of pairs, P=0.73, q=0.87), MEN1 +0.26 (50% of pairs, P=0.64, q=0.84)
+bottom 4: MTOR -0.41 (P=0.3, q=0.74), CDK8;BCL2 -0.35 (P=0.13, q=0.69), HMGCR -0.35 (P=0.38, q=0.76), BCL2;MEN1 -0.33 (P=0.053, q=0.64)
+pairs without a scored blast marker on both sides (left out): lasry pDC, naldini LMPP
+blast markers (KIT,FLT3,CD33) minus other targets, per pair: median +0.40, higher in 19/28 pairs, signed-rank P=0.022
+malignant minus normal stem (lasry HSC_MPP, naldini HSC_MPP, naldini LMPP, vangalen HSC_MPP), higher in every cohort: FLT3 +0.89, GLS +0.49, FLT3;DNMT1 +0.25, DNMT1;IDH2 +0.14
+
+################ stem targets: malignant vs normal stem compartment (map, mean over cohorts; normal stem absent in Beneyto)
+IL3RA        stem-spec +0.43 | stem malig. +0.31, stem normal +0.43 | malig.-normal stem NA (1/2 cohorts > 0)
+CD33         stem-spec +0.43 | stem malig. +0.48, stem normal +0.05 | malig.-normal stem NA (2/2 cohorts > 0)
+EIF4A1       stem-spec +0.35 | stem malig. +0.29, stem normal +0.13 | malig.-normal stem +0.13 (2/3 cohorts > 0)
+GLS          stem-spec +0.34 | stem malig. +0.39, stem normal +0.04 | malig.-normal stem +0.49 (3/3 cohorts > 0)
+BCL2;MEN1    stem-spec +0.33 | stem malig. +0.24, stem normal +0.30 | malig.-normal stem NA (0/2 cohorts > 0)
+BCL2;EIF4A1  stem-spec +0.32 | stem malig. +0.33, stem normal +0.08 | malig.-normal stem +0.17 (2/3 cohorts > 0)
+BCL2         stem-spec +0.32 | stem malig. +0.19, stem normal +0.39 | malig.-normal stem NA (1/1 cohorts > 0)
+CDK8;BCL2    stem-spec +0.21 | stem malig. +0.16, stem normal +0.14 | malig.-normal stem -0.17 (2/3 cohorts > 0)
+BCL2;IDH1    stem-spec +0.12 | stem malig. +0.10, stem normal +0.16 | malig.-normal stem -0.19 (2/3 cohorts > 0)
+BCL2;IDH2    stem-spec +0.11 | stem malig. +0.03, stem normal +0.30 | malig.-normal stem NA (0/2 cohorts > 0)
+DNMT1;TP53   stem-spec -0.23 | stem malig. -0.18, stem normal -0.21 | malig.-normal stem -0.11 (2/3 cohorts > 0)
+DNMT1;HAVCR2 stem-spec -0.26 | stem malig. -0.33, stem normal -0.02 | malig.-normal stem -0.43 (0/3 cohorts > 0)
+DNMT1;IDH2   stem-spec -0.27 | stem malig. -0.19, stem normal -0.31 | malig.-normal stem +0.14 (3/3 cohorts > 0)
+DNMT1        stem-spec -0.33 | stem malig. -0.34, stem normal -0.11 | malig.-normal stem -0.24 (1/3 cohorts > 0)
+
+################ further detail
+variance shares target/identity/residual: beneyto 28/48/24%, lasry 3/92/5%, naldini 7/87/7%, vangalen 8/85/7%
+stem specificity with the same sign in every scored cohort (>= 3): 16 targets (10 towards, 6 away); 2000 permutations: mean 6.5, P = 0.0075
+joint targets: Spearman across identities with the stronger member 0.94, the weaker 0.89 (medians over 84 joint x cohort); score 1.6-fold the higher member
+blast-marker excess by compartment: Progenitor 6/10 pairs, median +0.25; Stem 3/3 pairs, median +0.62; Mature 10/15 pairs, median +0.45
+malignant > normal in the cohort mean of matched pairs, all four cohorts: CD33, FLT3, FLT3;MEN1
